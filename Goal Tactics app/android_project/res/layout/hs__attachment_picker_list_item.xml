@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="48dp">
+    <ImageView
+        android:layout_gravity="center"
+        android:id="@+id/icon"
+        android:padding="3dp"
+        android:layout_width="@dimen/hs__dimen_24"
+        android:layout_height="@dimen/hs__dimen_24"
+        android:layout_marginLeft="@dimen/activity_horizontal_margin_medium"
+        android:tint="?attr/hs__attachmentPickerIconColor"
+        android:layout_marginStart="@dimen/activity_horizontal_margin_medium"/>
+    <com.helpshift.views.HSTextView
+        android:textSize="@dimen/hs__textSizeSmall"
+        android:textStyle="bold"
+        android:textColor="?android:attr/textColorPrimary"
+        android:gravity="center_vertical"
+        android:id="@+id/title"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginLeft="32dp"
+        android:layout_marginStart="32dp"/>
+</LinearLayout>

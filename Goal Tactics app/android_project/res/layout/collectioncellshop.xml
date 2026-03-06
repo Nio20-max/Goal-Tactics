@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:id="@+id/collectionCellShopBackground"
+        android:background="@drawable/shop_blank"
+        android:layout_width="200dp"
+        android:layout_height="177dp"
+        android:layout_margin="10dp">
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="272"/>
+        <TextView
+            android:gravity="center"
+            android:id="@+id/collectionCellShopText"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="90"
+            style="@style/LargeTextStyle"/>
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="133">
+            <crc645877ad3d44b9b81b.GTButton
+                android:layout_gravity="center"
+                android:id="@+id/collectionCellShopButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/teamview_greenbutton_height"
+                android:layout_marginLeft="10dp"
+                android:layout_marginRight="10dp"
+                style="@style/ButtonStyle"/>
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>
