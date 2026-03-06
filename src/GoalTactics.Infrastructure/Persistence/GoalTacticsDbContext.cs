@@ -31,6 +31,10 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
 
     public DbSet<FriendlyChallengeEntity> FriendlyChallenges => Set<FriendlyChallengeEntity>();
 
+    public DbSet<LadderSeasonEntity> LadderSeasons => Set<LadderSeasonEntity>();
+
+    public DbSet<LadderEntryEntity> LadderEntries => Set<LadderEntryEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<UserEntity>(entity =>
@@ -264,6 +268,39 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.HasIndex(x => x.HomeUserId);
             entity.HasIndex(x => x.AwayUserId);
             entity.HasIndex(x => x.MatchDateUtc);
+        });
+
+        modelBuilder.Entity<LadderSeasonEntity>(entity =>
+        {
+            entity.ToTable("ladder_seasons");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.EndDateUtc).HasColumnName("end_date").IsRequired();
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at").IsRequired();
+            entity.HasIndex(x => x.EndDateUtc);
+        });
+
+        modelBuilder.Entity<LadderEntryEntity>(entity =>
+        {
+            entity.ToTable("ladder_entries");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.LadderId).HasColumnName("ladder_id").IsRequired();
+            entity.Property(x => x.TeamId).HasColumnName("team_id");
+            entity.Property(x => x.TeamName).HasColumnName("team_name").HasMaxLength(128).IsRequired();
+            entity.Property(x => x.TeamLogo).HasColumnName("team_logo").HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Points).HasColumnName("points").IsRequired();
+            entity.Property(x => x.Rank).HasColumnName("rank").IsRequired();
+            entity.Property(x => x.Stamina).HasColumnName("stamina").IsRequired();
+            entity.Property(x => x.Strength).HasColumnName("strength").IsRequired();
+            entity.Property(x => x.IsBot).HasColumnName("is_bot").IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at").IsRequired();
+            entity.HasIndex(x => x.LadderId);
+            entity.HasIndex(x => x.TeamId).IsUnique(false);
+            entity.HasOne(x => x.Ladder)
+                .WithMany(x => x.Entries)
+                .HasForeignKey(x => x.LadderId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

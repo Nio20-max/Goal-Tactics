@@ -1,12 +1,14 @@
 using GoalTactics.Application.Auth;
 using GoalTactics.Application.Friends;
 using GoalTactics.Application.League;
+using GoalTactics.Application.Ladder;
 using GoalTactics.Application.Team;
 using GoalTactics.Application.Tutorial;
 using GoalTactics.Application.User;
 using GoalTactics.Infrastructure.Authentication;
 using GoalTactics.Infrastructure.Friends;
 using GoalTactics.Infrastructure.League;
+using GoalTactics.Infrastructure.Ladder;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Infrastructure.Team;
 using GoalTactics.Infrastructure.Tutorial;
@@ -31,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IAuthStore, AuthDbStore>();
         services.AddScoped<IFriendsStore, FriendsDbStore>();
         services.AddScoped<ILeagueStore, LeagueDbStore>();
+        services.AddScoped<ILadderStore, LadderDbStore>();
         services.AddScoped<ITeamStore, TeamDbStore>();
         services.AddScoped<ITutorialStore, TutorialDbStore>();
         services.AddScoped<IUserStore, UserDbStore>();

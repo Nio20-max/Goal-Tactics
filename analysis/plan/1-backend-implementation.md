@@ -13,10 +13,38 @@ Completed API slices in `src/`:
 - Team (`TeamController`) with club overview/resources/mail/news/finance endpoints and lazy team bootstrap.
 - League (`LeagueController`) with 16-club table generation, pyramid expansion, and `Mount=2` / `Dismount=8` behavior.
 - Friends (`FriendsController`) with list/search, like/unlike, accept/decline, and friendly challenge flow.
+- Ladder (`LadderController`) with ladder table, challenge preview, stamina restore, and match execution (`StaminaCost=25`, `StaminaMax=100`).
 
 Validation status:
 
-- Contract tests are green after Friends integration: `total: 19, failed: 0, succeeded: 19`.
+- Contract tests are green after Ladder integration: `total: 20, failed: 0, succeeded: 20`.
+
+## 1.0.1 Remaining work snapshot (2026-03-06)
+
+Still open in Phase 1 implementation (high level):
+
+- API slices not yet implemented: chat, lineup, live, scouting, shop, sponsor, squad, stadium, training, transfer market.
+- Realtime hubs not yet implemented: `/chat`, `/auc` (including reconnect-safe event replay behavior).
+- Worker/background job layer not yet implemented (season ticks, match resolution, auctions, scouting/training/sponsor cycles, cleanup jobs).
+- Formula-complete mechanics not yet implemented for all systems listed in section 1.6 (match simulation depth, scouting generation, transfer settlement, sponsor/economy cadence).
+- Audit-grade economy ledger coverage and cross-feature transactional boundaries still need expansion beyond current slices.
+- Broader test portfolio still pending: integration tests for economy mutations, formula characterization tests, realtime tests, and worker idempotency tests.
+
+## 1.0.2 Database creation and bootstrap (explicit Phase 1 requirement)
+
+Database creation is an explicit Phase 1 responsibility and is now tracked here.
+
+Required implementation/workflow:
+
+- The runtime must create the physical database if it does not exist and apply all migrations on startup in development/test environments.
+- The migration chain must be complete and reproducible from an empty database to latest schema.
+- A clean-environment bootstrap check must be part of Phase 1 validation: start from no DB file/container volume, run app startup, confirm schema is created, then run contract tests.
+
+Current status in this repository:
+
+- Startup migration execution is already wired in `src/GoalTactics.Api/Program.cs` via `dbContext.Database.Migrate()`.
+- Migration coverage currently includes identity/auth, tutorial/preferences, team, league, friends, and ladder slices.
+- Remaining Phase 1 slices must continue adding forward-only migrations so fresh DB creation remains one-pass and deterministic.
 
 ## 1.1 What this phase starts from
 

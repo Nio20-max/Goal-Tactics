@@ -7,6 +7,7 @@ using GoalTactics.Application.User;
 using GoalTactics.Application.Team;
 using GoalTactics.Application.League;
 using GoalTactics.Application.Friends;
+using GoalTactics.Application.Ladder;
 using GoalTactics.Api.Middleware;
 using GoalTactics.Api.Security;
 using GoalTactics.Api.Validation;
@@ -97,6 +98,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<ILeagueService, LeagueService>();
 builder.Services.AddScoped<IFriendsService, FriendsService>();
+builder.Services.AddScoped<ILadderService, LadderService>();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
