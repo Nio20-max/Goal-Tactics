@@ -4,6 +4,8 @@
     <Project Path="src/GoalTactics.Application/GoalTactics.Application.csproj" />
     <Project Path="src/GoalTactics.Contracts/GoalTactics.Contracts.csproj" />
     <Project Path="src/GoalTactics.Infrastructure/GoalTactics.Infrastructure.csproj" />
+    <Project Path="src/GoalTactics.Realtime/GoalTactics.Realtime.csproj" />
+    <Project Path="src/GoalTactics.Worker/GoalTactics.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/GoalTactics.ContractTests/GoalTactics.ContractTests.csproj" />

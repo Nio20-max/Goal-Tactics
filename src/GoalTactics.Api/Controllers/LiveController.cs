@@ -35,4 +35,10 @@ public sealed class LiveController(ILiveService liveService) : ControllerBase
 
         return Ok(await liveService.GetMatchReportAsync(userId, request.Id, cancellationToken));
     }
+
+    [HttpPost("GetMatchDetails")]
+    public Task<ActionResult<LiveMatchResponse>> GetMatchDetails([FromBody] IdRequest request, CancellationToken cancellationToken)
+    {
+        return GetMatchReport(request, cancellationToken);
+    }
 }

@@ -23,6 +23,7 @@ using GoalTactics.Api.Security;
 using GoalTactics.Api.Validation;
 using GoalTactics.Infrastructure;
 using GoalTactics.Infrastructure.Persistence;
+using GoalTactics.Realtime;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,8 @@ builder.Services.AddSingleton<ICountryCatalog, InMemoryCountryCatalog>();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 builder.Services.AddGoalTacticsInfrastructure(builder.Configuration);
+builder.Services.AddGoalTacticsRealtime();
+builder.Services.AddGoalTacticsRealtimeFilters();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -148,6 +151,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapGoalTacticsRealtime();
 
 app.Run();
 

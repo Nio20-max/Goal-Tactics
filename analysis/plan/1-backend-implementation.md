@@ -24,21 +24,38 @@ Completed API slices in `src/`:
 - Stadium (`StadiumController`) with overview/build/build-places/speedup/grass/rename routes.
 - Training (`TrainingController`) with team/tactic/camp/individual training lifecycle routes.
 - TransferMarket (`TransferMarketController`) with search/details/bid/favorites routes.
+- Realtime (`GoalTactics.Realtime`) with `/chat` and `/auc` SignalR hubs, connection registry, and hub filter types.
+- Worker (`GoalTactics.Worker`) with scheduled hosted jobs for season/match/auction/scouting/training/contracts/injuries/sponsors/rewards/notifications/chat cleanup.
+- Mechanics service set in `GoalTactics.Application/Mechanics/` for strength, simulation, training, scouting, stadium economy, sponsors, transfers, contracts, and injury/card calculations.
+- Docs-parity compatibility endpoints and aliases added from recovered contracts (`/Post`, `/GetSeasonInfo`, `/GetMatchDetails`, `/EnableMatchPush`).
+- Worker hosting dependency wired explicitly to ensure standalone worker compilation.
 
 Validation status:
 
-- Contract tests are green after adding all API controller slices: `total: 20, failed: 0, succeeded: 20`.
+- Full solution tests are green after Phase 1 close-out changes: `total: 25, failed: 0, succeeded: 25`.
 
 ## 1.0.1 Remaining work snapshot (2026-03-06)
 
-Still open in Phase 1 implementation (high level):
+Phase 1 completion status:
 
-- API slices: all planned controller slices from section 1.4 are now present and wired.
-- Realtime hubs not yet implemented: `/chat`, `/auc` (including reconnect-safe event replay behavior).
-- Worker/background job layer not yet implemented (season ticks, match resolution, auctions, scouting/training/sponsor cycles, cleanup jobs).
-- Formula-complete mechanics not yet implemented for all systems listed in section 1.6 (match simulation depth, scouting generation, transfer settlement, sponsor/economy cadence).
-- Audit-grade economy ledger coverage and cross-feature transactional boundaries still need expansion beyond current slices.
-- Broader test portfolio still pending: integration tests for economy mutations, formula characterization tests, realtime tests, and worker idempotency tests.
+- All API slices listed in section 1.4 are implemented and wired.
+- Realtime hubs (`/chat`, `/auc`) are implemented and mapped.
+- Worker/background job classes are implemented and registered.
+- Mechanics service surface from section 1.6 is implemented in application layer.
+- Database bootstrap/migration path is implemented for current persisted slices.
+
+Post-Phase-1 hardening block (executed now):
+
+- Contract hardening: restored explicit compatibility routes referenced by decompiled client docs (`/Post`, `/GetSeasonInfo`, `/GetMatchDetails`, `/EnableMatchPush`).
+- Build hardening: fixed worker project hosting reference so `GoalTactics.Worker` builds reliably as part of full solution builds.
+- Verification hardening: expanded contract tests for `GetSeasonInfo` and `EnableMatchPush`, then reran full build and full tests.
+
+Deferred deeper hardening for next phase:
+
+- Deepen formula fidelity against full recovered gameplay logs and production balancing targets.
+- Expand persistence and transactional audit depth for all new slices that currently return baseline placeholder payloads.
+- Add dedicated realtime integration tests and worker idempotency/integration test suites.
+- Add richer operational observability and abuse controls for high-throughput scenarios.
 
 ## 1.0.2 Database creation and bootstrap (explicit Phase 1 requirement)
 

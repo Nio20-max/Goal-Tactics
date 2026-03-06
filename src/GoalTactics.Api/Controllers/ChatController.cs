@@ -37,6 +37,12 @@ public sealed class ChatController(IChatService chatService) : ControllerBase
         return Ok(new ResponseObject { Success = true, Message = "Posted" });
     }
 
+    [HttpPost("Post")]
+    public Task<ActionResult<ResponseObject>> Post([FromBody] ChatPostRequest request, CancellationToken cancellationToken)
+    {
+        return PostChatMessage(request, cancellationToken);
+    }
+
     [HttpPost("Typing")]
     public async Task<ActionResult<ResponseObject>> Typing([FromBody] RequestObject request, CancellationToken cancellationToken)
     {

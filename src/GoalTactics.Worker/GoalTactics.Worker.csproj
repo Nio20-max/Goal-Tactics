@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,15 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\GoalTactics.Application\GoalTactics.Application.csproj" />
-    <ProjectReference Include="..\GoalTactics.Contracts\GoalTactics.Contracts.csproj" />
     <ProjectReference Include="..\GoalTactics.Infrastructure\GoalTactics.Infrastructure.csproj" />
-    <ProjectReference Include="..\GoalTactics.Realtime\GoalTactics.Realtime.csproj" />
   </ItemGroup>
 
 </Project>

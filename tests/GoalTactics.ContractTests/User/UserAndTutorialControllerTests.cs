@@ -80,6 +80,24 @@ public sealed class UserAndTutorialControllerTests : IClassFixture<WebApplicatio
         Assert.False(body.NotificationSettings.AuctionEnd);
     }
 
+    [Fact]
+    public async Task EnableMatchPush_ReturnsEnabledState()
+    {
+        var token = await RegisterAndLoginAsync();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var matchId = Guid.NewGuid();
+        var response = await client.PostAsJsonAsync("/api/EnableMatchPush", new EnableMatchPushRequest { MatchId = matchId });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<EnableMatchPushResponse>();
+        Assert.NotNull(body);
+        Assert.True(body!.Success);
+        Assert.Equal(matchId, body.MatchId);
+        Assert.True(body.IsEnabled);
+    }
+
     private async Task<string> RegisterAndLoginAsync()
     {
         var email = $"user_{Guid.NewGuid():N}@example.com";

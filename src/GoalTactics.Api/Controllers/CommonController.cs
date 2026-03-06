@@ -35,4 +35,10 @@ public sealed class CommonController(ICountryCatalog countryCatalog, IConfigurat
 
         return Ok(response);
     }
+
+    [HttpPost("GetSeasonInfo")]
+    public ActionResult<TextResponse> GetSeasonInfo([FromBody] RequestObject request)
+    {
+        return Ok(new TextResponse { Value = "Season ongoing" });
+    }
 }

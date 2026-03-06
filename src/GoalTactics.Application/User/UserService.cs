@@ -1,5 +1,6 @@
 using GoalTactics.Application.Abstractions;
 using GoalTactics.Contracts.User;
+using System.Collections.Concurrent;
 
 namespace GoalTactics.Application.User;
 
@@ -15,11 +16,15 @@ public interface IUserService
 
     Task<UpdateUserResponse> UpdateUserAsync(string userId, UpdateUserRequest request, CancellationToken cancellationToken = default);
 
+    Task<EnableMatchPushResponse> EnableMatchPushAsync(string userId, Guid matchId, CancellationToken cancellationToken = default);
+
     Task DeleteAccountAsync(string userId, CancellationToken cancellationToken = default);
 }
 
 public sealed class UserService(IUserStore userStore, IPasswordHasher passwordHasher) : IUserService
 {
+    private static readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, bool>> MatchPushByUser = new();
+
     public Task<decimal> ClaimDailyRewardAsync(string userId, CancellationToken cancellationToken = default)
     {
         return Task.FromResult(50m);
@@ -100,6 +105,20 @@ public sealed class UserService(IUserStore userStore, IPasswordHasher passwordHa
             FacebookReward = 0,
             Message = "Updated"
         };
+    }
+
+    public Task<EnableMatchPushResponse> EnableMatchPushAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
+    {
+        var entries = MatchPushByUser.GetOrAdd(userId, _ => new ConcurrentDictionary<Guid, bool>());
+        entries[matchId] = true;
+
+        return Task.FromResult(new EnableMatchPushResponse
+        {
+            Success = true,
+            Message = "Match push enabled",
+            MatchId = matchId,
+            IsEnabled = true
+        });
     }
 
     public Task DeleteAccountAsync(string userId, CancellationToken cancellationToken = default)

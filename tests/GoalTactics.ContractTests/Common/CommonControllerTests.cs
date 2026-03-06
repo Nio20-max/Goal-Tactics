@@ -47,4 +47,15 @@ public sealed class CommonControllerTests : IClassFixture<WebApplicationFactory<
         Assert.NotEmpty(body!.Countries);
         Assert.Contains(body.Countries, x => x.IsoCode == "DE");
     }
+
+    [Fact]
+    public async Task GetSeasonInfo_ReturnsTextPayload()
+    {
+        var response = await _client.PostAsJsonAsync("/api/GetSeasonInfo", new RequestObject());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<TextResponse>();
+        Assert.NotNull(body);
+        Assert.Equal("Season ongoing", body!.Value);
+    }
 }

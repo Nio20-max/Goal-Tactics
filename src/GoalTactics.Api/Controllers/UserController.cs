@@ -94,4 +94,17 @@ public sealed class UserController(IUserService userService) : ControllerBase
         await userService.DeleteAccountAsync(userId, cancellationToken);
         return Ok(new ResponseObject { Success = true, Message = "Deleted" });
     }
+
+    [HttpPost("EnableMatchPush")]
+    public async Task<ActionResult<EnableMatchPushResponse>> EnableMatchPush([FromBody] EnableMatchPushRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new EnableMatchPushResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        var response = await userService.EnableMatchPushAsync(userId, request.MatchId, cancellationToken);
+        return Ok(response);
+    }
 }
