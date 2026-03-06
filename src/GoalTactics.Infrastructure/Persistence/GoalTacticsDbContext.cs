@@ -35,6 +35,12 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
 
     public DbSet<LadderEntryEntity> LadderEntries => Set<LadderEntryEntity>();
 
+    public DbSet<ChatMessageEntity> ChatMessages => Set<ChatMessageEntity>();
+
+    public DbSet<ChatPresenceEntity> ChatPresence => Set<ChatPresenceEntity>();
+
+    public DbSet<MatchPushSubscriptionEntity> MatchPushSubscriptions => Set<MatchPushSubscriptionEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<UserEntity>(entity =>
@@ -300,6 +306,49 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.HasOne(x => x.Ladder)
                 .WithMany(x => x.Entries)
                 .HasForeignKey(x => x.LadderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatMessageEntity>(entity =>
+        {
+            entity.ToTable("chat_messages");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(x => x.Message).HasColumnName("message").HasMaxLength(512).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at").IsRequired();
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => x.UserId);
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatPresenceEntity>(entity =>
+        {
+            entity.ToTable("chat_presence");
+            entity.HasKey(x => x.UserId);
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.LastTypingAtUtc).HasColumnName("last_typing_at").IsRequired();
+            entity.Property(x => x.LastSeenAtUtc).HasColumnName("last_seen_at").IsRequired();
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MatchPushSubscriptionEntity>(entity =>
+        {
+            entity.ToTable("match_push_subscriptions");
+            entity.HasKey(x => new { x.UserId, x.MatchId });
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.MatchId).HasColumnName("match_id").HasMaxLength(64);
+            entity.Property(x => x.EnabledAtUtc).HasColumnName("enabled_at").IsRequired();
+            entity.HasIndex(x => x.MatchId);
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

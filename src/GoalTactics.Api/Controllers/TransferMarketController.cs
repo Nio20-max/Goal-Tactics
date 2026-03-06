@@ -4,6 +4,7 @@ using GoalTactics.Contracts.Common;
 using GoalTactics.Contracts.TransferMarket;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace GoalTactics.Api.Controllers;
 
@@ -37,6 +38,7 @@ public sealed class TransferMarketController(ITransferMarketService transferMark
     }
 
     [HttpPost("BidPlayer")]
+    [EnableRateLimiting("mutation-write")]
     public async Task<ActionResult<ResponseObject>> BidPlayer([FromBody] BidRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
@@ -50,6 +52,7 @@ public sealed class TransferMarketController(ITransferMarketService transferMark
     }
 
     [HttpPost("UpdateTransfermarketFavourites")]
+    [EnableRateLimiting("mutation-write")]
     public async Task<ActionResult<ResponseObject>> UpdateTransfermarketFavourites([FromBody] IdRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();

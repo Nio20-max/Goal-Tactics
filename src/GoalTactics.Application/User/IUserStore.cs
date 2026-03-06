@@ -8,6 +8,8 @@ public interface IUserStore
 
     Task SavePreferencesAsync(string userId, UserPreferencesRecord preferences, CancellationToken cancellationToken = default);
 
+    Task SaveMatchPushSubscriptionAsync(string userId, Guid matchId, CancellationToken cancellationToken = default);
+
     Task UpdateUserAsync(string userId, UserProfileUpdateRecord update, CancellationToken cancellationToken = default);
 
     Task MarkAccountDeletedAsync(string userId, CancellationToken cancellationToken = default);

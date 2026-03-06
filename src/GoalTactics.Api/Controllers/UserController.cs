@@ -4,6 +4,7 @@ using GoalTactics.Contracts.Common;
 using GoalTactics.Contracts.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace GoalTactics.Api.Controllers;
 
@@ -13,6 +14,7 @@ namespace GoalTactics.Api.Controllers;
 public sealed class UserController(IUserService userService) : ControllerBase
 {
     [HttpPost("ClaimDailyReward")]
+    [EnableRateLimiting("mutation-write")]
     public async Task<ActionResult<ValueResponse>> ClaimDailyReward([FromBody] RequestObject request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
@@ -96,6 +98,7 @@ public sealed class UserController(IUserService userService) : ControllerBase
     }
 
     [HttpPost("EnableMatchPush")]
+    [EnableRateLimiting("mutation-write")]
     public async Task<ActionResult<EnableMatchPushResponse>> EnableMatchPush([FromBody] EnableMatchPushRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();

@@ -1,4 +1,5 @@
 using GoalTactics.Application.Auth;
+using GoalTactics.Application.Chat;
 using GoalTactics.Application.Friends;
 using GoalTactics.Application.League;
 using GoalTactics.Application.Ladder;
@@ -6,6 +7,7 @@ using GoalTactics.Application.Team;
 using GoalTactics.Application.Tutorial;
 using GoalTactics.Application.User;
 using GoalTactics.Infrastructure.Authentication;
+using GoalTactics.Infrastructure.Chat;
 using GoalTactics.Infrastructure.Friends;
 using GoalTactics.Infrastructure.League;
 using GoalTactics.Infrastructure.Ladder;
@@ -31,6 +33,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IAuthStore, AuthDbStore>();
+        services.AddScoped<IChatStore, ChatDbStore>();
         services.AddScoped<IFriendsStore, FriendsDbStore>();
         services.AddScoped<ILeagueStore, LeagueDbStore>();
         services.AddScoped<ILadderStore, LadderDbStore>();

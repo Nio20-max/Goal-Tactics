@@ -29,10 +29,15 @@ Completed API slices in `src/`:
 - Mechanics service set in `GoalTactics.Application/Mechanics/` for strength, simulation, training, scouting, stadium economy, sponsors, transfers, contracts, and injury/card calculations.
 - Docs-parity compatibility endpoints and aliases added from recovered contracts (`/Post`, `/GetSeasonInfo`, `/GetMatchDetails`, `/EnableMatchPush`).
 - Worker hosting dependency wired explicitly to ensure standalone worker compilation.
+- Deep hardening pass completed:
+  - chat moved from placeholder payloads to DB-backed persistence (`chat_messages`, `chat_presence`)
+  - match push subscriptions moved from in-memory state to DB-backed persistence (`match_push_subscriptions`)
+  - write-path abuse controls expanded with route-level rate limits for chat and mutation endpoints
+  - worker scheduler hardened with in-process overlap guard and concrete chat-retention cleanup behavior
 
 Validation status:
 
-- Full solution tests are green after Phase 1 close-out changes: `total: 25, failed: 0, succeeded: 25`.
+- Full solution tests are green after deep hardening pass: `total: 27, failed: 0, succeeded: 27`.
 
 ## 1.0.1 Remaining work snapshot (2026-03-06)
 
@@ -49,6 +54,9 @@ Post-Phase-1 hardening block (executed now):
 - Contract hardening: restored explicit compatibility routes referenced by decompiled client docs (`/Post`, `/GetSeasonInfo`, `/GetMatchDetails`, `/EnableMatchPush`).
 - Build hardening: fixed worker project hosting reference so `GoalTactics.Worker` builds reliably as part of full solution builds.
 - Verification hardening: expanded contract tests for `GetSeasonInfo` and `EnableMatchPush`, then reran full build and full tests.
+- Persistence hardening: implemented DB persistence and migration for chat history/presence and match-push subscriptions.
+- Abuse hardening: applied rate limiting to high-frequency/high-risk write routes (`Post`, `Typing`, `BidPlayer`, favorites update, daily reward, match-push enable).
+- Worker hardening: added scheduler overlap protection and real retention cleanup implementation in `ChatRetentionJob`.
 
 Deferred deeper hardening for next phase:
 
@@ -56,6 +64,11 @@ Deferred deeper hardening for next phase:
 - Expand persistence and transactional audit depth for all new slices that currently return baseline placeholder payloads.
 - Add dedicated realtime integration tests and worker idempotency/integration test suites.
 - Add richer operational observability and abuse controls for high-throughput scenarios.
+
+Phase 2 handoff readiness:
+
+- Phase 1 implementation and hardening goals are complete for baseline go-live architecture.
+- Repository is now ready to begin Phase 2 (bot simulation and deeper formula fidelity) on a stable compile/test baseline.
 
 ## 1.0.2 Database creation and bootstrap (explicit Phase 1 requirement)
 

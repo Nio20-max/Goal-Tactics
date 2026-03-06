@@ -68,6 +68,29 @@ public sealed class UserDbStore(GoalTacticsDbContext dbContext) : IUserStore
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task SaveMatchPushSubscriptionAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
+    {
+        var key = matchId.ToString("N");
+        var existing = await dbContext.MatchPushSubscriptions
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.MatchId == key, cancellationToken);
+
+        if (existing is null)
+        {
+            dbContext.MatchPushSubscriptions.Add(new MatchPushSubscriptionEntity
+            {
+                UserId = userId,
+                MatchId = key,
+                EnabledAtUtc = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            existing.EnabledAtUtc = DateTime.UtcNow;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task UpdateUserAsync(string userId, UserProfileUpdateRecord update, CancellationToken cancellationToken = default)
     {
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);

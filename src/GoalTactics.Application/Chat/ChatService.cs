@@ -11,35 +11,40 @@ public interface IChatService
     Task NotifyTypingAsync(string userId, CancellationToken cancellationToken = default);
 }
 
-public sealed class ChatService : IChatService
+public sealed class ChatService(IChatStore chatStore) : IChatService
 {
-    public Task<ChatHistoryResponse> GetHistoryAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<ChatHistoryResponse> GetHistoryAsync(string userId, CancellationToken cancellationToken = default)
     {
-        var now = DateTime.UtcNow;
-        return Task.FromResult(new ChatHistoryResponse
+        var records = await chatStore.GetRecentMessagesAsync(100, cancellationToken);
+        var ordered = records.OrderBy(x => x.CreatedAtUtc).ToArray();
+
+        return new ChatHistoryResponse
         {
             Success = true,
-            Messages =
-            [
-                new ChatMessageData
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = Guid.TryParse(userId, out var parsed) ? parsed : Guid.Empty,
-                    UserName = "System",
-                    Message = "Chat initialized",
-                    CreatedAt = now.ToString("O")
-                }
-            ]
-        });
+            Messages = ordered.Select(x => new ChatMessageData
+            {
+                Id = Guid.TryParse(x.Id, out var messageId) ? messageId : Guid.Empty,
+                UserId = Guid.TryParse(x.UserId, out var parsedUserId) ? parsedUserId : Guid.Empty,
+                UserName = x.UserName,
+                Message = x.Message,
+                CreatedAt = x.CreatedAtUtc.ToString("O")
+            }).ToArray()
+        };
     }
 
-    public Task PostAsync(string userId, string? message, CancellationToken cancellationToken = default)
+    public async Task PostAsync(string userId, string? message, CancellationToken cancellationToken = default)
     {
-        return Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        var normalized = message.Trim();
+        await chatStore.AddMessageAsync(userId, normalized, cancellationToken);
     }
 
     public Task NotifyTypingAsync(string userId, CancellationToken cancellationToken = default)
     {
-        return Task.CompletedTask;
+        return chatStore.TouchPresenceAsync(userId, cancellationToken);
     }
 }
