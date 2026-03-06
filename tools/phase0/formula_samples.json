@@ -1,0 +1,143 @@
+{
+  "createdAt": "2026-03-06T18:02:32.435037+00:00",
+  "entries": {
+    "matchSnapshots": [
+      {
+        "team1Strength": 6623.0,
+        "team2Strength": 5512.7,
+        "team1Score": 1,
+        "team2Score": 0,
+        "team1Breakdown": "Team 1 had a home match bonus of 289.9",
+        "team2Breakdown": "",
+        "notes": "No team had a tactical bonus because they chose the same tactic"
+      },
+      {
+        "team1Strength": 7288.7,
+        "team2Strength": 5928.2,
+        "team1Score": 0,
+        "team2Score": 0,
+        "team1Breakdown": "Home game bonus of 318.6 and tactical bonus of 127.4",
+        "team2Breakdown": "",
+        "notes": ""
+      },
+      {
+        "team1Strength": 7377.0,
+        "team2Strength": 5744.0,
+        "team1Score": 3,
+        "team2Score": 2,
+        "team1Breakdown": "Home game bonus of 322",
+        "team2Breakdown": "tactical bonus of 263.6",
+        "notes": ""
+      },
+      {
+        "team1Strength": 5882.8,
+        "team2Strength": 7263.2,
+        "team1Score": 1,
+        "team2Score": 1,
+        "team1Breakdown": "Home game bonus of 271.8 and a modd loss of 23.9",
+        "team2Breakdown": "Tactical bonus of 617.3",
+        "notes": ""
+      }
+    ],
+    "attendanceSnapshots": [],
+    "trainingSnapshots": [],
+    "contractSnapshots": [
+      {
+        "player": "1",
+        "age": 25,
+        "strength": 316.23,
+        "salary": 185355.0,
+        "budgetCost": 0,
+        "premiumCost": 0,
+        "result": "",
+        "notes": "I don't know what you mean by budget renewal cost or premium renewal cost. So I won't answer them"
+      },
+      {
+        "player": "2",
+        "age": 19,
+        "strength": 173.26,
+        "salary": 23267.0,
+        "budgetCost": 0,
+        "premiumCost": 0,
+        "result": "",
+        "notes": ""
+      },
+      {
+        "player": "3",
+        "age": 34,
+        "strength": 415.12,
+        "salary": 209795.0,
+        "budgetCost": 0,
+        "premiumCost": 0,
+        "result": "",
+        "notes": ""
+      },
+      {
+        "player": "4",
+        "age": 34,
+        "strength": 450.33,
+        "salary": 213407.0,
+        "budgetCost": 0,
+        "premiumCost": 0,
+        "result": "",
+        "notes": ""
+      },
+      {
+        "player": "5",
+        "age": 34,
+        "strength": 525.08,
+        "salary": 203390.0,
+        "budgetCost": 0,
+        "premiumCost": 0,
+        "result": "",
+        "notes": ""
+      }
+    ],
+    "auctionSnapshots": [
+      {
+        "currentBid": 900305,
+        "bidIncrement": 27009,
+        "nextBid": 0,
+        "finalSettlement": 0,
+        "notes": "I don't know what you mean for the values that I put 0 in. The other two should be enough"
+      },
+      {
+        "currentBid": 4552460,
+        "bidIncrement": 136574,
+        "nextBid": 0,
+        "finalSettlement": 0,
+        "notes": ""
+      },
+      {
+        "currentBid": 4542791,
+        "bidIncrement": 136284,
+        "nextBid": 0,
+        "finalSettlement": 0,
+        "notes": ""
+      },
+      {
+        "currentBid": 4881071,
+        "bidIncrement": 146432,
+        "nextBid": 0,
+        "finalSettlement": 0,
+        "notes": ""
+      },
+      {
+        "currentBid": 1917596,
+        "bidIncrement": 57528,
+        "nextBid": 0,
+        "finalSettlement": 0,
+        "notes": ""
+      },
+      {
+        "currentBid": 2095409,
+        "bidIncrement": 62862,
+        "nextBid": 0,
+        "finalSettlement": 0,
+        "notes": ""
+      }
+    ],
+    "injuryCardSnapshots": []
+  },
+  "updatedAt": "2026-03-06T18:57:19.637003+00:00"
+}
