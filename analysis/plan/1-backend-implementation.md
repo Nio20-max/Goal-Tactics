@@ -2,6 +2,22 @@
 
 This phase turns the recovered contracts and mechanics spec into the new Goal Tactics backend. The backend is authoritative for identity, economy, progression, competition, chat, auctions, notifications, and purchases.
 
+## 1.0 Implementation progress (2026-03-06)
+
+Completed API slices in `src/`:
+
+- Auth (`AuthController`) with DB-backed session tokens, revocation checks, password hashing, and JWT auth.
+- Common (`CommonController`) with countries and app metadata responses.
+- Tutorial (`TutorialController`) with persisted tutorial step state.
+- User (`UserController`) with preferences, profile updates, Helpshift user payload, and account deletion.
+- Team (`TeamController`) with club overview/resources/mail/news/finance endpoints and lazy team bootstrap.
+- League (`LeagueController`) with 16-club table generation, pyramid expansion, and `Mount=2` / `Dismount=8` behavior.
+- Friends (`FriendsController`) with list/search, like/unlike, accept/decline, and friendly challenge flow.
+
+Validation status:
+
+- Contract tests are green after Friends integration: `total: 19, failed: 0, succeeded: 19`.
+
 ## 1.1 What this phase starts from
 
 Before Phase 1 begins, Phase 0 must already have frozen:
@@ -557,3 +573,51 @@ Security baseline completed in Step 1 continuation:
 - Bearer token authentication configured in API pipeline.
 - Protected endpoint (`GET /api/Me`) added and contract-tested.
 - Negative-path tests added for tampered token and missing bearer token.
+
+Additional Phase 1 progress (tutorial + user profile slice):
+
+- New authenticated user endpoints implemented:
+  - `POST /api/GetTutorial`
+  - `POST /api/SkipTutorial`
+  - `POST /api/FinishTutorialStep`
+  - `POST /api/ResetTutorial`
+  - `POST /api/ClaimDailyReward`
+  - `POST /api/GetHelpshiftUserInfo`
+  - `POST /api/GetPreferences`
+  - `POST /api/SavePreferences`
+  - `POST /api/UpdateUser`
+  - `POST /api/DeleteAccount`
+- Added contracts for tutorial and user domain request/response payloads under:
+  - `src/GoalTactics.Contracts/Tutorial/`
+  - `src/GoalTactics.Contracts/User/`
+  - `src/GoalTactics.Contracts/Common/ValueResponse.cs`
+- Added DB-backed persistence for preferences/tutorial state:
+  - `user_preferences` table
+  - `tutorial_states` table
+  - migration `20260306203000_AddTutorialAndPreferences`
+- Added application services and infrastructure stores for tutorial/user behavior.
+- Test suite status after this slice: all tests passing (`15/15`).
+
+Additional Phase 1 progress (team slice):
+
+- Implemented authenticated Team API routes in `TeamController`:
+  - `POST /api/GetTeamInfo`
+  - `POST /api/GetMyTeamInfo`
+  - `POST /api/GetMyTeamExtendedInfo`
+  - `POST /api/GetClubNews`
+  - `POST /api/GetMyResources`
+  - `POST /api/GetMyMail`
+  - `POST /api/MarkAsRead`
+  - `POST /api/MarkAllAsRead`
+  - `POST /api/DeleteMail`
+  - `POST /api/DeleteAllRead`
+  - `POST /api/GetAccomplishments`
+  - `POST /api/GetFinanceHistory`
+  - `POST /api/GetFinances`
+  - `POST /api/ChangeTeamName`
+- Added Team contracts under `src/GoalTactics.Contracts/Team/` and shared `IdRequest` in `src/GoalTactics.Contracts/Common/IdRequest.cs`.
+- Added Team application service/store abstractions in `src/GoalTactics.Application/Team/`.
+- Added Team persistence entities and DB store in `src/GoalTactics.Infrastructure/Persistence/Entities/` and `src/GoalTactics.Infrastructure/Team/TeamDbStore.cs`.
+- Added migration `20260306213000_AddTeamSlice` (tables: `teams`, `team_resources`, `team_news`, `team_mail`, `team_finance_history`).
+- Added contract tests in `tests/GoalTactics.ContractTests/Team/TeamControllerTests.cs`.
+- Test suite status after this slice: all tests passing (`17/17`).

@@ -2,6 +2,11 @@ using System.Text;
 using GoalTactics.Application.Common;
 using GoalTactics.Application.Auth;
 using GoalTactics.Application.Abstractions;
+using GoalTactics.Application.Tutorial;
+using GoalTactics.Application.User;
+using GoalTactics.Application.Team;
+using GoalTactics.Application.League;
+using GoalTactics.Application.Friends;
 using GoalTactics.Api.Middleware;
 using GoalTactics.Api.Security;
 using GoalTactics.Api.Validation;
@@ -87,6 +92,11 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ITutorialService, TutorialService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ITeamService, TeamService>();
+builder.Services.AddScoped<ILeagueService, LeagueService>();
+builder.Services.AddScoped<IFriendsService, FriendsService>();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 

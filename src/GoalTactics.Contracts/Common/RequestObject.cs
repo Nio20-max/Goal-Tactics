@@ -1,5 +1,5 @@
 namespace GoalTactics.Contracts.Common;
 
-public sealed class RequestObject
+public class RequestObject
 {
 }
