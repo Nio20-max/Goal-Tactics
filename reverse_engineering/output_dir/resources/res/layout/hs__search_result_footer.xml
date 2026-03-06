@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <View
+        android:background="?attr/hs__separatorColor"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="@dimen/activity_vertical_margin_medium"/>
+    <com.helpshift.views.HSButton
+        android:id="@+id/send_anyway_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/activity_vertical_margin_medium"
+        android:text="@string/hs__send_anyway"
+        style="@style/Helpshift.Style.BorderlessButton"/>
+    <View
+        android:background="@android:color/transparent"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/activity_vertical_margin_medium"/>
+</LinearLayout>

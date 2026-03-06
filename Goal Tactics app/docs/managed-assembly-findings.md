@@ -4,8 +4,8 @@ This document captures the exact backend and client behavior recovered from the 
 
 ## What Was Recovered
 
-- `GT.Core.dll` was recovered as a valid managed assembly and decompiled from the payload now extracted to `extracted_managed_meta/GT.Core.dll`.
-- `GT.Droid.dll` was recovered as a valid managed assembly and decompiled from the payload now extracted to `extracted_managed_meta/GT.Droid.dll`.
+- `GT.Core.dll` was recovered as a valid managed assembly and decompiled from the payload now extracted to `reverse_engineering/extracted_managed_meta/GT.Core.dll`.
+- `GT.Droid.dll` was recovered as a valid managed assembly and decompiled from the payload now extracted to `reverse_engineering/extracted_managed_meta/GT.Droid.dll`.
 - The extraction helper used for this pass is `tools/extract_xamarin_assemblies.py`. It now skips empty descriptors and names assemblies from their own metadata instead of trusting the manifest blindly.
 
 ## Exact Backend URLs
@@ -352,9 +352,9 @@ The resource set confirms many local notification templates exist for:
 
 ## Most Important Recovered Code Locations
 
-- `decompiled/GT.Core.actual/store0_idx17.decompiled.cs`
+- `reverse_engineering/decompiled/GT.Core.actual/store0_idx17.decompiled.cs`
   - exact API interfaces, headers, base URLs, auth flow, service classes, SignalR wiring
-- `decompiled/GT.Droid.actual/GT.Droid.decompiled.cs`
+- `reverse_engineering/decompiled/GT.Droid.actual/GT.Droid.decompiled.cs`
   - `MainActivity`, Firebase messaging, Helpshift, AppsFlyer, IronSource, notification handling
 - `tools/extract_xamarin_assemblies.py`
   - extractor used to recover the real managed payloads

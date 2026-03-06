@@ -7,11 +7,11 @@ Scope: Execute user tasks 0-7 in strict order and record completion state.
 
 - [x] 0. Create this exact plan/progress file and keep it updated.
 - [x] 1. Build folder `Goal Tactics app` with ordered decompiled project structure that could be used to rebuild the APK; move useful unmatched files into an extra folder; write summary of important files and paths.
-- [ ] 2. Write a very detailed frontend analysis that enables rebuild without app access (assuming all image assets are available).
-- [ ] 3. Write exact summary of all API endpoints called and expected response contents.
-- [ ] 4. Write exact account of app contents/features and what they did (clear, not too technical, concrete).
-- [ ] 5. Write detailed account of server software and server details required to rebuild backend.
-- [ ] 6. Move files/folders into clearer subfolder organization to reduce top-level clutter.
+- [x] 2. Write a very detailed frontend analysis that enables rebuild without app access (assuming all image assets are available).
+- [x] 3. Write exact summary of all API endpoints called and expected response contents.
+- [x] 4. Write exact account of app contents/features and what they did (clear, not too technical, concrete).
+- [x] 5. Write detailed account of server software and server details required to rebuild backend.
+- [x] 6. Move files/folders into clearer subfolder organization to reduce top-level clutter.
 - [ ] 7. Push all changes to `origin master` from `/root/projekte/Goal-Tactics/`.
 
 ## Execution Plan (Ordered)
@@ -19,7 +19,7 @@ Scope: Execute user tasks 0-7 in strict order and record completion state.
 1. Task 1
 - Create `/root/projekte/Goal-Tactics/Goal Tactics app/`.
 - Build canonical subfolders: `android_project/`, `managed_dotnet/`, `decompiled_java/`, `assets_and_resources/`, `build_metadata/`, `extra_useful_files/`, `docs/`.
-- Populate by copying decompiled (not compiled) source/resources/manifests/metadata from `output_dir/`, `decompiled/`, and extraction/decompile outputs.
+- Populate by copying decompiled (not compiled) source/resources/manifests/metadata from `reverse_engineering/output_dir/`, `reverse_engineering/decompiled/`, and extraction/decompile outputs.
 - Produce `docs/important-files-and-paths-summary.md` describing key paths and file roles.
 
 2. Task 2
@@ -48,3 +48,8 @@ Scope: Execute user tasks 0-7 in strict order and record completion state.
 
 - 2026-03-06: Task 0 completed (plan file created).
 - 2026-03-06: Task 1 completed (`Goal Tactics app/` created and populated; summary added at `Goal Tactics app/docs/important-files-and-paths-summary.md`).
+- 2026-03-06: Task 2 completed (verified and retained the detailed rebuild spec at `Goal Tactics app/docs/frontend-rebuild-analysis.md`).
+- 2026-03-06: Task 3 completed (`Goal Tactics app/docs/api-endpoints-and-response-contracts.md` created from exact GT.Core interface and DTO recovery).
+- 2026-03-06: Task 4 completed (`Goal Tactics app/docs/app-content-and-function-overview.md` created as the non-technical but concrete app walkthrough).
+- 2026-03-06: Task 5 completed (`Goal Tactics app/docs/backend-server-rebuild-requirements.md` created with server/runtime/deployment requirements).
+- 2026-03-06: Task 6 completed (root reorganized into grouped folders: `analysis/`, `reference_materials/`, and `reverse_engineering/`; plan/docs paths updated to match).

@@ -4,12 +4,12 @@
 
 This folder documents how the decompiled Goal Tactics Android client appears to have worked in version 1.2.4 (versionCode 66). The account is based on four evidence sources inside this workspace:
 
-- the feature notes in Goal Tactics.md under current version
-- the Android manifest and resource strings in output_dir/resources
-- the Xamarin assembly manifest in output_dir/resources/assemblies/assemblies.manifest
-- metadata strings embedded in the Xamarin managed assembly store in output_dir/resources/assemblies/assemblies.blob
+- the feature notes in reference_materials/Goal Tactics.md under current version
+- the Android manifest and resource strings in reverse_engineering/output_dir/resources
+- the Xamarin assembly manifest in reverse_engineering/output_dir/resources/assemblies/assemblies.manifest
+- metadata strings embedded in the Xamarin managed assembly store in reverse_engineering/output_dir/resources/assemblies/assemblies.blob
 
-One important limitation mattered during the first pass: this APK is a Xamarin app. The Java sources under output_dir/sources are mostly Android wrapper classes, while the real game logic lives in GT.Core and GT.Droid inside the Xamarin assembly blob. A later extraction pass recovered both managed assemblies, and the exact backend and Android findings from that pass are documented in managed-assembly-findings.md. Because parts of this folder were written before that recovery step, this write-up still separates three levels of confidence:
+One important limitation mattered during the first pass: this APK is a Xamarin app. The Java sources under reverse_engineering/output_dir/sources are mostly Android wrapper classes, while the real game logic lives in GT.Core and GT.Droid inside the Xamarin assembly blob. A later extraction pass recovered both managed assemblies, and the exact backend and Android findings from that pass are documented in managed-assembly-findings.md. Because parts of this folder were written before that recovery step, this write-up still separates three levels of confidence:
 
 - Confirmed: directly visible in manifest, resources, or feature notes.
 - Strongly supported: visible through managed metadata names and platform integrations.
@@ -121,9 +121,15 @@ The app was not a thin WebView wrapper. It was a real native-shell mobile client
 
 ## Files in this folder
 
-- features-and-frontend.md: what the user could do and how the client likely presented it
-- backend-and-live-services.md: how the online systems most likely worked
-- faq.md: likely reader questions answered directly
+- frontend-rebuild-analysis.md: the detailed screen-by-screen rebuild spec for the frontend.
+- api-endpoints-and-response-contracts.md: the exact recovered API surface, request models, response models, URLs, and hub endpoints.
+- app-content-and-function-overview.md: a concrete, non-technical tour of everything the player could do in the app.
+- backend-server-rebuild-requirements.md: the server-side stack and deployment requirements implied by the recovered client.
+- managed-assembly-findings.md: the core exact findings recovered from decompiled GT.Core and GT.Droid assemblies.
+- important-files-and-paths-summary.md: guide to the reconstructed folder layout and the important paths.
+- features-and-frontend.md: earlier feature/front-end reconstruction notes.
+- backend-and-live-services.md: earlier backend/live-systems reconstruction notes.
+- faq.md: likely reader questions answered directly.
 
 ## Bottom-line reconstruction
 
