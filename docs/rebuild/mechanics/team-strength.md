@@ -53,6 +53,10 @@ Pending for full backend formula:
 
 Unknown terms (`OtherContext`) require server-side calibration.
 
+Phase 0 coupling note:
+- This effective strength output feeds the match fallback in `match-engine.md` where goal intensity is derived from strength deltas.
+- additive component behavior is strongly supported by user-provided match decomposition and decompiled role/mood structures.
+
 ## Simulated walkthrough
 Example (using provided evidence):
 - Base lineup strength: `5631`

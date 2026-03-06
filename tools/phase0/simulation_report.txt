@@ -1,0 +1,152 @@
+
+============================================================================================
+A) Transfer market bid increment formula
+============================================================================================
+Hypothesis: increment = clamp(round(current_bid * r), min=5000, max=150000)
+We test r in [2.5%, 3.0%, 3.5%] and pick best MAE.
+  r=0.025 -> MAE=15741.17
+  r=0.030 -> MAE=0.00
+  r=0.035 -> MAE=9212.83
+
+Selected best-fit rate: r=0.030 with MAE=0.00
+
+Detailed per-sample steps:
+  Sample 1: bid=900,305 -> raw=27,009.15 -> rounded/clamped=27,009 | observed=27,009 | abs_error=0
+  Sample 2: bid=4,552,460 -> raw=136,573.80 -> rounded/clamped=136,574 | observed=136,574 | abs_error=0
+  Sample 3: bid=4,542,791 -> raw=136,283.73 -> rounded/clamped=136,284 | observed=136,284 | abs_error=0
+  Sample 4: bid=4,881,071 -> raw=146,432.13 -> rounded/clamped=146,432 | observed=146,432 | abs_error=0
+  Sample 5: bid=1,917,596 -> raw=57,527.88 -> rounded/clamped=57,528 | observed=57,528 | abs_error=0
+  Sample 6: bid=2,095,409 -> raw=62,862.27 -> rounded/clamped=62,862 | observed=62,862 | abs_error=0
+
+Reasonableness check:
+  - Cap starts around bid >= 5,000,000 (predicted).
+  - This is consistent with user report that increments cap around high bids (~5M).
+
+============================================================================================
+B) Stadium earnings and running-cost formulas
+============================================================================================
+Given sample: league 3, standing=19500, seats=24000, vip=1900
+Known payout rates league 3: vip=269, sit=21, stand=10
+  VIP earnings:    1900 * 269 = 511,100
+  Seat earnings:   24000 * 21 = 504,000
+  Stand earnings:  19500 * 10 = 195,000
+  Total earnings:  1,210,100
+
+Running-cost reconstruction:
+  VIP running:     1900 * 21.2 = 40,280.0
+  Seat running:    24000 * 1.7 = 40,800.0
+  Stand running:   19500 * 0.85 = 16,575.0
+  Total running:   97,655
+
+Reasonableness check:
+  - Reconstructed earnings exactly match provided sample (1,210,100).
+  - Reconstructed running costs match provided sample (97,655).
+  - Per-unit deltas also match your provided increments.
+
+Standing occupancy fallback model (needed because standing seats are unlimited):
+  max_filled_stands = (seats + vip * 10) * league_ratio * (1 + 0.35 * form_index)
+  where form_index is in [-1, +1] and league_ratio is calibrated by league.
+  League 3, poor form: max_filled=15,286, actual_filled=15,286, stand_earnings=152,860
+  League 3, neutral: max_filled=19,350, actual_filled=19,350, stand_earnings=193,500
+  League 3, great form: max_filled=24,091, actual_filled=19,500, stand_earnings=195,000
+  -> This keeps stands unbounded in construction but bounded in occupancy.
+
+============================================================================================
+C) Match result formula candidate (strength -> goals)
+============================================================================================
+Candidate model:
+  lambda_home = base * exp(scale * ((s1 - s2) / 1000))
+  lambda_away = base * exp(scale * ((s2 - s1) / 1000))
+Best grid fit: base=1.00, scale=0.20, log_likelihood=-10.2446
+
+Detailed per-sample prediction steps:
+  Sample 1: s1=6623.0, s2=5512.7, delta_k=1.1103
+    -> lambda_home=1.2486, lambda_away=0.8009, total_xg=2.0495
+    -> observed score 1:0
+  Sample 2: s1=7288.7, s2=5928.2, delta_k=1.3605
+    -> lambda_home=1.3127, lambda_away=0.7618, total_xg=2.0745
+    -> observed score 0:0
+  Sample 3: s1=7377.0, s2=5744.0, delta_k=1.6330
+    -> lambda_home=1.3862, lambda_away=0.7214, total_xg=2.1076
+    -> observed score 3:2
+  Sample 4: s1=5882.8, s2=7263.2, delta_k=-1.3804
+    -> lambda_home=0.7588, lambda_away=1.3180, total_xg=2.0767
+    -> observed score 1:1
+
+Reasonableness check:
+  - Model predicts low-scoring outcomes often, matching current small sample set.
+  - Sample count is too small for final freeze; keep as fallback candidate only.
+
+============================================================================================
+D) Training/fitness growth candidate
+============================================================================================
+Known constraints:
+  - Newly scouted players can start fitness < 100.
+  - Fitness recovers to 100 and then stays there.
+  - At training center level 20, daily fitness increase is +4.
+  - Facility max level is 20 and constrained by office level.
+  - Max player strength target (user observed): 700.
+
+Candidate formula:
+  fitness_gain_per_day = 0.2 * training_center_level
+  new_fitness = min(100, old_fitness + fitness_gain_per_day)
+
+Simulation: old_fitness=72.0, level=20
+  Day 1: +4.0 -> fitness=76.0
+  Day 2: +4.0 -> fitness=80.0
+  Day 3: +4.0 -> fitness=84.0
+  Day 4: +4.0 -> fitness=88.0
+  Day 5: +4.0 -> fitness=92.0
+  Day 6: +4.0 -> fitness=96.0
+  Day 7: +4.0 -> fitness=100.0
+  Fitness cap reached (100). Further gains stop.
+
+Reasonableness check:
+  - Exactly satisfies the known level-20 daily increase (+4).
+  - Gives linear and transparent progression to cap.
+  - Age/talent effect for non-fitness skill growth still unresolved (needs samples).
+
+Fallback non-fitness growth model (provisional):
+  daily_strength_gain = base_gain * (tc_level/20) * talent_factor * age_factor * fitness_factor
+  talent_factor = 1 + 0.08 * (talent - 5)
+  age_factor tiers use old-age marker at 34 from decompiled constants
+  fitness_factor = 0.6 + 0.4 * (fitness/100)
+  strength is capped at 700 (user-observed cap)
+  Youth A: age=18, talent=8, fitness=92 -> gain/day=0.2881, next_strength=480.2881
+  Prime B: age=27, talent=6, fitness=100 -> gain/day=0.1836, next_strength=620.1836
+  Veteran C: age=34, talent=7, fitness=100 -> gain/day=0.1044, next_strength=660.1044
+
+============================================================================================
+E) Auction time extension rule
+============================================================================================
+Rule from user evidence:
+  If remaining auction time < 20s when a valid bid lands, set remaining time = 20s.
+
+Simulation sequence:
+  Bid 1: before=45s -> after=45s
+  Bid 2: before=19s -> after=20s
+  Bid 3: before=11s -> after=20s
+  Bid 4: before=3s -> after=20s
+
+Reasonableness check:
+  - Prevents last-millisecond sniping.
+  - Aligns with observed 'jump back to 20 seconds' behavior.
+
+============================================================================================
+F) Contract renewal cost fallback model
+============================================================================================
+No direct renewal-price samples available, so this is a provisional formula.
+Candidate:
+  budget_cost = salary * 0.45 + strength * 650 + age_penalty
+  age_penalty = max(0, age - 30) * 12000
+  premium_cost_stars = round(budget_cost / 55)
+  Player 1 (age=25, str=316.23, salary=185,355) -> budget=288,959, premium_stars=5,254
+  Player 2 (age=19, str=173.26, salary=23,267) -> budget=123,089, premium_stars=2,238
+  Player 3 (age=34, str=415.12, salary=209,795) -> budget=412,236, premium_stars=7,495
+  Player 4 (age=34, str=450.33, salary=213,407) -> budget=436,748, premium_stars=7,941
+  Player 5 (age=34, str=525.08, salary=203,390) -> budget=480,828, premium_stars=8,742
+
+Reasonableness check:
+  - Higher salary and strength increase renewal cost monotonically.
+  - Age >= 31 adds extra pressure, matching old-age progression concerns.
+  - Must be replaced if real renewal price samples become available.

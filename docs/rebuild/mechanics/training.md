@@ -5,6 +5,7 @@
 2. Extracted explicit UI upgrade cost formula from squad viewmodel.
 3. Identified unresolved server-side growth formulas and marked candidate-model flow.
 4. Logged missing samples and requested user data collection support.
+5. Added simulation-fitted fallback formulas from `tools/phase0/simulate_phase0_formulas.py`.
 
 ## Exact from decompiled logic
 - Individual training response fields include `TrainPrice`, `RenewPrice`, `RenewAllPrice`.
@@ -26,8 +27,21 @@ Pending formulas:
 - tactic progression curve
 - camp multipliers and overlap interaction
 
-Proposed candidate model skeleton:
-`daily_gain = base_gain(skill) * efficiency_modifier * camp_modifier * boredom_modifier`
+Selected fitness fallback (high confidence):
+- `daily_fitness_gain = 0.2 * training_center_level`
+- capped at `100` total fitness
+- matches user evidence: level 20 -> `+4` fitness/day
+
+Provisional non-fitness growth fallback:
+- `daily_strength_gain = base_skill_gain * level_factor * age_factor * talent_factor * finesse_factor`
+- recommended defaults for simulation:
+  - `base_skill_gain = 0.05`
+  - `level_factor = 0.6 + 0.02 * training_center_level`
+  - `age_factor = max(0.55, 1.05 - max(0, age - 24) * 0.015)`
+  - `talent_factor = 0.85 + 0.003 * talent`
+  - `finesse_factor = 0.85 + 0.003 * finesse`
+
+This non-fitness model is intentionally marked provisional until we collect day-over-day player strength samples.
 
 Where:
 - `efficiency_modifier = EfficiencyValue / 100`
@@ -44,11 +58,18 @@ What this accomplishes:
 - linear and transparent star sink for direct upgrades.
 - easy to validate between UI and backend because client sends both target strength and computed price.
 
-Candidate training test walkthrough (fallback model):
-- base gain: `0.08`
-- efficiency: `85` -> `0.85`
-- camp modifier: `1.10`
-- boredom modifier: `0.90`
-- gain/day: `0.08 * 0.85 * 1.10 * 0.90 = 0.06732`
+Fitness walkthrough (selected formula):
+- training center level: `20`
+- gain/day: `0.2 * 20 = 4`
+- if player fitness `92` then next-day fitness becomes `96`
+- if player fitness `98` then next-day fitness becomes `100` (cap)
 
-This is only a test harness model until real server-like progression is calibrated.
+Non-fitness walkthrough (provisional formula):
+- age `23`, talent `72`, finesse `68`, training center level `15`
+- `level_factor = 0.6 + 0.02*15 = 0.90`
+- `age_factor = 1.05`
+- `talent_factor = 0.85 + 0.003*72 = 1.066`
+- `finesse_factor = 0.85 + 0.003*68 = 1.054`
+- `daily_strength_gain = 0.05 * 0.90 * 1.05 * 1.066 * 1.054 = 0.0531`
+
+This remains a calibration model until real server-like progression is fitted against longitudinal samples.

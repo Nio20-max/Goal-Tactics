@@ -5,6 +5,7 @@
 2. Extracted table ordering logic and known strength inputs from decompiled viewmodels.
 3. Integrated user-provided real match snapshot with explicit bonus components.
 4. Marked unresolved server-only event generation as candidate-model territory.
+5. Ran parameter search in `tools/phase0/simulate_phase0_formulas.py` and selected a provisional fallback.
 
 ## Exact from decompiled logic
 - Match full-time UI minute constant: `115`.
@@ -42,20 +43,30 @@ Model C (hybrid expected-goals + event filler):
 Selection rule:
 - choose model with best fit against observed score distributions and bonus-impact sensitivity.
 
+Selected fallback for Phase 0 (provisional):
+- `lambda_home = max(0.2, base + scale * (team_a_total - team_b_total) / 100)`
+- `lambda_away = max(0.2, base + scale * (team_b_total - team_a_total) / 100)`
+- best current grid result from stored samples: `base = 1.00`, `scale = 0.20`
+
+Confidence note:
+- sample size is still small, so this remains a fallback for simulator/bot realism, not a claimed exact original formula.
+
 ## Simulated walkthrough
 Input sample:
 - Team A effective: `6890.6`
 - Team B effective: `6878.0` (illustrative composition from your provided components)
 - delta: `+12.6`
 
-If using Model A trial:
-- base_rate both teams: `1.2`
-- strength_scale: `0.00005`
-- `lambda_home = 1.2 + 12.6 * 0.00005 = 1.20063`
-- `lambda_away = 1.2 - 12.6 * 0.00005 = 1.19937`
+If using selected fallback:
+- `base = 1.00`
+- `scale = 0.20`
+- delta term: `12.6 / 100 = 0.126`
+- `lambda_home = 1.00 + 0.20 * 0.126 = 1.0252`
+- `lambda_away = 1.00 - 0.20 * 0.126 = 0.9748`
 
 Result tendency:
-- near-even game, slight home edge, plausible for 1:0 or 1:1 outcomes.
+- near-even game, slight edge to Team A, with most likely outcomes still in low-score bands.
 
 What this accomplishes:
 - keeps simulation sensitive to tactical and role bonuses without producing unrealistic blowouts for small strength deltas.
+- provides a deterministic and calibratable fallback until larger historical match logs are captured.

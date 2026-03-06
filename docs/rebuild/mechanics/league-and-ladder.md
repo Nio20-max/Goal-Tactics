@@ -4,6 +4,7 @@
 1. Extracted constants for lineup lock and ladder stamina from decompiled settings.
 2. Extracted table sorting logic from decompiled league viewmodel.
 3. Combined with known route contracts for ladder challenge and match execution.
+4. Confirmed stamina loop behavior with simulation walkthrough assumptions.
 
 ## Exact from decompiled logic
 - Ladder constants:
@@ -31,6 +32,10 @@ Candidate ladder points update model:
 - on win: `points += WinPoints`
 - on loss: `points -= LosePoints`
 - stamina consumption per match as returned by challenge payload
+
+Current status:
+- stamina constants are exact from decompiled client (`25` per match, `100` max)
+- point updates and matchmaking remain server-driven until more match/ladder logs are collected
 
 ## Simulated walkthrough
 - Team starts with stamina `100`.

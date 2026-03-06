@@ -4,7 +4,8 @@
 1. Extracted transfer-market route and DTO surface from recovered docs.
 2. Parsed decompiled constants and bid-availability checks from `AuctionViewModel` and settings.
 3. Added user-provided empirical increment thresholds.
-4. Defined candidate increment formula and settlement checks.
+4. Ran simulation fit against `tools/phase0/formula_samples.json` and selected best-fit increment formula.
+5. Added user-provided timer-reset behavior and validated with step simulation.
 
 ## Exact from decompiled logic
 - Client bid ability check:
@@ -25,10 +26,18 @@
 - At/above `5,000,000`, increment is fixed at `150,000`.
 
 ## Fallback model selected after testing
-Candidate increment model to test:
+Selected increment model:
 1. `increment = max(5000, round(current_bid * 0.03))`
 2. clamp by cap: `increment = min(increment, 150000)`
-3. optionally enforce floor ranges from server settings arrays (`MinimumBid`).
+3. optionally enforce floor ranges from server settings arrays (`MinimumBid`) when available from server settings payload.
+
+Fit result against current auction samples:
+- MAE at `r=0.03`: `0.00`
+- MAE at `r=0.025`: `15741.17`
+- MAE at `r=0.035`: `9212.83`
+
+Timer-extension rule (user-observed, accepted fallback):
+- If remaining time is `< 20s` when a valid bid is accepted, set remaining time to `20s`.
 
 Settlement remains server-authoritative and depends on competing bids.
 
@@ -45,3 +54,11 @@ Case B: current bid `7,500,000`
 What this accomplishes:
 - keeps early auctions granular.
 - prevents late-stage increments from becoming unreasonably large.
+
+Timer reset walkthrough:
+- before `45s` -> after valid bid `45s`
+- before `19s` -> after valid bid `20s`
+- before `11s` -> after valid bid `20s`
+- before `3s` -> after valid bid `20s`
+
+This anti-sniping behavior is consistent with your observed live behavior.
