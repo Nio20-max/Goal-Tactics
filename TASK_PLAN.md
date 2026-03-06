@@ -12,7 +12,7 @@ Scope: Execute user tasks 0-7 in strict order and record completion state.
 - [x] 4. Write exact account of app contents/features and what they did (clear, not too technical, concrete).
 - [x] 5. Write detailed account of server software and server details required to rebuild backend.
 - [x] 6. Move files/folders into clearer subfolder organization to reduce top-level clutter.
-- [ ] 7. Push all changes to `origin master` from `/root/projekte/Goal-Tactics/`.
+- [x] 7. Push all changes to `origin master` from `/root/projekte/Goal-Tactics/`.
 
 ## Execution Plan (Ordered)
 
@@ -53,3 +53,4 @@ Scope: Execute user tasks 0-7 in strict order and record completion state.
 - 2026-03-06: Task 4 completed (`Goal Tactics app/docs/app-content-and-function-overview.md` created as the non-technical but concrete app walkthrough).
 - 2026-03-06: Task 5 completed (`Goal Tactics app/docs/backend-server-rebuild-requirements.md` created with server/runtime/deployment requirements).
 - 2026-03-06: Task 6 completed (root reorganized into grouped folders: `analysis/`, `reference_materials/`, and `reverse_engineering/`; plan/docs paths updated to match).
+- 2026-03-06: Task 7 completed (committed as `32973ab` and pushed to `origin/master`; GitHub accepted the push with a warning that `reverse_engineering/jadx/lib/jadx-1.5.5-all.jar` is larger than the recommended 50 MB threshold).
