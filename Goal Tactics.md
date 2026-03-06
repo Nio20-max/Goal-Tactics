@@ -1,5 +1,5 @@
 - Goal Tactics
-  - actual version
+  - current version
     - shop
       - stars
         - Android
