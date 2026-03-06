@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GoalTactics.Api/GoalTactics.Api.csproj" />
+    <Project Path="src/GoalTactics.Application/GoalTactics.Application.csproj" />
+    <Project Path="src/GoalTactics.Contracts/GoalTactics.Contracts.csproj" />
+    <Project Path="src/GoalTactics.Infrastructure/GoalTactics.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GoalTactics.ContractTests/GoalTactics.ContractTests.csproj" />
+    <Project Path="tests/GoalTactics.UnitTests/GoalTactics.UnitTests.csproj" />
+  </Folder>
+</Solution>

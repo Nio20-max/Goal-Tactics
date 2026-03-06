@@ -2,3 +2,8 @@
 jadx/*
 .venv/*
 */jadx-1.5.5-all.jar
+
+# .NET build artifacts
+**/bin/
+**/obj/
+**/TestResults/

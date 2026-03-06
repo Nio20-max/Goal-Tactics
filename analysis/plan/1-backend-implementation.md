@@ -522,3 +522,38 @@ Phase 1 is complete only when:
 - all critical mechanics are implemented from the frozen Phase 0 spec
 - all economy mutations are transactional and audited
 - workers can resolve matches, auctions, scouting, training, sponsors, and season ticks without manual intervention
+
+## 1.12 Implementation Progress Checkpoint
+
+Status as of initial Phase 1 start:
+
+- Backend solution scaffolded in repository root as `GoalTactics.slnx`.
+- Projects created and wired:
+  - `src/GoalTactics.Api`
+  - `src/GoalTactics.Application`
+  - `src/GoalTactics.Contracts`
+  - `tests/GoalTactics.UnitTests`
+  - `tests/GoalTactics.ContractTests`
+- First API slice implemented with tests:
+  - `GET /api/Ping`
+  - `GET /api/GetVersion`
+  - `POST /api/GetCountries`
+  - `POST /api/Register`
+  - `POST /api/Login`
+  - `POST /api/VerifyLogin`
+- Current implementation detail:
+  - Common endpoints use in-memory catalog and config-backed version string.
+  - Auth endpoints now use security-focused in-memory auth with hashed passwords and signed JWT tokens.
+  - JWT bearer authentication/authorization middleware is active for protected routes.
+  - Persistence and database-backed identity/session storage are pending subsequent Phase 1 slices.
+- Test cadence in use:
+  - full suite run after each implementation slice via `dotnet test GoalTactics.slnx`.
+  - current result at this checkpoint: all tests passing.
+
+Security baseline completed in Step 1 continuation:
+
+- PBKDF2 password hashing added via `IPasswordHasher` and API security implementation.
+- JWT token issuance and signature/lifetime validation added via `ITokenService`.
+- Bearer token authentication configured in API pipeline.
+- Protected endpoint (`GET /api/Me`) added and contract-tested.
+- Negative-path tests added for tampered token and missing bearer token.
