@@ -14,16 +14,26 @@ Completed API slices in `src/`:
 - League (`LeagueController`) with 16-club table generation, pyramid expansion, and `Mount=2` / `Dismount=8` behavior.
 - Friends (`FriendsController`) with list/search, like/unlike, accept/decline, and friendly challenge flow.
 - Ladder (`LadderController`) with ladder table, challenge preview, stamina restore, and match execution (`StaminaCost=25`, `StaminaMax=100`).
+- Chat (`ChatController`) with history/post/typing API routes.
+- Lineup (`LineupController`) with lineup list, match lineup payload, and save route.
+- Live (`LiveController`) with live match and report payload routes.
+- Scouting (`ScoutingController`) with scout list/instruction/recruit/speedup routes.
+- Shop (`ShopController`) with products/equipment/purchase verification/buy/use routes.
+- Sponsor (`SponsorController`) with offer fetch, negotiate, and accept routes.
+- Squad (`SquadController`) with squad fetch, statistics, player mutations, contracts/upgrades/heal routes.
+- Stadium (`StadiumController`) with overview/build/build-places/speedup/grass/rename routes.
+- Training (`TrainingController`) with team/tactic/camp/individual training lifecycle routes.
+- TransferMarket (`TransferMarketController`) with search/details/bid/favorites routes.
 
 Validation status:
 
-- Contract tests are green after Ladder integration: `total: 20, failed: 0, succeeded: 20`.
+- Contract tests are green after adding all API controller slices: `total: 20, failed: 0, succeeded: 20`.
 
 ## 1.0.1 Remaining work snapshot (2026-03-06)
 
 Still open in Phase 1 implementation (high level):
 
-- API slices not yet implemented: chat, lineup, live, scouting, shop, sponsor, squad, stadium, training, transfer market.
+- API slices: all planned controller slices from section 1.4 are now present and wired.
 - Realtime hubs not yet implemented: `/chat`, `/auc` (including reconnect-safe event replay behavior).
 - Worker/background job layer not yet implemented (season ticks, match resolution, auctions, scouting/training/sponsor cycles, cleanup jobs).
 - Formula-complete mechanics not yet implemented for all systems listed in section 1.6 (match simulation depth, scouting generation, transfer settlement, sponsor/economy cadence).
