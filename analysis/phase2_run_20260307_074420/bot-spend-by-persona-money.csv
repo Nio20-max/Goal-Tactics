@@ -1,7 +1,7 @@
-persona,resource,scouting.standard,transfer.fee,total
-AggressiveTraderBot,money,410000,2026804738,2027214738
-ConservativeBot,money,460000,6323143,6783143
-LadderGrinderBot,money,550000,1364666095,1365216095
-NewManagerBot,money,430000,1325923803,1326353803
-SocialBot,money,420000,1335566205,1335986205
-YouthFocusedBot,money,410000,1309320657,1309730657
+persona            , resource, scouting.standard, transfer.fee, total
+AggressiveTraderBot, money   ,            410000,   2026804738, 2027214738
+ConservativeBot    , money   ,            460000,      6323143,    6783143
+LadderGrinderBot   , money   ,            550000,   1364666095, 1365216095
+NewManagerBot      , money   ,            430000,   1325923803, 1326353803
+SocialBot          , money   ,            420000,   1335566205, 1335986205
+YouthFocusedBot    , money   ,            410000,   1309320657, 1309730657

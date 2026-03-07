@@ -57,6 +57,8 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
     {
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
         var news = await teamStore.GetTeamNewsAsync(team.TeamId, cancellationToken);
+        var stadium = await teamStore.GetStadiumStateAsync(userId, cancellationToken);
+        var players = await teamStore.GetSquadPlayersAsync(userId, cancellationToken);
 
         return new ExtendedTeamDataResponse
         {
@@ -85,10 +87,10 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
                     LastActivity = team.UserLastActivityAtUtc?.ToString("O")
                 },
                 LeaguePosition = 1,
-                PlayersCount = 11,
+                PlayersCount = players.Count,
                 BestVictory = "3-0",
                 WorstDefeat = "0-2",
-                StadiumSize = 5000
+                StadiumSize = stadium.Capacity
             },
             News = news.Select(x => new ClubNews { Date = x.Date, Title = x.Title, Text = x.Text }).ToArray(),
             Season = "S1",

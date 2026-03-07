@@ -28,6 +28,9 @@ public sealed class BotTeamSeasonTracker
                 LeagueGroup = bot.LeagueGroup,
                 StadiumLevel = bot.StadiumLevel,
                 TrainingCenterLevel = bot.TrainingCenterLevel,
+                OfficeLevel = bot.OfficeLevel,
+                FanShopLevel = bot.FanShopLevel,
+                ParkingLevel = bot.ParkingLevel,
                 TeamStrength = bot.Strength,
                 MoneyBalance = bot.Money,
                 StarsBalance = bot.Stars,
@@ -48,7 +51,7 @@ public sealed class BotTeamSeasonTracker
 
         var csv = new List<string>
         {
-            "team_name,season,persona,tier,group,stadium_level,training_center_level,team_strength,money_balance,stars_balance,money_in,money_out,stars_in,stars_out"
+            "team_name,season,persona,tier,group,stadium_level,training_center_level,office_level,fan_shop_level,parking_level,team_strength,money_balance,stars_balance,money_in,money_out,stars_in,stars_out"
         };
 
         csv.AddRange(ordered.Select(x => string.Join(',',
@@ -59,6 +62,9 @@ public sealed class BotTeamSeasonTracker
             x.LeagueGroup,
             x.StadiumLevel,
             x.TrainingCenterLevel,
+            x.OfficeLevel,
+            x.FanShopLevel,
+            x.ParkingLevel,
             x.TeamStrength,
             x.MoneyBalance,
             x.StarsBalance,

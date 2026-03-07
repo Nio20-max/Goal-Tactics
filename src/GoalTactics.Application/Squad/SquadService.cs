@@ -1,4 +1,5 @@
 using GoalTactics.Contracts.Squad;
+using GoalTactics.Application.Team;
 
 namespace GoalTactics.Application.Squad;
 
@@ -27,48 +28,73 @@ public interface ISquadService
     Task HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
 }
 
-public sealed class SquadService : ISquadService
+public sealed class SquadService(ITeamStore teamStore) : ISquadService
 {
-    public Task<SquadResponse> GetSquadAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<SquadResponse> GetSquadAsync(string userId, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new SquadResponse
+        var players = await teamStore.GetSquadPlayersAsync(userId, cancellationToken);
+        return new SquadResponse
         {
             Success = true,
-            Players =
-            [
-                new SquadPlayerData
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "Player One",
-                    Position = "MID",
-                    Strength = 62,
-                    Fitness = 95
-                }
-            ]
-        });
+            Players = players.Select(x => new SquadPlayerData
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Position = x.Position,
+                Strength = x.Strength,
+                Fitness = x.Fitness
+            }).ToArray()
+        };
     }
 
-    public Task<PlayerStatisticsResponse> GetPlayerStatisticsAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    public async Task<PlayerStatisticsResponse> GetPlayerStatisticsAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new PlayerStatisticsResponse
+        var player = await teamStore.GetSquadPlayerAsync(userId, playerId, cancellationToken);
+        if (player is null)
+        {
+            return new PlayerStatisticsResponse { Success = false, Message = "Player not found" };
+        }
+
+        return new PlayerStatisticsResponse
         {
             Success = true,
             Statistics = new PlayerStatisticsData
             {
                 PlayerId = playerId,
-                Matches = 12,
-                Goals = 5,
-                YellowCards = 1,
-                RedCards = 0
+                Matches = player.Matches,
+                Goals = player.Goals,
+                YellowCards = player.YellowCards,
+                RedCards = player.RedCards
             }
-        });
+        };
     }
 
-    public Task ChangePlayerNameAsync(string userId, Guid playerId, string? value, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task ChangePlayerNameAsync(string userId, Guid playerId, string? value, CancellationToken cancellationToken = default)
+    {
+        var success = await teamStore.UpdatePlayerNameAsync(userId, playerId, value, cancellationToken);
+        if (!success)
+        {
+            throw new InvalidOperationException("Player not found.");
+        }
+    }
 
-    public Task ChangePlayerOriginAsync(string userId, Guid playerId, string? value, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task ChangePlayerOriginAsync(string userId, Guid playerId, string? value, CancellationToken cancellationToken = default)
+    {
+        var success = await teamStore.UpdatePlayerOriginAsync(userId, playerId, value, cancellationToken);
+        if (!success)
+        {
+            throw new InvalidOperationException("Player not found.");
+        }
+    }
 
-    public Task ChangePlayerShirtAsync(string userId, Guid playerId, int shirtNumber, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task ChangePlayerShirtAsync(string userId, Guid playerId, int shirtNumber, CancellationToken cancellationToken = default)
+    {
+        var success = await teamStore.UpdatePlayerShirtAsync(userId, playerId, shirtNumber, cancellationToken);
+        if (!success)
+        {
+            throw new InvalidOperationException("Player not found.");
+        }
+    }
 
     public Task SellPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 

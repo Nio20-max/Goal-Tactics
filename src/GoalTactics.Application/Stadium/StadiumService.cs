@@ -1,4 +1,5 @@
 using GoalTactics.Contracts.Stadium;
+using GoalTactics.Application.Team;
 
 namespace GoalTactics.Application.Stadium;
 
@@ -17,46 +18,62 @@ public interface IStadiumService
     Task RenameAsync(string userId, string? name, CancellationToken cancellationToken = default);
 }
 
-public sealed class StadiumService : IStadiumService
+public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
 {
-    public Task<StadiumResponse> GetStadiumAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<StadiumResponse> GetStadiumAsync(string userId, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new StadiumResponse
+        var stadium = await teamStore.GetStadiumStateAsync(userId, cancellationToken);
+        return new StadiumResponse
         {
             Success = true,
             Stadium = new StadiumData
             {
-                Name = "My Stadium",
-                GrassQuality = 80,
-                Capacity = 5000,
-                EarningsAverage = 25000
+                Name = stadium.Name,
+                GrassQuality = stadium.GrassQuality,
+                Capacity = stadium.Capacity,
+                EarningsAverage = stadium.EarningsAverage
             }
-        });
+        };
     }
 
-    public Task<BuildPlacesResponse> GetBuildPlacesAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<BuildPlacesResponse> GetBuildPlacesAsync(string userId, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new BuildPlacesResponse
+        var places = await teamStore.GetBuildPlacesAsync(userId, cancellationToken);
+        return new BuildPlacesResponse
         {
             Success = true,
-            Places =
-            [
-                new BuildPlaceData
-                {
-                    Id = Guid.NewGuid(),
-                    BuildingType = "Tribune",
-                    Level = 1,
-                    CanBuild = true
-                }
-            ]
-        });
+            Places = places.Select(x => new BuildPlaceData
+            {
+                Id = x.Id,
+                BuildingType = x.BuildingType,
+                Level = x.Level,
+                CanBuild = x.CanBuild
+            }).ToArray()
+        };
     }
 
-    public Task BuildAsync(string userId, Guid placeId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task BuildAsync(string userId, Guid placeId, CancellationToken cancellationToken = default)
+    {
+        var success = await teamStore.BuildPlaceAsync(userId, placeId, cancellationToken);
+        if (!success)
+        {
+            throw new InvalidOperationException("Upgrade unavailable or insufficient resources.");
+        }
+    }
 
-    public Task SpeedupAsync(string userId, Guid buildId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task SpeedupAsync(string userId, Guid buildId, CancellationToken cancellationToken = default)
+    {
+        // Build timers are not modeled yet, so speedup currently triggers immediate build semantics.
+        return BuildAsync(userId, buildId, cancellationToken);
+    }
 
-    public Task RenewGrassAsync(string userId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task RenewGrassAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        return teamStore.RenewGrassAsync(userId, cancellationToken);
+    }
 
-    public Task RenameAsync(string userId, string? name, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task RenameAsync(string userId, string? name, CancellationToken cancellationToken = default)
+    {
+        return teamStore.RenameStadiumAsync(userId, string.IsNullOrWhiteSpace(name) ? "My Stadium" : name.Trim(), cancellationToken);
+    }
 }

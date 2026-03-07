@@ -54,8 +54,11 @@ public sealed class BotRegistry
                 Tier = tier,
                 LeagueGroup = group,
                 Position = 1 + (i % options.TeamsPerLeague),
+                OfficeLevel = 4 + random.Next(0, 5),
                 StadiumLevel = 1 + random.Next(0, 4),
                 TrainingCenterLevel = 2 + random.Next(0, 5),
+                FanShopLevel = 1 + random.Next(0, 4),
+                ParkingLevel = 1 + random.Next(0, 4),
                 TeamMainTrainingPosition = random.Next(0, 4),
                 TeamSubTrainingSkill = random.Next(0, 10)
             });

@@ -31,6 +31,7 @@ public sealed class BotSimulationRunner(
             var report = metricsCollector.StartSeason(season);
             playerCareerTracker.StartSeason(season);
             ResetSeasonFlowCounters(bots);
+            ResetSeasonSportCounters(bots);
             InitializeSeasonSponsors(bots, report, clock.CurrentUtc);
             await RunSeasonAsync(bots, report, cancellationToken);
 
@@ -80,6 +81,7 @@ public sealed class BotSimulationRunner(
             await ExecuteBotLoopAsync(bots, report, hasTrainingTick: false, hasLeagueMatch: true, hasFriendlyMatch: false, cancellationToken);
 
             await ResolveLeagueMatchesAsync(bots, report);
+            ApplyDailyStadiumIncome(bots, DateOnly.FromDateTime(clock.CurrentUtc));
             clock.AdvanceDay();
             clock.AdvanceMatchday();
 
@@ -211,13 +213,35 @@ public sealed class BotSimulationRunner(
         }
     }
 
+    private static void ResetSeasonSportCounters(IReadOnlyList<BotClubProfile> bots)
+    {
+        foreach (var bot in bots)
+        {
+            bot.SeasonWins = 0;
+            bot.SeasonLosses = 0;
+            bot.SeasonDraws = 0;
+        }
+    }
+
     private void ApplySeasonInfrastructureInvestments(IReadOnlyList<BotClubProfile> bots)
     {
         foreach (var bot in bots)
         {
-            var random = new Random(HashCode.Combine(bot.Seed, clock.CurrentSeason, bot.StadiumLevel, bot.TrainingCenterLevel));
+            var random = new Random(HashCode.Combine(bot.Seed, clock.CurrentSeason, bot.StadiumLevel, bot.TrainingCenterLevel, bot.OfficeLevel));
 
-            if (bot.StadiumLevel < 12 && bot.Money > 250_000m && random.NextDouble() < 0.65)
+            if (bot.OfficeLevel < 20 && bot.Money > 300_000m && random.NextDouble() < 0.55)
+            {
+                var officeCost = 70_000m + (25_000m * bot.OfficeLevel);
+                if (bot.Money >= officeCost)
+                {
+                    bot.Money -= officeCost;
+                    bot.MoneyOutSeason += officeCost;
+                    metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.office", officeCost);
+                    bot.OfficeLevel++;
+                }
+            }
+
+            if (bot.StadiumLevel < 20 && bot.OfficeLevel >= (bot.StadiumLevel + 1) && bot.Money > 250_000m && random.NextDouble() < 0.60)
             {
                 var cost = 90_000m + (20_000m * bot.StadiumLevel);
                 if (bot.Money >= cost)
@@ -229,7 +253,7 @@ public sealed class BotSimulationRunner(
                 }
             }
 
-            if (bot.TrainingCenterLevel < 12 && bot.Stars > 2_500m && random.NextDouble() < 0.70)
+            if (bot.TrainingCenterLevel < 20 && bot.OfficeLevel >= (bot.TrainingCenterLevel + 1) && bot.Stars > 2_500m && random.NextDouble() < 0.70)
             {
                 var starsCost = 1_200m + (180m * bot.TrainingCenterLevel);
                 if (bot.Stars >= starsCost)
@@ -240,6 +264,60 @@ public sealed class BotSimulationRunner(
                     bot.TrainingCenterLevel++;
                 }
             }
+
+            if (bot.FanShopLevel < 20 && bot.OfficeLevel >= (bot.FanShopLevel + 1) && bot.Money > 200_000m && random.NextDouble() < 0.45)
+            {
+                var fanShopCost = 55_000m + (18_000m * bot.FanShopLevel);
+                if (bot.Money >= fanShopCost)
+                {
+                    bot.Money -= fanShopCost;
+                    bot.MoneyOutSeason += fanShopCost;
+                    metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.fan_shop", fanShopCost);
+                    bot.FanShopLevel++;
+                }
+            }
+
+            if (bot.ParkingLevel < 20 && bot.OfficeLevel >= (bot.ParkingLevel + 1) && bot.Money > 180_000m && random.NextDouble() < 0.40)
+            {
+                var parkingCost = 45_000m + (14_000m * bot.ParkingLevel);
+                if (bot.Money >= parkingCost)
+                {
+                    bot.Money -= parkingCost;
+                    bot.MoneyOutSeason += parkingCost;
+                    metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.parking", parkingCost);
+                    bot.ParkingLevel++;
+                }
+            }
+        }
+    }
+
+    private void ApplyDailyStadiumIncome(IReadOnlyList<BotClubProfile> bots, DateOnly day)
+    {
+        foreach (var bot in bots)
+        {
+            var ticket = GetTicketPricesByTier(bot.Tier);
+            var seatCaps = GetSeatCapsByTier(bot.Tier);
+
+            var vipSeats = Math.Min(seatCaps.MaxVipSeats, 200 + (bot.StadiumLevel * 130));
+            var sitSeats = Math.Min(seatCaps.MaxSitSeats, 2_500 + (bot.StadiumLevel * 1_750));
+
+            // Standing seats are theoretically uncapped, but attendance is demand-limited.
+            var standBuilt = 3_000 + (bot.StadiumLevel * 2_200);
+            var standingDemandCap = GetStandingDemandCap(bot.Tier, bot.SeasonWins, bot.SeasonLosses);
+            var standSold = Math.Min(standBuilt, standingDemandCap);
+
+            var gross =
+                (vipSeats * ticket.Vip) +
+                (sitSeats * ticket.Sit) +
+                (standSold * ticket.Stand);
+
+            // Facility bonuses and running costs make other buildings economically relevant.
+            var facilityBonus = (bot.FanShopLevel * 450m) + (bot.ParkingLevel * 300m);
+            var facilityCost = (bot.OfficeLevel * 250m) + (bot.FanShopLevel * 180m) + (bot.ParkingLevel * 150m);
+            var net = Math.Max(0m, gross + facilityBonus - facilityCost);
+
+            bot.Money += net;
+            bot.MoneyInSeason += net;
         }
     }
 
@@ -297,18 +375,60 @@ public sealed class BotSimulationRunner(
             if (homeScore > awayScore)
             {
                 report.HomeWins++;
+                home.SeasonWins++;
+                away.SeasonLosses++;
             }
             else if (awayScore > homeScore)
             {
                 report.AwayWins++;
+                away.SeasonWins++;
+                home.SeasonLosses++;
             }
             else
             {
                 report.Draws++;
+                home.SeasonDraws++;
+                away.SeasonDraws++;
             }
 
             await logWriter.WriteAsync("simulation-events.log", $"{clock.CurrentUtc:O}|league.match|home={home.TeamName}|away={away.TeamName}|score={homeScore}:{awayScore}|tier={home.Tier}");
         }
+    }
+
+    private static (int Vip, int Sit, int Stand) GetTicketPricesByTier(int tier)
+    {
+        return tier switch
+        {
+            1 => (436, 34, 17),
+            2 => (343, 27, 13),
+            3 => (269, 21, 10),
+            _ => (212, 16, 8)
+        };
+    }
+
+    private static (int MaxVipSeats, int MaxSitSeats) GetSeatCapsByTier(int tier)
+    {
+        return tier switch
+        {
+            1 => (2800, 35000),
+            2 => (2300, 28500),
+            3 => (1900, 24000),
+            _ => (1700, 20000)
+        };
+    }
+
+    private static int GetStandingDemandCap(int tier, int wins, int losses)
+    {
+        var baseline = tier switch
+        {
+            1 => 58_000,
+            2 => 46_000,
+            3 => 36_000,
+            _ => 30_000
+        };
+
+        var formModifier = Math.Clamp((wins - losses) * 750, -12_000, 18_000);
+        return Math.Max(5_000, baseline + formModifier);
     }
 
     private void ValidateScheduleOrThrow()

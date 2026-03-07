@@ -237,10 +237,10 @@ public sealed class BotPlayerCareerTracker(BotOptions options)
     {
         foreach (var player in trackedPlayers)
         {
+            player.CurrentAge++;
+
             if (!player.Sold)
             {
-                player.CurrentAge++;
-
                 // Fitness naturally drifts down with age but remains bounded.
                 if (player.CurrentAge > 28)
                 {

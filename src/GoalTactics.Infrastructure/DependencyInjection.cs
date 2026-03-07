@@ -3,6 +3,7 @@ using GoalTactics.Application.Chat;
 using GoalTactics.Application.Friends;
 using GoalTactics.Application.League;
 using GoalTactics.Application.Ladder;
+using GoalTactics.Application.Mechanics;
 using GoalTactics.Application.Team;
 using GoalTactics.Application.Tutorial;
 using GoalTactics.Application.User;
@@ -37,6 +38,9 @@ public static class DependencyInjection
         services.AddScoped<IFriendsStore, FriendsDbStore>();
         services.AddScoped<ILeagueStore, LeagueDbStore>();
         services.AddScoped<ILadderStore, LadderDbStore>();
+        services.AddSingleton<StadiumEconomyService>();
+        services.AddSingleton<TrainingProgressService>();
+        services.AddSingleton<TeamStrengthCalculator>();
         services.AddScoped<ITeamStore, TeamDbStore>();
         services.AddScoped<ITutorialStore, TutorialDbStore>();
         services.AddScoped<IUserStore, UserDbStore>();

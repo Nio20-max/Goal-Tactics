@@ -17,6 +17,10 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
 
     public DbSet<TeamResourcesEntity> TeamResources => Set<TeamResourcesEntity>();
 
+    public DbSet<TeamPlayerEntity> TeamPlayers => Set<TeamPlayerEntity>();
+
+    public DbSet<TeamTrainingStateEntity> TeamTrainingStates => Set<TeamTrainingStateEntity>();
+
     public DbSet<TeamNewsEntity> TeamNews => Set<TeamNewsEntity>();
 
     public DbSet<TeamMailEntity> TeamMail => Set<TeamMailEntity>();
@@ -131,6 +135,9 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.Members).HasColumnName("members").IsRequired();
             entity.Property(x => x.Strength).HasColumnName("strength").IsRequired();
             entity.Property(x => x.MatchTrend).HasColumnName("match_trend").HasMaxLength(32).IsRequired();
+            entity.Property(x => x.StadiumName).HasColumnName("stadium_name").HasMaxLength(96).IsRequired();
+            entity.Property(x => x.GrassQuality).HasColumnName("grass_quality").IsRequired();
+            entity.Property(x => x.LeagueTier).HasColumnName("league_tier").IsRequired();
             entity.HasIndex(x => x.UserId).IsUnique();
             entity.HasOne(x => x.User)
                 .WithMany()
@@ -146,9 +153,68 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.Money).HasColumnName("money").IsRequired();
             entity.Property(x => x.Medipacks).HasColumnName("medipacks").IsRequired();
             entity.Property(x => x.GTStars).HasColumnName("gt_stars").IsRequired();
+            entity.Property(x => x.OfficeLevel).HasColumnName("office_level").IsRequired();
+            entity.Property(x => x.TrainingCenterLevel).HasColumnName("training_center_level").IsRequired();
+            entity.Property(x => x.MedicalCenterLevel).HasColumnName("medical_center_level").IsRequired();
+            entity.Property(x => x.YouthAcademyLevel).HasColumnName("youth_academy_level").IsRequired();
+            entity.Property(x => x.FanShopLevel).HasColumnName("fan_shop_level").IsRequired();
+            entity.Property(x => x.ParkingLevel).HasColumnName("parking_level").IsRequired();
+            entity.Property(x => x.StadiumVipSeats).HasColumnName("stadium_vip_seats").IsRequired();
+            entity.Property(x => x.StadiumSitSeats).HasColumnName("stadium_sit_seats").IsRequired();
+            entity.Property(x => x.StadiumStandSeats).HasColumnName("stadium_stand_seats").IsRequired();
+            entity.Property(x => x.StadiumVisitorsLastMatch).HasColumnName("stadium_visitors_last_match").IsRequired();
+            entity.Property(x => x.StadiumVisitorsTotal).HasColumnName("stadium_visitors_total").IsRequired();
+            entity.Property(x => x.StadiumEarningsLastMatch).HasColumnName("stadium_earnings_last_match").IsRequired();
+            entity.Property(x => x.StadiumEarningsTotal).HasColumnName("stadium_earnings_total").IsRequired();
+            entity.Property(x => x.StadiumMatchesCount).HasColumnName("stadium_matches_count").IsRequired();
+            entity.Property(x => x.LastEconomyTickUtc).HasColumnName("last_economy_tick_utc");
+            entity.Property(x => x.LastTrainingTickUtc).HasColumnName("last_training_tick_utc");
+            entity.Property(x => x.ProgressDayCounter).HasColumnName("progress_day_counter").IsRequired();
             entity.HasOne(x => x.Team)
                 .WithOne()
                 .HasForeignKey<TeamResourcesEntity>(x => x.TeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TeamPlayerEntity>(entity =>
+        {
+            entity.ToTable("team_players");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.TeamId).HasColumnName("team_id").IsRequired();
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Origin).HasColumnName("origin").HasMaxLength(8).IsRequired();
+            entity.Property(x => x.Position).HasColumnName("position").HasMaxLength(8).IsRequired();
+            entity.Property(x => x.ShirtNumber).HasColumnName("shirt_number").IsRequired();
+            entity.Property(x => x.Age).HasColumnName("age").IsRequired();
+            entity.Property(x => x.Talent).HasColumnName("talent").IsRequired();
+            entity.Property(x => x.Strength).HasColumnName("strength").IsRequired();
+            entity.Property(x => x.Fitness).HasColumnName("fitness").IsRequired();
+            entity.Property(x => x.Matches).HasColumnName("matches").IsRequired();
+            entity.Property(x => x.Goals).HasColumnName("goals").IsRequired();
+            entity.Property(x => x.YellowCards).HasColumnName("yellow_cards").IsRequired();
+            entity.Property(x => x.RedCards).HasColumnName("red_cards").IsRequired();
+            entity.Property(x => x.IndividualTrainingSkill).HasColumnName("individual_training_skill").HasMaxLength(32);
+            entity.Property(x => x.IndividualTrainingUntilUtc).HasColumnName("individual_training_until_utc");
+            entity.HasIndex(x => x.TeamId);
+            entity.HasOne(x => x.Team)
+                .WithMany()
+                .HasForeignKey(x => x.TeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TeamTrainingStateEntity>(entity =>
+        {
+            entity.ToTable("team_training_state");
+            entity.HasKey(x => x.TeamId);
+            entity.Property(x => x.TeamId).HasColumnName("team_id");
+            entity.Property(x => x.MainSkillIndex).HasColumnName("main_skill_index").IsRequired();
+            entity.Property(x => x.SubSkillIndex).HasColumnName("sub_skill_index").IsRequired();
+            entity.Property(x => x.CampType).HasColumnName("camp_type").HasMaxLength(32).IsRequired();
+            entity.Property(x => x.CampActiveUntilUtc).HasColumnName("camp_active_until_utc");
+            entity.HasOne(x => x.Team)
+                .WithOne()
+                .HasForeignKey<TeamTrainingStateEntity>(x => x.TeamId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

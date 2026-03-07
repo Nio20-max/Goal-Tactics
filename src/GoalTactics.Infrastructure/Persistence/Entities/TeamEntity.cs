@@ -32,5 +32,11 @@ public sealed class TeamEntity
 
     public string MatchTrend { get; set; } = "Stable";
 
+    public string StadiumName { get; set; } = "My Stadium";
+
+    public int GrassQuality { get; set; } = 80;
+
+    public int LeagueTier { get; set; } = 4;
+
     public UserEntity? User { get; set; }
 }

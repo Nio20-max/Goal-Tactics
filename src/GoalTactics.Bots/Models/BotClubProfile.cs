@@ -52,6 +52,12 @@ public sealed class BotClubProfile
 
     public int TrainingCenterLevel { get; set; } = 1;
 
+    public int OfficeLevel { get; set; } = 1;
+
+    public int FanShopLevel { get; set; } = 1;
+
+    public int ParkingLevel { get; set; } = 1;
+
     public int TeamMainTrainingPosition { get; set; }
 
     public int TeamSubTrainingSkill { get; set; }
@@ -59,6 +65,12 @@ public sealed class BotClubProfile
     public DateTime? CampActiveUntilUtc { get; set; }
 
     public decimal CampPower { get; set; }
+
+    public int SeasonWins { get; set; }
+
+    public int SeasonLosses { get; set; }
+
+    public int SeasonDraws { get; set; }
 
     public decimal MoneyInSeason { get; set; }
 

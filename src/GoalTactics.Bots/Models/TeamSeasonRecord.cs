@@ -18,6 +18,12 @@ public sealed class TeamSeasonRecord
 
     public int TrainingCenterLevel { get; init; }
 
+    public int OfficeLevel { get; init; }
+
+    public int FanShopLevel { get; init; }
+
+    public int ParkingLevel { get; init; }
+
     public int TeamStrength { get; init; }
 
     public decimal MoneyBalance { get; init; }
