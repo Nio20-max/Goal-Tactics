@@ -1,0 +1,1 @@
+../../Goal Tactics app/docs/Goal Tactics.md

@@ -3,16 +3,36 @@ using Mono.Cecil.Cil;
 
 if (args.Length < 3)
 {
-    Console.Error.WriteLine("Usage: AssemblyUrlPatcher <input-assembly> <output-assembly> <host> [--disable-helpshift] [--disable-appcenter] [--disable-appsflyer]");
+    Console.Error.WriteLine("Usage: AssemblyUrlPatcher <input-assembly> <output-assembly> <host>");
+    Console.Error.WriteLine();
+    Console.Error.WriteLine("This tool only supports fixed-string backend URL patching.");
+    Console.Error.WriteLine("Unsafe GT.Droid startup rewrites were removed because they produced crash-prone assemblies for the legacy Xamarin assembly store.");
     return 1;
 }
 
 var inputAssembly = Path.GetFullPath(args[0]);
 var outputAssembly = Path.GetFullPath(args[1]);
 var host = args[2].Trim().TrimEnd('/');
-var disableHelpshift = args.Skip(3).Any(arg => arg == "--disable-helpshift");
-var disableAppCenter = args.Skip(3).Any(arg => arg == "--disable-appcenter");
-var disableAppsFlyer = args.Skip(3).Any(arg => arg == "--disable-appsflyer");
+var unsupportedFlags = args
+    .Skip(3)
+    .Where(arg => arg is "--disable-helpshift" or "--disable-appcenter" or "--disable-appsflyer")
+    .Distinct(StringComparer.Ordinal)
+    .ToArray();
+
+if (unsupportedFlags.Length > 0)
+{
+    Console.Error.WriteLine("Unsupported flag(s): " + string.Join(", ", unsupportedFlags));
+    Console.Error.WriteLine("Behavior-changing GT.Droid rewrites are intentionally blocked.");
+    Console.Error.WriteLine("Use the descriptor-index-fixed GT.Core URL patch path instead of modifying startup methods or analytics constructors.");
+    return 3;
+}
+
+var unexpectedFlags = args.Skip(3).Distinct(StringComparer.Ordinal).ToArray();
+if (unexpectedFlags.Length > 0)
+{
+    Console.Error.WriteLine("Unsupported argument(s): " + string.Join(", ", unexpectedFlags));
+    return 1;
+}
 
 var replacements = new Dictionary<string, string>
 {
@@ -33,35 +53,6 @@ var readerParameters = new ReaderParameters
 };
 
 using var assembly = AssemblyDefinition.ReadAssembly(inputAssembly, readerParameters);
-
-static void ReplaceMethodWithReturn(MethodDefinition method)
-{
-    method.Body.Instructions.Clear();
-    method.Body.Variables.Clear();
-    method.Body.ExceptionHandlers.Clear();
-    method.Body.InitLocals = false;
-    method.Body.GetILProcessor().Append(Instruction.Create(OpCodes.Ret));
-}
-
-static void ReplaceConstructorWithBaseCall(MethodDefinition method)
-{
-    var baseConstructor = method.DeclaringType.BaseType?.Resolve()?.Methods.FirstOrDefault(
-        candidate => candidate.IsConstructor && !candidate.IsStatic && candidate.Parameters.Count == 0);
-    if (baseConstructor is null)
-    {
-        throw new InvalidOperationException($"Could not resolve parameterless base constructor for {method.FullName}");
-    }
-
-    method.Body.Instructions.Clear();
-    method.Body.Variables.Clear();
-    method.Body.ExceptionHandlers.Clear();
-    method.Body.InitLocals = false;
-
-    var il = method.Body.GetILProcessor();
-    il.Append(Instruction.Create(OpCodes.Ldarg_0));
-    il.Append(Instruction.Create(OpCodes.Call, method.Module.ImportReference(baseConstructor)));
-    il.Append(Instruction.Create(OpCodes.Ret));
-}
 
 var replacementsApplied = 0;
 
@@ -98,24 +89,6 @@ foreach (var module in assembly.Modules)
                     replacementsApplied++;
                 }
             }
-
-            if (disableHelpshift && type.Name == "MainActivity" && method.Name == "InitializeHelpshift" && method.Parameters.Count == 0)
-            {
-                ReplaceMethodWithReturn(method);
-                replacementsApplied++;
-            }
-
-            if (disableAppCenter && type.Name == "AppCenterAnalyticsService" && method.IsConstructor && !method.IsStatic && method.Parameters.Count == 0)
-            {
-                ReplaceConstructorWithBaseCall(method);
-                replacementsApplied++;
-            }
-
-            if (disableAppsFlyer && type.Name == "AppsFlyerAnalyticsService" && method.IsConstructor && !method.IsStatic && method.Parameters.Count == 1)
-            {
-                ReplaceConstructorWithBaseCall(method);
-                replacementsApplied++;
-            }
         }
     }
 }
@@ -125,8 +98,5 @@ assembly.Write(outputAssembly);
 
 Console.WriteLine($"Patched assembly: {outputAssembly}");
 Console.WriteLine($"Replacements applied: {replacementsApplied}");
-Console.WriteLine($"Disable Helpshift: {disableHelpshift}");
-Console.WriteLine($"Disable AppCenter: {disableAppCenter}");
-Console.WriteLine($"Disable AppsFlyer: {disableAppsFlyer}");
 
 return replacementsApplied > 0 ? 0 : 2;

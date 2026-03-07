@@ -222,8 +222,19 @@ def main() -> None:
     parser.add_argument("--host", type=str, required=True)
     parser.add_argument("--patched-gt-core", type=Path)
     parser.add_argument("--patched-gt-droid", type=Path)
+    parser.add_argument(
+        "--allow-unsafe-gt-droid-payload",
+        action="store_true",
+        help="Allow reinjecting a rewritten GT.Droid payload. This is unsafe for the legacy Xamarin assembly-store startup path and is blocked by default.",
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
+
+    if args.patched_gt_droid is not None and not args.allow_unsafe_gt_droid_payload:
+        raise SystemExit(
+            "Refusing to inject a patched GT.Droid payload without --allow-unsafe-gt-droid-payload. "
+            "The startup-bypass experiment produced crash-prone compatibility builds; prefer GT.Core-only URL patching."
+        )
 
     blob = args.blob.read_bytes()
     manifest = parse_manifest(args.manifest)
