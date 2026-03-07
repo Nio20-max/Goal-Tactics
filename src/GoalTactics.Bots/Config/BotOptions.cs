@@ -37,4 +37,16 @@ public sealed class BotOptions
     public int TeamsPerLeague { get; init; } = 16;
 
     public int MaxActionsPerSession { get; init; } = 12;
+
+    public int MaxPlayerStrength { get; init; } = 700;
+
+    public int IndividualTrainingStarsPerWeek { get; init; } = 1_000;
+
+    public int CampDurationDays { get; init; } = 7;
+
+    public int CampMoneyCost { get; init; } = 200_000;
+
+    public int CampStarsCost { get; init; } = 1_000;
+
+    public decimal CampSpecBoostPerDay { get; init; } = 1.5m;
 }

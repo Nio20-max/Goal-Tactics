@@ -90,10 +90,13 @@ public sealed class BotMetricsCollector
     {
         var lines = new List<string>
         {
-            "season,timestamp_utc,buyer_bot_id,buyer_persona,buyer_team,player_name,player_age,player_strength,player_potential,fee_money"
+            "season,timestamp_utc,buyer_bot_id,buyer_persona,buyer_team,player_name,player_age,player_talent,player_fitness,player_strength,player_potential,fee_money"
         };
 
-        lines.AddRange(completedTransfers.Select(t => string.Join(',',
+        lines.AddRange(completedTransfers
+            .OrderByDescending(x => x.FeeMoney)
+            .ThenBy(x => x.Season)
+            .Select(t => string.Join(',',
             t.Season,
             t.TimestampUtc.ToString("O"),
             t.BuyerBotId,
@@ -101,6 +104,8 @@ public sealed class BotMetricsCollector
             EscapeCsv(t.BuyerTeam),
             EscapeCsv(t.PlayerName),
             t.PlayerAge,
+            t.PlayerTalent,
+            t.PlayerFitness,
             t.PlayerStrength,
             t.PlayerPotential,
             t.FeeMoney)));

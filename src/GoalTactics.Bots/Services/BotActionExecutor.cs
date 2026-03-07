@@ -33,14 +33,14 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
                 break;
 
             case "scouting.standard":
-                bot.Money -= 10_000m;
+                SpendMoney(bot, 10_000m);
                 metricsCollector.RecordSpend(bot.Persona, "money", "scouting.standard", 10_000m);
                 await logWriter.WriteAsync("economy.log", $"{nowUtc:O}|scouting.standard|bot={bot.BotId}|money=-10000|balance={bot.Money}");
                 cooldowns.SetCooldown(bot.BotId, intent.IntentType, nowUtc, TimeSpan.FromHours(12));
                 break;
 
             case "scouting.premium":
-                bot.Stars -= 2_000m;
+                SpendStars(bot, 2_000m);
                 report.StarsSpent += 2_000;
                 metricsCollector.RecordSpend(bot.Persona, "stars", "scouting.premium", 2_000m);
                 await logWriter.WriteAsync("economy.log", $"{nowUtc:O}|scouting.premium|bot={bot.BotId}|stars=-2000|balance={bot.Stars}");
@@ -54,7 +54,7 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
                 break;
 
             case "transfer.bid":
-                bot.Stars -= options.BidStarCost;
+                SpendStars(bot, options.BidStarCost);
                 report.AuctionBids++;
                 report.StarsSpent += options.BidStarCost;
                 metricsCollector.RecordSpend(bot.Persona, "stars", "transfer.bid", options.BidStarCost);
@@ -72,7 +72,7 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
             case "shop.watch-ad":
                 if (bot.AdsWatchedToday < 12)
                 {
-                    bot.Stars += options.StarsPerAd;
+                    EarnStars(bot, options.StarsPerAd);
                     bot.AdsWatchedToday++;
                     report.AdsWatched++;
                     report.StarsEarned += options.StarsPerAd;
@@ -102,7 +102,7 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
                 break;
 
             case "ladder.restore":
-                bot.Stars -= 500m;
+                SpendStars(bot, 500m);
                 bot.LadderStamina = 100;
                 report.StarsSpent += 500;
                 metricsCollector.RecordSpend(bot.Persona, "stars", "ladder.restore", 500m);
@@ -148,7 +148,7 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
 
         if (!bot.ShortSponsorActiveUntilUtc.HasValue || nowUtc >= bot.ShortSponsorActiveUntilUtc.Value)
         {
-            bot.ShortSponsorActiveUntilUtc = nowUtc.AddDays(3);
+            bot.ShortSponsorActiveUntilUtc = nowUtc.AddDays(options.ShortSponsorRenewDays);
             report.ShortSponsorsRenewed++;
             await logWriter.WriteAsync("economy.log", $"{nowUtc:O}|sponsor.short.renew|bot={bot.BotId}|active_until={bot.ShortSponsorActiveUntilUtc:O}");
         }
@@ -162,12 +162,14 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
             return;
         }
 
-        var age = random.Next(17, 33);
-        var strength = Math.Clamp(bot.Strength + random.Next(-8, 9), 35, 95);
-        var potential = Math.Clamp(strength + random.Next(-3, 12), 40, 99);
-        var fee = Math.Round((decimal)(strength * 1200 + potential * 650 + random.Next(5_000, 40_000)), 0);
+        var age = random.Next(16, 34);
+        var talent = random.Next(1, 11);
+        var fitness = random.Next(72, 101);
+        var strength = random.Next(60, 71) + ((talent >= 9) ? random.Next(0, 4) : 0);
+        var potential = Math.Clamp(60 + (talent * 8) + random.Next(-4, 7), 65, 140);
+        var fee = Math.Round((decimal)(strength * 2100 + potential * 900 + talent * 5_000 + random.Next(25_000, 120_000)), 0);
 
-        bot.Money -= fee;
+        SpendMoney(bot, fee);
         report.TransfersCompleted++;
         report.TransferFeesPaidMoney += fee;
         metricsCollector.RecordSpend(bot.Persona, "money", "transfer.fee", fee);
@@ -181,6 +183,8 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
             BuyerTeam = bot.TeamName,
             PlayerName = $"P{Math.Abs(HashCode.Combine(bot.Seed, nowUtc.Ticks, report.TransfersCompleted)) % 9999:0000}",
             PlayerAge = age,
+            PlayerTalent = talent,
+            PlayerFitness = fitness,
             PlayerStrength = strength,
             PlayerPotential = potential,
             FeeMoney = fee
@@ -189,6 +193,30 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
         metricsCollector.RecordCompletedTransfer(transfer);
         await logWriter.WriteAsync(
             "transfer-completions.log",
-            $"{nowUtc:O}|completed|buyer={bot.BotId}|persona={bot.Persona}|team={bot.TeamName}|player={transfer.PlayerName}|age={age}|str={strength}|pot={potential}|fee={fee}");
+            $"{nowUtc:O}|completed|buyer={bot.BotId}|persona={bot.Persona}|team={bot.TeamName}|player={transfer.PlayerName}|age={age}|tal={talent}|fit={fitness}|str={strength}|pot={potential}|fee={fee}");
+    }
+
+    private static void SpendMoney(BotClubProfile bot, decimal amount)
+    {
+        bot.Money -= amount;
+        bot.MoneyOutSeason += amount;
+    }
+
+    private static void EarnMoney(BotClubProfile bot, decimal amount)
+    {
+        bot.Money += amount;
+        bot.MoneyInSeason += amount;
+    }
+
+    private static void SpendStars(BotClubProfile bot, decimal amount)
+    {
+        bot.Stars -= amount;
+        bot.StarsOutSeason += amount;
+    }
+
+    private static void EarnStars(BotClubProfile bot, decimal amount)
+    {
+        bot.Stars += amount;
+        bot.StarsInSeason += amount;
     }
 }

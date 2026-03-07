@@ -47,4 +47,24 @@ public sealed class BotClubProfile
     public DateOnly? ShortSponsorLastPayoutDate { get; set; }
 
     public DateOnly? SeasonSponsorLastPayoutDate { get; set; }
+
+    public int StadiumLevel { get; set; } = 1;
+
+    public int TrainingCenterLevel { get; set; } = 1;
+
+    public int TeamMainTrainingPosition { get; set; }
+
+    public int TeamSubTrainingSkill { get; set; }
+
+    public DateTime? CampActiveUntilUtc { get; set; }
+
+    public decimal CampPower { get; set; }
+
+    public decimal MoneyInSeason { get; set; }
+
+    public decimal MoneyOutSeason { get; set; }
+
+    public decimal StarsInSeason { get; set; }
+
+    public decimal StarsOutSeason { get; set; }
 }

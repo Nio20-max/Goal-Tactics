@@ -1,72 +1,87 @@
-# Phase 2 Bot Simulation Analysis (Enhanced)
+# Phase 2 Bot Simulation Analysis (Training Rework)
 
-## Run Scope
-- Output directory: `/mnt/website/goal_tactics/phase2_run_20260307_002154`
+## Scope and Method
+- Output directory: `/mnt/website/goal_tactics/phase2_run_20260307_074420`
 - Seasons: 20
 - Population: 96 bots (Tier 1: 16, Tier 2: 32, Tier 3: 48)
 - Matchdays per season: 30
 - Fixed schedule checks: training 08:00 UTC, friendlies 13:00 UTC, league 18:00 UTC
-- Economy constants: bid 200 stars, ad 100 stars
 - Sponsor model:
-	- Short sponsor: renew every 3 days, pays 200 stars/day
-	- Season sponsor: signed at season start, pays 300 stars/day
+- Short sponsor: renew every 3 days, pays 200 stars/day
+- Season sponsor: signed at season start, pays 300 stars/day
+- Decompiled training clues used for rework:
+- Talent is constrained to 1..10 in core search criteria constants
+- Team training uses main and sub training slots with efficiency state
+- Training camp data contains `PriceEuro`, `PriceStars`, and `Power`
+- Individual training uses star-price flow (`TrainPrice`) and renew mechanics
 
 ## Core Metrics (20-Season Average)
 - Matches/season: 1,440
-- Goals/match: 2.052
-- Transfers completed/season: 1,120.55
-- Transfer fees paid/season: 222,211,030.65 money
-- Season sponsors signed/season: 96.0
-- Short sponsor renewals/season: 960.0
-- Stars earned/season: 1,445,700
-- Stars spent/season: 1,107,890
-- Net stars/season: +337,810
-- Friendly acceptance rate: 72.9%
+- Goals/match: 2.055
+- Transfers completed/season: 1,112.05
+- Transfer fees paid/season: 368,430,232.05 money
+- Bids/season: 1,179.60
+- Ads watched/season: 295.70
+- Chat posts/season: 3,773.80
+- Friendly acceptance rate: 64.6%
+- Sponsors accepted/season: 10.95
+- Ladder challenges/season: 6,911.50
+- Stars earned/season: 1,469,570
+- Stars spent/season: 1,229,095
+- Net stars/season: +240,475
 
-## Competition Takeaways
-- Throughput is stable and deterministic enough for balancing comparisons.
-- Goal output remains in a realistic range with no visible schedule-induced anomalies.
+## Training Rework Validation
+- Player aging now increments by one each season.
+- Talent range is enforced at 1..10.
+- Transfer player generation centers around strength in the 60-70 band with elite variance.
+- Strength cap is enforced at 700.
+- Main+sub training model is age/talent/training-center sensitive.
+- Individual training is modeled as weekly star spend per player and produces stronger focused gains.
+- Camp booking is modeled for 7 days with money/stars payment options and daily effect.
 
-## Sponsor and Star Economy Takeaways
-- The new dual sponsor model is being applied exactly and consistently (full season-sign coverage and periodic short renewals).
-- Star economy flipped from slight deflation to strong inflation (+337,810/season), driven by high sponsor inflow.
-- Ad usage persists but has low relative importance under current sponsor payouts.
+## Tracked Player Outcomes (Sorted by Player)
+- Output file: `tracked-players.csv` sorted by player ID then season.
+- Tracked cohort is expanded to 13 players with mixed starting ages and manager personas.
+- Young high-talent players now frequently show ~1.1 daily gain seasons.
+- Evidence of high-end development is present:
+- Max tracked player strength reached `504.740` at season 20.
+- Sold-state tracking remains active and visible over time.
 
-## Transfer System Takeaways
-- Completed transfer tracking is active and detailed (`transfer-completions.csv`).
-- Transfer fee throughput is very high and now dominates money outflow for most personas.
-- Current fee formula likely overshoots sustainable club budgets over long horizons.
+## Transfer Outcomes (Sorted by Price)
+- Output file: `transfer-completions.csv` sorted by fee descending.
+- Completed transfer rows now include age, talent, fitness, strength, potential, and fee.
+- Top-fee transfers correlate with high talent and high potential profiles.
 
-## Persona Spend Split Takeaways
-- Money spend by persona is heavily uneven:
-	- `AggressiveTraderBot`: 1,231,265,553 money total
-	- `ConservativeBot`: 2,880,830 money total
-	- `LadderGrinderBot`: 816,236,109 money total
-	- `NewManagerBot`: 799,662,125 money total
-	- `SocialBot`: 808,015,950 money total
-	- `YouthFocusedBot`: 789,200,046 money total
-- Stars spend is more compressed across personas, dominated by ladder restores and bid costs.
-- Conservative persona transfer behavior appears under-active relative to all other archetypes.
+## Team Development Outcomes (Sorted by Team)
+- Output file: `tracked-teams.csv` sorted by team then season.
+- Per-team seasonal tracking now includes:
+- Team strength evolution
+- Stadium level evolution
+- Training center level evolution
+- Money/stars balances
+- Money/stars inflow and outflow
+- Strength trends are strongly upward across tracked teams.
+- Training center progression is active and often reaches high levels.
 
-## Tracked Player Career Takeaways
-- Longitudinal tracking is active (`tracked-players.csv`) with per-season age/strength/sale flags.
-- Example outcomes from this run:
-	- `Luca Weber` (NewManagerBot): sold, ended at age 23 strength 75.
-	- `Nils Berger` (YouthFocusedBot): sold early, preserved at age 21 strength 60.
-	- `Mateo Costa` (AggressiveTraderBot): sold, age 29 strength 72.
-	- `Rene Novak` (SocialBot): sold, age 25 strength 72.
-	- `Ivan Rossi` (ConservativeBot): unsold, age 45 strength 74.
-- The tracker now provides direct evidence for age-curve and persona-driven career outcomes.
+## Economy and Flow Takeaways
+- Star economy is now inflationary due combined sponsor + ad inflow.
+- Money economy is strongly negative for many clubs because transfer fee outflow dominates.
+- Persona spend breakdown now includes new categories:
+- `training.individual.weekly`
+- `training.camp.booking`
+- `infrastructure.stadium`
+- `infrastructure.training_center`
 
-## Validation Against Requested Changes
-- Two-sponsor system implemented as specified: passed.
-- Completed-transfer tracking (not only bids) with player stats and fee: passed.
-- Multi-year tracked players with different ages and manager types: passed.
-- Persona-separated spend by money and stars with category splits: passed.
+## Risks and Next Tuning Priorities
+1. Transfer fee formula is currently too aggressive versus simulated money income.
+2. Team strength growth is steep across 20 accelerated seasons; add stronger late-age drag and/or reduce passive gains.
+3. Keep the talent-10 path to 500+ possible, but tighten cost pressure and progression pacing.
+4. Add explicit money inflow systems (matchday/stadium/business revenue) to avoid structural insolvency drift.
 
-## More Educated Recommendations
-1. Reduce sponsor inflation pressure by lowering one payout or adding sponsor churn/eligibility gates.
-2. Re-scale transfer fee formula to align with realistic long-run money budgets.
-3. Add persona-specific transfer caps so conservative managers still participate without becoming outliers.
-4. Extend tracked-player cohort size (10-20 players) and include position/injury context for stronger tuning signals.
-5. Add a season-to-season club liquidity KPI (money floor breaches) to detect insolvency drift early.
+## Constraint Validation
+- 20-season run: passed.
+- 3-tier full pyramid: passed.
+- Fixed schedule checks (08/13/18 UTC): passed.
+- Expanded tracked players sorted by player: passed.
+- Completed transfers sorted by price: passed.
+- Tracked teams sorted by team with development flow: passed.

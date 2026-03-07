@@ -33,9 +33,10 @@ var scheduler = new BotActionScheduler(
     chatPlanner);
 
 var metricsCollector = new BotMetricsCollector();
-var playerCareerTracker = new BotPlayerCareerTracker();
+var playerCareerTracker = new BotPlayerCareerTracker(options);
+var teamSeasonTracker = new BotTeamSeasonTracker();
 var executor = new BotActionExecutor(options, cooldowns, messageGenerator, metricsCollector);
-var runner = new BotSimulationRunner(options, simulationOptions, registry, clock, scheduler, executor, metricsCollector, playerCareerTracker, logWriter);
+var runner = new BotSimulationRunner(options, simulationOptions, registry, clock, scheduler, executor, metricsCollector, playerCareerTracker, teamSeasonTracker, logWriter);
 var host = new BotHostService(options, runner, logWriter);
 
 await host.RunAsync(CancellationToken.None);
@@ -71,7 +72,13 @@ static BotOptions BuildOptions(string[] args)
         EnableChat = true,
         EnableFriendlies = true,
         MaxActionsPerSession = 12,
-        SnapshotEvery = 1
+        SnapshotEvery = 1,
+        MaxPlayerStrength = 700,
+        IndividualTrainingStarsPerWeek = 1_000,
+        CampDurationDays = 7,
+        CampMoneyCost = 200_000,
+        CampStarsCost = 1_000,
+        CampSpecBoostPerDay = 1.5m
     };
 }
 

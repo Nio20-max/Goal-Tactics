@@ -53,7 +53,11 @@ public sealed class BotRegistry
                 Strength = 45 + random.Next(0, 45),
                 Tier = tier,
                 LeagueGroup = group,
-                Position = 1 + (i % options.TeamsPerLeague)
+                Position = 1 + (i % options.TeamsPerLeague),
+                StadiumLevel = 1 + random.Next(0, 4),
+                TrainingCenterLevel = 2 + random.Next(0, 5),
+                TeamMainTrainingPosition = random.Next(0, 4),
+                TeamSubTrainingSkill = random.Next(0, 10)
             });
         }
 

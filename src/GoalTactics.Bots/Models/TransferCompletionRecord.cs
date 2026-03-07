@@ -16,6 +16,10 @@ public sealed class TransferCompletionRecord
 
     public int PlayerAge { get; init; }
 
+    public int PlayerTalent { get; init; }
+
+    public int PlayerFitness { get; init; }
+
     public int PlayerStrength { get; init; }
 
     public int PlayerPotential { get; init; }

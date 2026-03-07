@@ -8,11 +8,21 @@ public sealed class TrackedPlayer
 
     public required string ManagerPersona { get; init; }
 
+    public int PositionGroup { get; init; }
+
+    public int Talent { get; init; }
+
+    public int Fitness { get; set; }
+
     public int StartAge { get; init; }
 
     public int CurrentAge { get; set; }
 
-    public int CurrentStrength { get; set; }
+    public decimal CurrentStrength { get; set; }
+
+    public bool UsesIndividualTraining { get; init; }
+
+    public decimal LastDailyGain { get; set; }
 
     public bool Sold { get; set; }
 

@@ -69,7 +69,8 @@ public sealed class BotSimulationRunnerTests
             scheduler,
             executor,
             metrics,
-            new BotPlayerCareerTracker(),
+            new BotPlayerCareerTracker(options),
+            new BotTeamSeasonTracker(),
             writer);
     }
 }
