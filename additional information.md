@@ -1,3 +1,11 @@
+what about the names of the bot clubs
+
+
+
+
+
+
+
 seat earnings per league per seat:
 4. League: VIP: 212; sit: 16; stand: 8
 3. League: VIP: 269; sit: 21; stand: 10

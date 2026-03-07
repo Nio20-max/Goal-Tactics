@@ -61,22 +61,22 @@ def parse_blob(blob: bytes) -> tuple[int, int, int, list[LocalEntry], bytes, byt
     return version, store_id, global_count, locals_, index32, index64, off
 
 
-def decompress_image(image: bytes) -> tuple[bytes, bool]:
+def decompress_image(image: bytes) -> tuple[bytes, bool, int]:
     if len(image) < 12:
-        return image, False
+        return image, False, 0
 
-    magic, _descriptor_index, uncompressed_length = struct.unpack_from("<III", image, 0)
+    magic, descriptor_index, uncompressed_length = struct.unpack_from("<III", image, 0)
     if magic != XALZ_MAGIC:
-        return image, False
+        return image, False, 0
 
     payload = image[12:]
     raw = lz4.block.decompress(payload, uncompressed_size=uncompressed_length)
-    return raw, True
+    return raw, True, descriptor_index
 
 
-def compress_image(raw: bytes) -> bytes:
+def compress_image(raw: bytes, descriptor_index: int) -> bytes:
     compressed = lz4.block.compress(raw, mode="high_compression", compression=9, store_size=False)
-    return struct.pack("<III", XALZ_MAGIC, 0, len(raw)) + compressed
+    return struct.pack("<III", XALZ_MAGIC, descriptor_index, len(raw)) + compressed
 
 
 def patch_fixed_width(haystack: bytes, old: bytes, new: bytes) -> tuple[bytes, int]:
@@ -220,6 +220,8 @@ def main() -> None:
     parser.add_argument("--blob", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--host", type=str, required=True)
+    parser.add_argument("--patched-gt-core", type=Path)
+    parser.add_argument("--patched-gt-droid", type=Path)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -228,14 +230,21 @@ def main() -> None:
     version, store_id, global_count, locals_, index32, index64, _ = parse_blob(blob)
 
     gt_core_index: int | None = None
+    gt_droid_index: int | None = None
     for i, _entry in enumerate(locals_):
         m = manifest.get((store_id, i))
-        if m and m.name == "GT.Core":
+        if not m:
+            continue
+        if m.name == "GT.Core":
             gt_core_index = i
-            break
+        elif m.name == "GT.Droid":
+            gt_droid_index = i
 
     if gt_core_index is None:
         raise RuntimeError("Could not find GT.Core in manifest for this store id")
+
+    if args.patched_gt_droid is not None and gt_droid_index is None:
+        raise RuntimeError("Could not find GT.Droid in manifest for this store id")
 
     patched_stats: dict[str, int] = {}
     chunks: list[tuple[bytes, bytes, bytes]] = []
@@ -247,12 +256,19 @@ def main() -> None:
 
         if e.data_offset and e.data_size:
             image = blob[e.data_offset : e.data_offset + e.data_size]
-            raw, was_compressed = decompress_image(image)
+            raw, was_compressed, descriptor_index = decompress_image(image)
 
             if i == gt_core_index:
-                raw, patched_stats = patch_gt_core_payload(raw, args.host)
+                if args.patched_gt_core is not None:
+                    raw = args.patched_gt_core.read_bytes()
+                    patched_stats = {"patched_gt_core_payload": 1}
+                else:
+                    raw, patched_stats = patch_gt_core_payload(raw, args.host)
+            elif args.patched_gt_droid is not None and i == gt_droid_index:
+                raw = args.patched_gt_droid.read_bytes()
+                patched_stats["patched_gt_droid_payload"] = 1
 
-            data_payload = compress_image(raw) if was_compressed else raw
+            data_payload = compress_image(raw, descriptor_index) if was_compressed else raw
 
         if e.debug_data_offset and e.debug_data_size:
             debug_payload = blob[e.debug_data_offset : e.debug_data_offset + e.debug_data_size]
