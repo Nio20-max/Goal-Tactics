@@ -1,0 +1,11 @@
+[Unit]
+Description=Run GoalTactics backup every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=goaltactics-backup.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

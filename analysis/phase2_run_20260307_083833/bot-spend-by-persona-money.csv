@@ -1,7 +1,7 @@
-persona,resource,infrastructure.fan_shop,infrastructure.office,infrastructure.parking,infrastructure.stadium,scouting.standard,training.camp.booking,transfer.fee,total
-AggressiveTraderBot,money,23394000,63660000,17958000,46650000,94570000,46000000,2080757010,2372989010
-ConservativeBot,money,21586000,55125000,17711000,42090000,96000000,43800000,1311416383,1587728383
-LadderGrinderBot,money,22000000,51695000,21018000,40030000,95890000,42000000,1365411232,1638044232
-NewManagerBot,money,27661000,60960000,17100000,47180000,95880000,42800000,1323741448,1615322448
-SocialBot,money,23950000,56625000,18619000,44900000,95990000,45000000,1337538522,1622622522
-YouthFocusedBot,money,27487000,55845000,17677000,38340000,95850000,47800000,1375554968,1658553968
+persona            , resource, infrastructure.fan_shop, infrastructure.office, infrastructure.parking, infrastructure.stadium, scouting.standard, training.camp.booking, transfer.fee, total
+AggressiveTraderBot, money   ,                23394000,              63660000,               17958000,               46650000,          94570000,              46000000,   2080757010, 2372989010
+ConservativeBot    , money   ,                21586000,              55125000,               17711000,               42090000,          96000000,              43800000,   1311416383, 1587728383
+LadderGrinderBot   , money   ,                22000000,              51695000,               21018000,               40030000,          95890000,              42000000,   1365411232, 1638044232
+NewManagerBot      , money   ,                27661000,              60960000,               17100000,               47180000,          95880000,              42800000,   1323741448, 1615322448
+SocialBot          , money   ,                23950000,              56625000,               18619000,               44900000,          95990000,              45000000,   1337538522, 1622622522
+YouthFocusedBot    , money   ,                27487000,              55845000,               17677000,               38340000,          95850000,              47800000,   1375554968, 1658553968

@@ -2,8 +2,9 @@
 jadx/*
 .venv/*
 */jadx-1.5.5-all.jar
+*.zip
 
 # .NET build artifacts
 **/bin/
 **/obj/
-**/TestResults/
+**/TestResults/analysis/phase3_compat/apk_dec/build/resources.zip

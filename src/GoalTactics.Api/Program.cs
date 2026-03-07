@@ -24,12 +24,18 @@ using GoalTactics.Api.Validation;
 using GoalTactics.Infrastructure;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Realtime;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using System.IO;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,6 +51,9 @@ builder.Services
 builder.Services.AddSingleton<ICountryCatalog, InMemoryCountryCatalog>();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("/mnt/website/goal_tactics/data-protection"))
+    .SetApplicationName("GoalTactics");
 builder.Services.AddGoalTacticsInfrastructure(builder.Configuration);
 builder.Services.AddGoalTacticsRealtime();
 builder.Services.AddGoalTacticsRealtimeFilters();
@@ -87,6 +96,13 @@ builder.Services
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddHealthChecks();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -183,15 +199,26 @@ using (var scope = app.Services.CreateScope())
 
 app.UseMiddleware<ErrorEnvelopeMiddleware>();
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
+app.UseForwardedHeaders();
 
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json; charset=utf-8";
+        var payload = new
+        {
+            success = report.Status == HealthStatus.Healthy,
+            message = report.Status == HealthStatus.Healthy ? "pong" : report.Status.ToString().ToLowerInvariant()
+        };
+
+        await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+    }
+});
 app.MapControllers();
 app.MapGoalTacticsRealtime();
 

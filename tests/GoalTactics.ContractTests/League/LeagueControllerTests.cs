@@ -31,7 +31,7 @@ public sealed class LeagueControllerTests : IClassFixture<WebApplicationFactory<
         Assert.True(body!.Success);
         Assert.Equal(16, body.Teams.Count);
         Assert.Equal(2, body.Mount);
-        Assert.Equal(8, body.Dismount);
+        Assert.Equal(6, body.Dismount);
     }
 
     private async Task<string> RegisterAndLoginAsync()

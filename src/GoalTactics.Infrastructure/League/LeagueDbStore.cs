@@ -8,8 +8,7 @@ namespace GoalTactics.Infrastructure.League;
 public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
 {
     private const int ClubsPerLeague = 16;
-    private const int MountSpots = 2;
-    private const int DismountSpots = 8;
+    private const int PreferredHumanTier = 3;
 
     public async Task<LeagueTableRecord> GetLeagueTableForUserAsync(string userId, Guid requestedLeagueId, CancellationToken cancellationToken = default)
     {
@@ -137,7 +136,8 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
     {
         var leagueWithSlot = await dbContext.Leagues
             .Include(x => x.Teams)
-            .OrderByDescending(x => x.Tier)
+            .OrderBy(x => x.Tier == PreferredHumanTier ? 0 : 1)
+            .ThenBy(x => x.Tier)
             .ThenBy(x => x.GroupNumber)
             .FirstOrDefaultAsync(x => x.Teams.Any(t => t.IsBot), cancellationToken);
 
@@ -149,7 +149,7 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
         var allLeagues = await dbContext.Leagues.AsNoTracking().ToListAsync(cancellationToken);
         if (allLeagues.Count == 0)
         {
-            return await CreateLeagueAsync(1, 1, cancellationToken);
+            return await CreateLeagueAsync(PreferredHumanTier, 1, cancellationToken);
         }
 
         var maxTier = allLeagues.Max(x => x.Tier);
@@ -173,8 +173,21 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
             Tier = tier,
             GroupNumber = groupNumber,
             Name = $"League {tier}-{groupNumber}",
-            Mount = MountSpots,
-            Dismount = DismountSpots
+            Mount = tier switch
+            {
+                1 => 0,
+                2 => 1,
+                3 => 2,
+                4 => 2,
+                _ => 0
+            },
+            Dismount = tier switch
+            {
+                1 => 5,
+                2 => 6,
+                3 => 6,
+                _ => 0
+            }
         };
 
         dbContext.Leagues.Add(league);

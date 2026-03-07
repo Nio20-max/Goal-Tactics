@@ -1,47 +1,77 @@
-# Legacy To New API Mapping (Phase 0)
+# Legacy To New API Mapping (Phase 3 Final)
 
-## Phase 0 Step Log
-1. Extracted old `/GameEngine/*` and new `/api/*` route surfaces from recovered docs.
-2. Applied scope decision: rebuilt app targets new API only.
-3. Defined migration buckets for service-level rewrite.
+Target host:
+- API: `https://gt.nikolai-linschmann.de/api/*`
+- Chat: `wss://gt.nikolai-linschmann.de/chat`
+- Auction: `wss://gt.nikolai-linschmann.de/auc`
 
-## Exact from client/docs
-- Legacy surface exists under `/GameEngine/*` with `Json*` DTOs.
-- New surface exists under `/api/*` with typed request/response objects.
+Legacy host to remove:
+- `https://engine.goaltactics.de/GameEngine/*`
 
-## Mapping table (service bucket)
-- Auth/login:
-  - Legacy `/Login`, `/GetCurrentAppVersion`, `/CheckPunishments` -> New `/Login`, `/VerifyLogin`, `/GetVersion`, plus user/status routes.
-- Team overview/resources/mail:
-  - Legacy `/GetTeam`, `/GetMoney`, mail-related legacy routes -> New `/GetMyTeamInfo`, `/GetMyResources`, `/GetMyMail`, `Mark*`, `Delete*`.
-- League/live:
-  - Legacy `/GetLeague*`, `/GetMatchDetails` -> New `/GetLeagueTable`, `/GetMatches`, `/GetGoalGetters`, `/GetMatchDetails`.
-- Lineup:
-  - Legacy `/GetMatchFormation`, `/SetMatchFormation`, `/GetLineupStatus` -> New `/GetLineups`, `/GetMatchLineup`, `/SaveLineup`.
-- Squad/contracts/upgrades:
-  - Legacy player endpoints -> New squad endpoints (`RenamePlayer`, `ChangeOrigin`, `ChangeShirt`, `SellPlayer`, `FirePlayer`, `GetPlayerContractCost`, `ExtendPlayerContract`, `UpgradePlayer`, `UseSkillCard`, `HealPlayer`).
-- Training:
-  - Legacy `SaveTraining*` and camp endpoints -> New `GetTraining`, `SaveTeamTraining`, `SaveTacticTraining`, camp and individual training lifecycle endpoints.
-- Scouting:
-  - Legacy youth-player routes -> New `GetPlayers`, `Instruct`, `Recruit`, `Speedup` under scouting API.
-- Transfer market:
-  - Legacy `SearchTransfermarket`, `BidPlayer`, favorites update -> New `Search`, `GetDetails`, `PlaceBid`, `GetFavorites`, `AddFavorite`, `RemoveFavorite`.
-- Stadium:
-  - Legacy stadium build and speedup routes -> New `GetStadium`, `Build`, `BuildPlaces`, `Speedup`, `RenewGrass`, `RenameStadium`.
-- Sponsors:
-  - Legacy sponsor offer routes -> New `GetSponsors`, `Accept`, `Negotiate`.
-- Friends/social/chat:
-  - Legacy friend/friendly routes -> New friends API + chat API + `/chat` hub.
-- Ladder:
-  - Legacy ladder routes -> New `GetLadder`, `GetLadderChallenge`, `RunMatch`, `RestoreStamina`.
-- Tutorial/user preferences:
-  - Legacy duplicated tutorial endpoints -> New tutorial and user profile/preference routes.
+## Core migration rules
+- Active call paths may only use `/api/*`, `/chat`, `/auc`.
+- Keep `x-goaltactics-version` and `x-goaltactics-capabilities` on authenticated API calls.
+- Remove legacy signed-request envelope logic from migrated service code.
+- Persist and reuse JWT returned from `/api/Login` and `/api/VerifyLogin`.
 
-## Exact from decompiled logic
-- Remaining app usage should preserve headers `x-goaltactics-version` and `x-goaltactics-capabilities`.
+## Mapping by subsystem
 
-## Fallback model selected after testing
-- None. Mapping is deterministic rewrite work.
+### Authentication
+- `/GameEngine/Login` -> `/api/Login`
+- legacy verify/login bootstrap -> `/api/VerifyLogin`
+- legacy register -> `/api/Register`
+- `/GameEngine/GetCurrentAppVersion` -> `/api/GetVersion`
 
-## Migration completion condition
-- No required runtime call path should depend on `/GameEngine/*` after Phase 3.
+### Team and club state
+- `/GameEngine/GetTeam` -> `/api/GetTeamInfo` and `/api/GetMyTeamInfo`
+- legacy team detail aggregates -> `/api/GetMyTeamExtendedInfo`
+- legacy news/resources/mail routes -> `/api/GetClubNews`, `/api/GetMyResources`, `/api/GetMyMail`
+- legacy mail actions -> `/api/MarkAsRead`, `/api/MarkAllAsRead`, `/api/DeleteMail`, `/api/DeleteAllRead`
+- legacy finance/accomplishment routes -> `/api/GetAccomplishments`, `/api/GetFinanceHistory`, `/api/GetFinances`
+- `/GameEngine/ChangeTeamName` -> `/api/ChangeTeamName`
+
+### League, lineup, and live
+- `/GameEngine/GetLeague*` -> `/api/GetLeagueTable`, `/api/GetMatches`, `/api/GetGoalGetters`
+- `/GameEngine/GetMatchDetails` -> `/api/GetMatchDetails` (and `/api/GetMatchReport` where needed)
+- `/GameEngine/GetMatchFormation` + `/GameEngine/GetLineupStatus` -> `/api/GetLineups`, `/api/GetMatchLineup`
+- `/GameEngine/SetMatchFormation` -> `/api/SaveLineup`
+
+### Squad and player actions
+- legacy player endpoints -> `/api/GetSquad`, `/api/GetPlayerStatistics`
+- rename/origin/shirt routes -> `/api/ChangePlayerName`, `/api/ChangePlayerOrigin`, `/api/ChangePlayerShirt`
+- contract/upgrade/skill/heal routes -> `/api/ExtendPlayerContract`, `/api/UpgradePlayer`, `/api/UseSkillCard`, `/api/HealPlayer`
+- sell/fire routes -> `/api/SellPlayer`, `/api/FirePlayer`
+
+### Training and scouting
+- `/GameEngine/GetTraining` -> `/api/GetTeamTraining`
+- `/GameEngine/SaveTeamTraining` -> `/api/SaveTeamTraining`
+- `/GameEngine/SaveTraining` -> `/api/SaveTacticTraining`
+- camp routes -> `/api/BookTrainingCamp`
+- individual training routes -> `/api/SaveIndividualTraining`, `/api/RenewIndividualTraining`, `/api/RenewAllIndividualTraining`
+- youth/scout routes -> `/api/GetScoutedPlayers`, `/api/InstructScout`, `/api/RecruitScoutedPlayer`, `/api/SpeedupScout`
+
+### Stadium and sponsors
+- `/GameEngine/GetStadium2` -> `/api/GetStadium`
+- build flow routes -> `/api/GetBuildPlaces`, `/api/BuildStadium`, `/api/SpeedupBuilding`
+- grass/rename -> `/api/RenewStadiumGrass`, `/api/RenameStadium`
+- sponsor routes -> `/api/GetSponsorOffers`, `/api/AcceptSponsor`, `/api/NegotiateSponsor`
+
+### Transfer market
+- `/GameEngine/SearchTransfermarket` -> `/api/SearchTransfermarket` (or `/api/Search` for new-query flow)
+- `/GameEngine/BidPlayer` -> `/api/BidPlayer`
+- favorites routes -> `/api/GetTransfermarketFavourites`, `/api/UpdateTransfermarketFavourites`
+- details route -> `/api/GetTransferDetails`
+
+### Friends, chat, and realtime
+- friend/challenge routes -> `/api/GetFriends`, `/api/GetChallenges`, `/api/ReplyChallenge`, `/api/SendChallenge`, `/api/Like`, `/api/Unlike`, `/api/Accept`, `/api/Decline`
+- chat REST routes -> `/api/GetChatHistory`, `/api/Post`, `/api/Typing`
+- old chat/auction realtime host -> `wss://gt.nikolai-linschmann.de/chat` and `wss://gt.nikolai-linschmann.de/auc`
+
+### Shop, rewards, and user settings
+- product/equipment/purchase routes -> `/api/GetProducts`, `/api/GetEquipment`, `/api/BuyProduct`, `/api/UseEquipment`, `/api/VerifyPurchase`
+- user routes -> `/api/ClaimDailyReward`, `/api/GetPreferences`, `/api/SavePreferences`, `/api/UpdateUser`, `/api/DeleteAccount`, `/api/GetHelpshiftUserInfo`, `/api/EnableMatchPush`
+
+## Completion criteria
+- No active references to `/GameEngine/*` in client runtime services.
+- All hubs use `/chat` and `/auc` on `gt.nikolai-linschmann.de`.
+- No legacy request-signing requirement on migrated calls.

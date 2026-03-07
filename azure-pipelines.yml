@@ -1,0 +1,49 @@
+trigger:
+- main
+
+pr:
+- main
+
+variables:
+  BuildConfiguration: 'Release'
+  DotNetVersion: '10.0.x'
+  GT_BACKEND_URL: 'https://gt.nikolai-linschmann.de'
+
+stages:
+- stage: ServerAndContracts
+  displayName: Build Server And Tests
+  jobs:
+  - job: Build
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: '$(DotNetVersion)'
+    - script: dotnet restore GoalTactics.slnx
+      displayName: Restore
+    - script: dotnet build GoalTactics.slnx --configuration $(BuildConfiguration) --no-restore
+      displayName: Build
+    - script: dotnet test GoalTactics.slnx --configuration $(BuildConfiguration) --no-build
+      displayName: Test
+
+- stage: ClientAndroid
+  displayName: Build Android Client (When Source Exists)
+  condition: succeeded()
+  jobs:
+  - job: Android
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+    - checkout: self
+    - powershell: |
+        if (!(Test-Path "client/GoalTactics.Mobile.sln")) {
+          Write-Host "Client solution not found in this repo snapshot. Skipping Android build stage."
+          exit 0
+        }
+      displayName: Check client solution availability
+    - powershell: |
+        ./scripts/android-build-debug.sh
+      displayName: Build debug Android artifact
+      condition: exists('client/GoalTactics.Mobile.sln')

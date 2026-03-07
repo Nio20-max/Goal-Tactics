@@ -1,6 +1,48 @@
 # Phase 3 - App Integration And Build
 
-This phase rewires the mobile client so it depends only on the rebuilt new backend. The goal is not just to change a base URL. The goal is to remove or replace every remaining legacy `/GameEngine/*` dependency, reconnect the app to `/api/*`, `/chat`, and `/auc`, and produce working signed builds.
+## Execution Status (2026-03-07)
+
+Phase 3 has been pivoted to the highest-fidelity working option:
+
+- keep the original app UI and behavior from the APK
+- avoid full Xamarin source rebuild
+- patch only backend endpoint bindings and keep runtime contracts intact
+
+Why this option was selected after decompiled + docs review:
+
+- `reverse_engineering/decompiled/GT.Core.actual/store0_idx17.decompiled.cs` proves most UI and game logic are in managed assemblies (`GT.Core`, `GT.Droid`) inside the APK.
+- `Goal Tactics app/docs/features-and-frontend.md` and `Goal Tactics app/docs/frontend-rebuild-analysis.md` show the full UI is management-heavy and tightly coupled to existing client behavior.
+- Rebuilding from decompiled source risks visual and behavioral drift; using the original APK preserves the old app look exactly.
+
+Produced outputs:
+
+- `docs/rebuild/client/service-callsite-inventory.md`
+- `docs/rebuild/client/legacy-to-new-api-mapping.md`
+- `docs/rebuild/client/client-dto-migration-plan.md`
+- `docs/rebuild/client/realtime-reconnection-plan.md`
+- `docs/rebuild/client/build-environment.md`
+- `docs/rebuild/client/release-checklist.md`
+- `docs/rebuild/client/host-rewire-patch-set.md`
+- `docs/rebuild/client/phase3-completion-report.md`
+- `scripts/android-build-debug.sh`
+- `scripts/android-build-release.sh`
+- `azure-pipelines.yml`
+- `analysis/phase3_compat/GoalTactics-compat-unsigned.apk`
+- `analysis/phase3_compat/out/GoalTactics-compat-debug.apk`
+
+Repository limitation recorded in completion report (still true for full source rebuild):
+
+- the buildable Xamarin client solution is not present in this snapshot, so signed APK/AAB execution is blocked until the client project files are restored.
+
+Execution result now includes a rebuilt and debug-signed compatibility APK.
+
+Important runtime finding from patch execution:
+
+- direct host literal patching in `analysis/phase3_compat/apk_dec/unknown/assemblies/assemblies.blob` yielded zero replacements for known legacy/new URL constants.
+- this APK variant does not expose expected host constants as directly patchable literals in managed payloads.
+- backend compatibility routing remains required for operational validation.
+
+This phase now focuses on a compatibility release path that keeps the old client UI intact while making it work with the rebuilt backend host.
 
 ## 3.1 Inputs required from earlier phases
 
@@ -13,27 +55,39 @@ Phase 3 depends on:
 
 ## 3.2 Main client rewrite objective
 
-The rebuilt app should make calls only to:
+The chosen objective is no longer "full client rewrite first". The chosen objective is:
+
+- keep original APK UI/flow exactly as-is
+- patch endpoint host targets used by the managed client
+- provide backend compatibility for both old and new route surfaces
+
+The runtime must successfully reach:
 
 - `https://<new-host>/api/*`
 - `wss://<new-host>/chat`
 - `wss://<new-host>/auc`
+- legacy-compatible `.../GameEngine/*` where old services are still called
 
-The app should no longer depend on:
+From decompiled client findings, both of these are still used:
 
-- `https://engine.goaltactics.de/GameEngine/*`
-- any request-signing flow specific to the legacy surface
-- legacy `Json*` service wrappers that are no longer needed after the migration
+- `URLHelper.BaseServiceUrl` (`/GameEngine/`)
+- `URLHelper.NewBackendUrl + "api/"` plus hubs `/chat` and `/auc`
+
+Therefore, the server must support compatibility mode until a later full rewrite.
 
 ## 3.3 Required client analysis and patch set
 
-Create these rewrite documents before changing code:
+Create and use these documents before shipping:
 
 - `docs/rebuild/client/service-callsite-inventory.md`
 - `docs/rebuild/client/legacy-to-new-api-mapping.md`
 - `docs/rebuild/client/client-dto-migration-plan.md`
 - `docs/rebuild/client/realtime-reconnection-plan.md`
 - `docs/rebuild/client/build-environment.md`
+
+Add this Phase 3 execution artifact:
+
+- `docs/rebuild/client/legacy-apk-compatibility-release.md`
 
 The callsite inventory must list for every service method:
 
@@ -43,164 +97,72 @@ The callsite inventory must list for every service method:
 - DTO conversion requirement
 - whether the UI behavior also changes
 
-## 3.4 Code areas to inspect and patch
+## 3.4 Binary-preserving patch areas
 
-The app rewrite should search and patch all of these categories:
+Patch only the minimum needed to re-target backend hosts while preserving UI and gameplay flow.
 
-- URL helper and base URL constants
-- Refit interface registrations
-- service classes that still depend on legacy `BaseServiceUrl`
-- service classes that still send legacy signed request envelopes
-- auth bootstrap and session refresh logic
-- SignalR connection setup for chat and auction
-- client DTO mapping code that still expects legacy `Json*` payloads
-- push-notification deep links and event routing
-- purchase verification and shop flows
-- tutorial progression and first-run onboarding
+Primary targets from decompiled managed code:
 
-Likely file and symbol targets to inspect in the reconstructed client code:
+- `GT.Core.URLHelper` constants and selectors
+- service base selection (`BaseServiceUrl` and `NewBackendUrl` consumers)
+- hub URLs for chat (`/chat`) and auction (`/auc`)
 
-- `URLHelper`
-- `BaseService<T>`
-- `AuthenticationManager`
-- all Refit API interfaces
-- transfer-market services
-- team and player services
-- training and stadium services
-- chat and realtime connection setup
+Validation targets from decompiled code:
 
-## 3.5 Exact migration work by subsystem
+- `URLHelper` constants in `GT.Core.actual/store0_idx17.decompiled.cs`
+- hub wiring lines that build connections to `URLHelper.NewBackendUrl + "/chat"` and `... + "/auc"`
 
-### Authentication
+Do not rewrite UI layer for this phase.
 
-- keep login, verify login, and register on the new auth API
-- ensure token persistence uses the new `AuthResponse.Token`
-- remove legacy request-signing code from new-service call paths
-- keep app-version and capabilities headers on every new API call
+## 3.5 Compatibility backend requirements (selected path)
 
-### Team and club state
+To keep the original client functional, backend must expose both:
 
-- replace legacy team-overview fetches with `GetMyTeamInfo`, `GetMyTeamExtendedInfo`, `GetClubNews`, `GetMyResources`, `GetMyMail`, `GetAccomplishments`, `GetFinances`, and `GetFinanceHistory`
-- replace legacy rename and mail actions with new API equivalents
+- legacy-compatible `/GameEngine/*` contract endpoints still called by legacy services
+- newer `/api/*` endpoints used by `NewBackendService<T>`
+- SignalR hubs `/chat` and `/auc`
 
-### League, live, and lineup
+The compatibility layer must preserve:
 
-- replace any old league or match-detail services with `GetLeagueTable`, `GetMatches`, `GetGoalGetters`, `GetLineups`, `GetMatchLineup`, `SaveLineup`, and `GetMatchDetails`
-- preserve lineup lock behavior in the UI using `MatchLineupResponse.IsLocked`
-- preserve captain, penalty, corner, and free-kick bonus displays from the new lineup response
+- expected request/response DTO shapes
+- headers `x-goaltactics-version` and `x-goaltactics-capabilities`
+- auth token and session semantics used by the existing app
 
-### Squad, training, and scouting
+## 3.6 APK patch and packaging flow (selected path)
 
-- replace old player-service calls with new squad endpoints for rename, shirt, origin, sell, fire, heal, upgrade, skill cards, and contract cost or extension
-- replace old training calls with `GetTraining`, `SaveTeamTraining`, `SaveTacticTraining`, camp actions, and individual-training actions
-- replace youth-player legacy scouting with new scouting endpoints and timers
+1. Start from original APK in `reference_materials/`.
+2. Modify backend URL bindings only (no UI/layout/resource changes).
+3. Repackage APK.
+4. Sign debug build for QA.
+5. Verify login, core navigation, lineup, training, transfer market, chat, and realtime.
 
-### Stadium and sponsors
+This path yields the closest visual and behavioral match to the historic app.
 
-- replace old stadium building and sponsor flows with `GetStadium`, `Build`, `BuildPlaces`, `Speedup`, `RenewGrass`, `RenameStadium`, `GetSponsors`, `Accept`, and `Negotiate`
+## 3.7 Deferred scope (not in selected path)
 
-### Transfer market
+Deferred to later phase:
 
-- rewire the entire market feature to the new `Search`, `GetDetails`, `PlaceBid`, `GetFavorites`, `AddFavorite`, and `RemoveFavorite` routes
-- remove any remaining calls to legacy `SearchTransfermarket`, `GetTransfermarketBids`, or bid submission methods after the new UI data flow is verified
+- full Xamarin source rebuild from recovered/decompiled code
+- large DTO/UI refactor to remove all legacy flows
+- complete removal of `/GameEngine/*` from runtime
 
-### Friends, chat, and realtime
+## 3.8 Verification checklist for compatibility release
 
-- move friend search, requests, likes, and friendlies to the new friends API
-- reconnect chat history, typing, and post flows to `/api/GetChatHistory`, `/api/Typing`, `/api/Post`, and the `/chat` hub
-- reconnect transfer-market live updates to the `/auc` hub and its `Bidded` event
+Must pass on-device:
 
-### Shop, rewards, preferences, support
+- login and session restore
+- Club, Finances, Stadium, Squad, Lineup, Training, Scouting
+- Transfer market search/details/bid/favorites
+- Chat history/post/typing with reconnect
+- Auction realtime updates via `/auc`
+- no visible UI regressions versus original APK
 
-- wire product and equipment flows to the new shop endpoints
-- verify Google Play purchase completion against the new backend only
-- wire `ClaimDailyReward`, `GetPreferences`, `SavePreferences`, `UpdateUser`, `DeleteAccount`, and `GetHelpshiftUserInfo`
+## 3.9 Exit criteria (updated)
 
-## 3.6 DTO migration strategy
+Phase 3 is complete for the selected option when:
 
-The app phase must explicitly decide for each screen whether to:
-
-- keep existing UI models and map new DTOs into them
-- or replace old UI models with new contracts directly
-
-Recommended rule:
-
-- keep presentation models when they are already stable and local to the screen
-- remove legacy transport DTOs from the app service layer as soon as the screen is migrated
-
-Create adapter classes for temporary overlap, then delete them once the entire subsystem is migrated.
-
-## 3.7 Realtime reconnect and offline behavior
-
-The app must preserve practical mobile behavior:
-
-- retry JWT-authenticated SignalR connection after app resume
-- reload latest chat history after reconnect to close message gaps
-- reload latest auction details after reconnect to close bid-state gaps
-- keep user-visible states for connecting, reconnecting, and stale data
-- unsubscribe and resubscribe cleanly on logout and account switching
-
-## 3.8 Build and signing requirements
-
-Document exact build prerequisites:
-
-- Xamarin or the exact toolchain needed by the recovered app project
-- Android SDK version
-- Java SDK version
-- NuGet restore flow
-- signing keystore setup
-- Firebase configuration file placement
-- IronSource or ad SDK configuration if retained in test builds
-
-Required build outputs:
-
-- debug APK for local QA
-- release APK or AAB for internal testing
-- symbol files or crash-reporting artifacts if supported
-
-## 3.9 Verification checklist for the rewritten app
-
-Every migrated subsystem must be tested on device or emulator:
-
-- login, register, and session restore
-- club overview, resources, and mail
-- lineup fetch, edit, lock display, and save
-- league table, fixtures, and match reports
-- squad actions: rename, shirt, origin, heal, contract, upgrade, skill cards
-- training actions: team, tactic, individual, camps
-- scouting actions: standard, premium, speedup, recruit
-- stadium actions: build, build places, grass, speedup, rename
-- sponsor negotiation and acceptance
-- transfer-market search, details, favorite, bid, and live updates
-- chat history, typing, post, reconnect
-- daily reward, preferences, support identity, account update, account deletion
-- purchase verification and reward grant with test credentials
-
-## 3.10 CI and release packaging
-
-Create these build and release artifacts:
-
-- `azure-pipelines.yml` or equivalent CI file
-- `docs/rebuild/client/build-environment.md`
-- `docs/rebuild/client/release-checklist.md`
-- `scripts/android-build-debug.sh`
-- `scripts/android-build-release.sh`
-
-The release checklist must include:
-
-- backend environment URL
-- correct Firebase project
-- correct billing product IDs
-- correct signing identity
-- version code and version name bump
-- smoke-test signoff from core gameplay flows
-
-## 3.11 Exit criteria
-
-Phase 3 is complete only when:
-
-- the app contains no remaining required dependency on the legacy `/GameEngine/*` API
-- every active screen hits the new backend only
-- chat and auction realtime flows reconnect correctly
-- test purchases verify against the rebuilt backend
-- signed debug and release builds are produced successfully
+- patched APK runs with original UI unchanged
+- patched APK works against rebuilt backend host with compatibility routing
+- `/api/*`, `/chat`, and `/auc` flows are operational
+- required legacy `/GameEngine/*` compatibility calls are operational
+- debug-signed APK artifact is produced and smoke-tested
