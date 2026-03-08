@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Main game shell: matches original mainlayout.xml structure exactly
+     - Left side menu (250dp) always visible
+     - Game area: background image + top bar + content frame + bottom bar
+     - Chat/help floating buttons
+     - Loading overlay
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainContainer"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Always-visible left side menu, matching original 250dp GTListView -->
+    <ListView
+        android:id="@+id/navMenu"
+        android:layout_width="@dimen/gt_menu_width"
+        android:layout_height="match_parent"
+        android:background="@color/colorBackground"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="0dp"
+        android:choiceMode="singleChoice"
+        android:scrollbars="none" />
+
+    <!-- Game content area (to the right of the menu) -->
+    <RelativeLayout
+        android:id="@+id/gameArea"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginStart="@dimen/gt_menu_width">
+
+        <!-- Background image -->
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/background"
+            android:scaleType="centerCrop"
+            android:contentDescription="" />
+
+        <!-- Top bar - simple title text with tab_middle_inactive background -->
+        <TextView
+            android:id="@+id/topBar"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/gt_top_bar_height"
+            android:layout_alignParentTop="true"
+            android:background="@drawable/tab_middle_inactive"
+            android:gravity="center"
+            android:textColor="@color/colorText"
+            android:textSize="@dimen/gt_text_sm"
+            android:textStyle="bold"
+            android:shadowColor="@color/colorShadow"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2" />
+
+        <!-- Bottom navigation bar with game images -->
+        <FrameLayout
+            android:id="@+id/bottomBar"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/gt_bottom_bar_height"
+            android:layout_alignParentBottom="true"
+            android:background="@drawable/navigationbar"
+            android:clipChildren="false">
+
+            <!-- Back button -->
+            <ImageButton
+                android:id="@+id/btnBack"
+                android:layout_width="105dp"
+                android:layout_height="@dimen/gt_bottom_bar_height"
+                android:background="@drawable/button_back_selector"
+                android:contentDescription="Back" />
+
+            <!-- Currency display (centered) -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:clipChildren="false"
+                android:orientation="horizontal">
+
+                <!-- Medipacks -->
+                <LinearLayout
+                    android:id="@+id/medipacksButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:background="@drawable/selector_bottombar"
+                    android:clipChildren="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/balance_plus"
+                        android:contentDescription="" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="2dp"
+                        android:src="@drawable/balance_medipacks"
+                        android:contentDescription="" />
+
+                    <TextView
+                        android:id="@+id/textMedipacks"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="2dp"
+                        android:gravity="center_vertical"
+                        android:minWidth="30dp"
+                        android:text="0"
+                        android:textColor="@color/colorText"
+                        android:textSize="@dimen/gt_text_sm"
+                        android:textStyle="bold"
+                        android:shadowColor="@color/colorShadow"
+                        android:shadowDx="1"
+                        android:shadowDy="1"
+                        android:shadowRadius="2" />
+                </LinearLayout>
+
+                <!-- Stars -->
+                <LinearLayout
+                    android:id="@+id/starsButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/selector_bottombar"
+                    android:clipChildren="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/balance_plus"
+                        android:contentDescription="" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="2dp"
+                        android:src="@drawable/balance_star"
+                        android:contentDescription="" />
+
+                    <TextView
+                        android:id="@+id/textStars"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="2dp"
+                        android:gravity="center_vertical"
+                        android:minWidth="30dp"
+                        android:text="0"
+                        android:textColor="@color/colorStars"
+                        android:textSize="@dimen/gt_text_sm"
+                        android:textStyle="bold"
+                        android:shadowColor="@color/colorShadow"
+                        android:shadowDx="1"
+                        android:shadowDy="1"
+                        android:shadowRadius="2" />
+                </LinearLayout>
+
+                <!-- Money -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/background_light"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/balance_money"
+                        android:contentDescription="" />
+
+                    <TextView
+                        android:id="@+id/textMoney"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="2dp"
+                        android:gravity="center_vertical"
+                        android:minWidth="50dp"
+                        android:text="0"
+                        android:textColor="@color/colorEuro"
+                        android:textSize="@dimen/gt_text_sm"
+                        android:textStyle="bold"
+                        android:shadowColor="@color/colorShadow"
+                        android:shadowDx="1"
+                        android:shadowDy="1"
+                        android:shadowRadius="2" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Context/Submenu button (right side) -->
+            <ImageButton
+                android:id="@+id/btnContextMenu"
+                android:layout_width="105dp"
+                android:layout_height="@dimen/gt_bottom_bar_height"
+                android:layout_gravity="end"
+                android:background="@drawable/submenu_selector"
+                android:contentDescription="Context Menu"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <!-- Main content frame between top bar and bottom bar -->
+        <FrameLayout
+            android:id="@+id/contentFrame"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_above="@+id/bottomBar"
+            android:layout_below="@+id/topBar"
+            android:clipChildren="false" />
+
+        <!-- Chat button (floating, top left of game area) -->
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_medium"
+            android:layout_marginTop="@dimen/spacing_medium">
+
+            <ImageButton
+                android:id="@+id/btnChat"
+                android:layout_width="@dimen/round_button_size"
+                android:layout_height="@dimen/round_button_size"
+                android:background="@drawable/button_chat_selector"
+                android:contentDescription="Chat" />
+
+            <View
+                android:id="@+id/chatNotificationBadge"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="top|end"
+                android:background="@drawable/badge_circle"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <!-- Help button (floating, top right of game area) -->
+        <ImageButton
+            android:id="@+id/btnHelp"
+            android:layout_width="@dimen/round_button_size"
+            android:layout_height="@dimen/round_button_size"
+            android:layout_alignParentEnd="true"
+            android:layout_marginTop="@dimen/spacing_medium"
+            android:layout_marginEnd="@dimen/spacing_medium"
+            android:background="@drawable/button_helpshift_selector"
+            android:contentDescription="Help"
+            android:visibility="gone" />
+    </RelativeLayout>
+
+    <!-- Loading overlay -->
+    <FrameLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ProgressBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:id="@+id/textLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gt_spacing_md"
+                android:text="@string/loading"
+                android:textColor="@color/colorText"
+                android:textStyle="bold"
+                android:shadowColor="@color/colorShadow"
+                android:shadowDx="1"
+                android:shadowDy="1"
+                android:shadowRadius="2" />
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

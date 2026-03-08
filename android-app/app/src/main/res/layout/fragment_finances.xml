@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Finances screen with today/yesterday split -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:padding="@dimen/gt_spacing_md">
+
+    <!-- Today -->
+    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical">
+        <TextView style="@style/GT.Text.Title" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/finances_today" android:layout_marginBottom="@dimen/gt_spacing_md" />
+        <LinearLayout style="@style/GT.Row.Header" android:orientation="horizontal">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="3" android:text="Type" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2" android:text="Amount" android:gravity="end" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        </LinearLayout>
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerToday" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+        <TextView android:id="@+id/textTodayTotal" style="@style/GT.Text.Body" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:padding="@dimen/gt_spacing_md" />
+    </LinearLayout>
+
+    <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/gt_separator" android:layout_marginHorizontal="@dimen/gt_spacing_md" />
+
+    <!-- Yesterday -->
+    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical">
+        <TextView style="@style/GT.Text.Title" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/finances_yesterday" android:layout_marginBottom="@dimen/gt_spacing_md" />
+        <LinearLayout style="@style/GT.Row.Header" android:orientation="horizontal">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="3" android:text="Type" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2" android:text="Amount" android:gravity="end" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        </LinearLayout>
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerYesterday" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+        <TextView android:id="@+id/textYesterdayTotal" style="@style/GT.Text.Body" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:padding="@dimen/gt_spacing_md" />
+    </LinearLayout>
+</LinearLayout>

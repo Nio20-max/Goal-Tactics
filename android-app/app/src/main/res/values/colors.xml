@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary game palette (from legacy APK) -->
+    <color name="gt_background_dark">#FF1D2B03</color>
+    <color name="gt_background_panel">#FF2A3D08</color>
+    <color name="gt_background_overlay">#CC000000</color>
+
+    <!-- Primary greens -->
+    <color name="gt_green_primary">#FF3D6A1B</color>
+    <color name="gt_green_accent">#FFAFD50C</color>
+    <color name="gt_green_lime">#FF6A8D0C</color>
+    <color name="gt_green_light">#FF8CBF26</color>
+    <color name="gt_green_field">#FF4C8C2B</color>
+
+    <!-- Currency colors -->
+    <color name="gt_stars_yellow">#FFFEE697</color>
+    <color name="gt_money_green">#FFDCFFB2</color>
+    <color name="gt_medipacks_blue">#FF6CBEED</color>
+
+    <!-- Text colors -->
+    <color name="gt_text_primary">#FFFFFFFF</color>
+    <color name="gt_text_secondary">#FFCCCCCC</color>
+    <color name="gt_text_disabled">#FF888888</color>
+    <color name="gt_text_warning">#FFFFCC00</color>
+    <color name="gt_text_error">#FFFF4444</color>
+    <color name="gt_text_success">#FF88CC00</color>
+
+    <!-- Accent blue -->
+    <color name="gt_blue_accent">#FF004497</color>
+    <color name="gt_blue_link">#FF4488CC</color>
+
+    <!-- Table/row colors -->
+    <color name="gt_row_even">#FF2A3D08</color>
+    <color name="gt_row_odd">#FF1D2B03</color>
+    <color name="gt_row_active">#FF4C6B1F</color>
+    <color name="gt_row_warning">#FF6B4A1F</color>
+    <color name="gt_row_new">#FF3D5A1B</color>
+    <color name="gt_row_selected">#FF5A7F2A</color>
+
+    <!-- Button colors -->
+    <color name="gt_button_primary">#FF3D6A1B</color>
+    <color name="gt_button_primary_pressed">#FF2A4D12</color>
+    <color name="gt_button_secondary">#FF555555</color>
+    <color name="gt_button_danger">#FF992222</color>
+    <color name="gt_button_disabled">#FF333333</color>
+
+    <!-- Separator / border -->
+    <color name="gt_separator">#FF4A4A4A</color>
+    <color name="gt_border">#FF3A5A18</color>
+
+    <!-- Skill card backgrounds -->
+    <color name="gt_skill_normal">#FF3D6A1B</color>
+    <color name="gt_skill_blue">#FF004497</color>
+    <color name="gt_skill_master">#FF7B2D8E</color>
+    <color name="gt_skill_legend">#FFCC8800</color>
+
+    <!-- Bar / progress -->
+    <color name="gt_progress_fill">#FFAFD50C</color>
+    <color name="gt_progress_bg">#FF333333</color>
+
+    <!-- Status -->
+    <color name="gt_status_online">#FF88CC00</color>
+    <color name="gt_status_offline">#FF666666</color>
+
+    <!-- Gradient -->
+    <color name="gt_gradient_start">#00000000</color>
+    <color name="gt_gradient_end">#FF000000</color>
+
+    <!-- White and black -->
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="transparent">#00000000</color>
+
+    <!-- Original app color names (referenced by game XML drawables) -->
+    <color name="colorAccentGreen">#afd50c</color>
+    <color name="colorAccentBlue">#004497</color>
+    <color name="colorBackground">#1d2b03</color>
+    <color name="colorBackgroundTransparent">#e02e5a10</color>
+    <color name="colorBlackTransparent">#99000000</color>
+    <color name="colorBlackTransparentDark">#e6000000</color>
+    <color name="colorCompareGreen">#2e5a10</color>
+    <color name="colorEvenRow">#641d2b03</color>
+    <color name="colorUnevenRow">#6492cc46</color>
+    <color name="colorGradientStart">#3d6a1b</color>
+    <color name="colorGradientEnd">#003d6a1b</color>
+    <color name="colorGray">#999999</color>
+    <color name="colorDarkGray">#555555</color>
+    <color name="colorGreen">#3d6a1b</color>
+    <color name="colorHighlight">#ff0000</color>
+    <color name="colorInactiveEvenRow">#64555555</color>
+    <color name="colorInactiveUnevenRow">#64999999</color>
+    <color name="colorLadderGreen">#6a8d0c</color>
+    <color name="colorLadderStamina">#323bb4</color>
+    <color name="colorNewEvenRow">#64002248</color>
+    <color name="colorNewUnevenRow">#64004497</color>
+    <color name="colorPopup">#1d2b03</color>
+    <color name="colorScoreGradientStart">#2a2a2a</color>
+    <color name="colorScoreGradientEnd">#151515</color>
+    <color name="colorSection">#a0afd50c</color>
+    <color name="colorSectionNew">#a00088ff</color>
+    <color name="colorShadow">#000000</color>
+    <color name="colorSkillCardBackground">#66376e78</color>
+    <color name="colorSkillCardBlue">#6ed4e7</color>
+    <color name="colorSkillCardLegend">#a425f3</color>
+    <color name="colorSkillCardMaster">#126cef</color>
+    <color name="colorStars">#fee697</color>
+    <color name="colorEuro">#dcffb2</color>
+    <color name="colorText">#ffffff</color>
+    <color name="colorWarningEvenRow">#64b22222</color>
+    <color name="colorWarningUnevenRow">#648b0000</color>
+    <color name="colorBlackGradientStart">#cc000000</color>
+    <color name="colorBlackGradientEnd">#00000000</color>
+    <color name="colorCompareBackground">#161f13</color>
+</resources>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings screen -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:padding="@dimen/gt_spacing_md">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+        <TextView style="@style/GT.Text.Title" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/nav_settings" android:layout_marginBottom="@dimen/gt_spacing_xl" />
+
+        <!-- Notification toggles -->
+        <TextView style="@style/GT.Text.Body" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/settings_notifications" android:layout_marginBottom="@dimen/gt_spacing_md" android:textStyle="bold" />
+        <CheckBox android:id="@+id/checkAuctionOverbid" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auction Overbid" android:textColor="@color/gt_text_primary" />
+        <CheckBox android:id="@+id/checkMatchResults" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Match Results" android:textColor="@color/gt_text_primary" />
+        <CheckBox android:id="@+id/checkLineupIncomplete" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Lineup Incomplete" android:textColor="@color/gt_text_primary" />
+        <CheckBox android:id="@+id/checkFriendInvite" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Friend Invite" android:textColor="@color/gt_text_primary" />
+        <CheckBox android:id="@+id/checkIneffectiveTraining" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ineffective Training" android:textColor="@color/gt_text_primary" />
+        <CheckBox android:id="@+id/checkFriendlyMatch" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Friendly Match" android:textColor="@color/gt_text_primary" />
+        <CheckBox android:id="@+id/checkSystem" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="System" android:textColor="@color/gt_text_primary" />
+        <CheckBox android:id="@+id/checkAuctionEnd" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auction End" android:textColor="@color/gt_text_primary" />
+
+        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/gt_separator" android:layout_marginVertical="@dimen/gt_spacing_xl" />
+
+        <Button android:id="@+id/btnSavePrefs" style="@style/GT.Button" android:layout_width="match_parent"
+            android:text="@string/save" android:layout_marginBottom="@dimen/gt_spacing_md" />
+        <Button android:id="@+id/btnDailyReward" style="@style/GT.Button.Secondary" android:layout_width="match_parent"
+            android:text="@string/settings_daily_reward" android:layout_marginBottom="@dimen/gt_spacing_md" />
+        <Button android:id="@+id/btnLogout" style="@style/GT.Button.Secondary" android:layout_width="match_parent"
+            android:text="@string/settings_logout" android:layout_marginBottom="@dimen/gt_spacing_md" />
+        <Button android:id="@+id/btnDeleteAccount" style="@style/GT.Button.Danger" android:layout_width="match_parent"
+            android:text="@string/settings_delete_account" />
+    </LinearLayout>
+</ScrollView>

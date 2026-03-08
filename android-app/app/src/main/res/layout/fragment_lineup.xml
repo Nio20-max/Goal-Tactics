@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lineup screen with formation area and player list -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal">
+
+    <!-- Formation view area -->
+    <RelativeLayout
+        android:id="@+id/formationArea"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="6"
+        android:background="@color/gt_green_field"
+        android:padding="@dimen/gt_spacing_md">
+
+        <!-- System and tactic selectors -->
+        <LinearLayout
+            android:id="@+id/lineupControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/lineup_system"
+                style="@style/GT.Text.Secondary"
+                android:layout_marginEnd="@dimen/gt_spacing_sm" />
+
+            <Spinner
+                android:id="@+id/spinnerSystem"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/gt_button_height_small"
+                android:layout_marginEnd="@dimen/gt_spacing_xl" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/lineup_tactic"
+                style="@style/GT.Text.Secondary"
+                android:layout_marginEnd="@dimen/gt_spacing_sm" />
+
+            <Spinner
+                android:id="@+id/spinnerTactic"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/gt_button_height_small" />
+        </LinearLayout>
+
+        <!-- Locked banner -->
+        <TextView
+            android:id="@+id/textLocked"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/lineupControls"
+            android:background="@color/gt_row_warning"
+            android:gravity="center"
+            android:padding="@dimen/gt_spacing_sm"
+            android:text="@string/lineup_locked"
+            android:textColor="@color/gt_text_warning"
+            android:visibility="gone" />
+
+        <!-- Formation position slots will be added programmatically -->
+        <FrameLayout
+            android:id="@+id/formationSlots"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/textLocked" />
+
+        <!-- Save button -->
+        <Button
+            android:id="@+id/btnSave"
+            style="@style/GT.Button"
+            android:layout_width="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentEnd="true"
+            android:text="@string/lineup_save" />
+    </RelativeLayout>
+
+    <!-- Player list for lineup selection -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="4"
+        android:orientation="vertical"
+        android:padding="@dimen/gt_spacing_md">
+
+        <!-- Match selector -->
+        <Spinner
+            android:id="@+id/spinnerMatch"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/gt_button_height"
+            android:layout_marginBottom="@dimen/gt_spacing_md" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerLineupPlayers"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+</LinearLayout>

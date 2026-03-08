@@ -3,6 +3,9 @@ jadx/*
 .venv/*
 */jadx-1.5.5-all.jar
 *.zip
+*.mp4
+android-app/app/build/intermediates/processed_res/debug/out/resources-debug.ap_
+*.ap_
 
 # .NET build artifacts
 **/bin/

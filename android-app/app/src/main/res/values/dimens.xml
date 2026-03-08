@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Core dimensions from legacy APK -->
+    <dimen name="gt_top_bar_height">30dp</dimen>
+    <dimen name="gt_bottom_bar_height">50dp</dimen>
+    <dimen name="gt_menu_width">250dp</dimen>
+    <dimen name="gt_context_menu_width">200dp</dimen>
+    <dimen name="gt_corner_radius">10dp</dimen>
+    <dimen name="gt_avatar_size">50dp</dimen>
+    <dimen name="gt_avatar_radius">25dp</dimen>
+    <dimen name="gt_player_avatar_width">320dp</dimen>
+    <dimen name="gt_player_avatar_height">120dp</dimen>
+    <dimen name="gt_flag_width">60dp</dimen>
+    <dimen name="gt_flag_height">40dp</dimen>
+    <dimen name="gt_coach_height">250dp</dimen>
+    <dimen name="gt_match_info_height">88dp</dimen>
+
+    <!-- Buttons -->
+    <dimen name="gt_button_height">40dp</dimen>
+    <dimen name="gt_button_height_small">30dp</dimen>
+    <dimen name="gt_button_width">150dp</dimen>
+    <dimen name="gt_button_width_wide">180dp</dimen>
+
+    <!-- Spacing -->
+    <dimen name="gt_spacing_xs">2dp</dimen>
+    <dimen name="gt_spacing_sm">4dp</dimen>
+    <dimen name="gt_spacing_md">8dp</dimen>
+    <dimen name="gt_spacing_lg">12dp</dimen>
+    <dimen name="gt_spacing_xl">16dp</dimen>
+    <dimen name="gt_spacing_xxl">24dp</dimen>
+
+    <!-- Text sizes -->
+    <dimen name="gt_text_xs">10sp</dimen>
+    <dimen name="gt_text_sm">12sp</dimen>
+    <dimen name="gt_text_body">14sp</dimen>
+    <dimen name="gt_text_md">16sp</dimen>
+    <dimen name="gt_text_lg">18sp</dimen>
+    <dimen name="gt_text_xl">22sp</dimen>
+    <dimen name="gt_text_title">24sp</dimen>
+
+    <!-- Table / list rows -->
+    <dimen name="gt_row_height">36dp</dimen>
+    <dimen name="gt_row_padding_h">8dp</dimen>
+    <dimen name="gt_row_padding_v">4dp</dimen>
+
+    <!-- Formation lineup -->
+    <dimen name="gt_formation_width">180dp</dimen>
+    <dimen name="gt_formation_height">140dp</dimen>
+    <dimen name="gt_bench_width">60dp</dimen>
+    <dimen name="gt_bench_height">375dp</dimen>
+
+    <!-- Dialog / popup -->
+    <dimen name="gt_popup_width">400dp</dimen>
+    <dimen name="gt_popup_padding">16dp</dimen>
+
+    <!-- Badge -->
+    <dimen name="gt_badge_size">18dp</dimen>
+    <dimen name="gt_badge_text_size">10sp</dimen>
+
+    <!-- Original app dimension names (referenced by game XML drawables) -->
+    <dimen name="corner_radius">10dp</dimen>
+    <dimen name="popup_corner_radius">10dp</dimen>
+    <dimen name="popup_border_width">1dp</dimen>
+    <dimen name="avatar_border">2dp</dimen>
+    <dimen name="card_corner_radius">8dp</dimen>
+    <dimen name="card_shadow_corner_radius">10dp</dimen>
+    <dimen name="card_shadow_padding">2dp</dimen>
+    <dimen name="skill_border_width">2dp</dimen>
+
+    <!-- Original app layout dimensions -->
+    <dimen name="spacing_small">5dp</dimen>
+    <dimen name="spacing_medium">10dp</dimen>
+    <dimen name="spacing_large">20dp</dimen>
+    <dimen name="spacing_extralarge">30dp</dimen>
+    <dimen name="button_height">30dp</dimen>
+    <dimen name="button_width">150dp</dimen>
+    <dimen name="round_button_size">30dp</dimen>
+    <dimen name="menu_cell_height">50dp</dimen>
+    <dimen name="menu_image_size">40dp</dimen>
+    <dimen name="menu_title_inset">60dp</dimen>
+    <dimen name="entry_height">35dp</dimen>
+</resources>

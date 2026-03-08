@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Login screen: matches legacy dual-pane layout with manual entry fields -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/gt_background_dark">
+
+    <!-- Center panel with login form -->
+    <LinearLayout
+        android:id="@+id/loginFormContainer"
+        android:layout_width="400dp"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:background="@drawable/bg_panel"
+        android:orientation="vertical"
+        android:padding="@dimen/gt_spacing_xxl">
+
+        <!-- Title -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="@dimen/gt_spacing_xl"
+            android:text="@string/app_name"
+            android:textColor="@color/gt_green_accent"
+            android:textSize="@dimen/gt_text_title"
+            android:textStyle="bold" />
+
+        <!-- Email input -->
+        <EditText
+            android:id="@+id/editEmail"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/gt_button_height"
+            android:layout_marginBottom="@dimen/gt_spacing_md"
+            android:background="@drawable/bg_input_field"
+            android:hint="@string/login_email_hint"
+            android:inputType="textEmailAddress"
+            android:maxLength="256"
+            android:padding="@dimen/gt_spacing_md"
+            android:textColor="@color/gt_text_primary"
+            android:textColorHint="@color/gt_text_disabled"
+            android:textSize="@dimen/gt_text_body" />
+
+        <!-- Password input -->
+        <EditText
+            android:id="@+id/editPassword"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/gt_button_height"
+            android:layout_marginBottom="@dimen/gt_spacing_lg"
+            android:background="@drawable/bg_input_field"
+            android:hint="@string/login_password_hint"
+            android:inputType="textPassword"
+            android:maxLength="128"
+            android:padding="@dimen/gt_spacing_md"
+            android:textColor="@color/gt_text_primary"
+            android:textColorHint="@color/gt_text_disabled"
+            android:textSize="@dimen/gt_text_body" />
+
+        <!-- Error message -->
+        <TextView
+            android:id="@+id/textError"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/gt_spacing_md"
+            android:textColor="@color/gt_text_error"
+            android:textSize="@dimen/gt_text_sm"
+            android:visibility="gone" />
+
+        <!-- Login button -->
+        <Button
+            android:id="@+id/btnLogin"
+            style="@style/GT.Button"
+            android:layout_width="match_parent"
+            android:layout_marginBottom="@dimen/gt_spacing_md"
+            android:text="@string/login_button" />
+
+        <!-- Register button -->
+        <Button
+            android:id="@+id/btnRegister"
+            style="@style/GT.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_marginBottom="@dimen/gt_spacing_md"
+            android:text="@string/login_register" />
+
+        <!-- Quick start -->
+        <Button
+            android:id="@+id/btnQuickStart"
+            style="@style/GT.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="@string/login_quickstart" />
+    </LinearLayout>
+
+    <!-- Loading overlay -->
+    <FrameLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/gt_background_overlay"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
+    </FrameLayout>
+
+    <!-- Version text -->
+    <TextView
+        android:id="@+id/textVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:padding="@dimen/gt_spacing_sm"
+        android:textColor="@color/gt_text_disabled"
+        android:textSize="@dimen/gt_text_xs" />
+</RelativeLayout>

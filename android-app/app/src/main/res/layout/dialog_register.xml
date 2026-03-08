@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Register dialog/overlay: shown on top of login when user taps Register -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="400dp"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_panel"
+    android:orientation="vertical"
+    android:padding="@dimen/gt_spacing_xxl">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="@dimen/gt_spacing_xl"
+        android:text="@string/login_register"
+        android:textColor="@color/gt_green_accent"
+        android:textSize="@dimen/gt_text_xl"
+        android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/editRegEmail"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/gt_button_height"
+        android:layout_marginBottom="@dimen/gt_spacing_md"
+        android:background="@drawable/bg_input_field"
+        android:hint="@string/login_email_hint"
+        android:inputType="textEmailAddress"
+        android:maxLength="256"
+        android:padding="@dimen/gt_spacing_md"
+        android:textColor="@color/gt_text_primary"
+        android:textColorHint="@color/gt_text_disabled" />
+
+    <EditText
+        android:id="@+id/editRegManagerName"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/gt_button_height"
+        android:layout_marginBottom="@dimen/gt_spacing_md"
+        android:background="@drawable/bg_input_field"
+        android:hint="@string/login_manager_name_hint"
+        android:inputType="textPersonName"
+        android:maxLength="64"
+        android:padding="@dimen/gt_spacing_md"
+        android:textColor="@color/gt_text_primary"
+        android:textColorHint="@color/gt_text_disabled" />
+
+    <EditText
+        android:id="@+id/editRegPassword"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/gt_button_height"
+        android:layout_marginBottom="@dimen/gt_spacing_md"
+        android:background="@drawable/bg_input_field"
+        android:hint="@string/login_password_hint"
+        android:inputType="textPassword"
+        android:maxLength="128"
+        android:padding="@dimen/gt_spacing_md"
+        android:textColor="@color/gt_text_primary"
+        android:textColorHint="@color/gt_text_disabled" />
+
+    <EditText
+        android:id="@+id/editRegPasswordConfirm"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/gt_button_height"
+        android:layout_marginBottom="@dimen/gt_spacing_md"
+        android:background="@drawable/bg_input_field"
+        android:hint="@string/login_confirm_password_hint"
+        android:inputType="textPassword"
+        android:maxLength="128"
+        android:padding="@dimen/gt_spacing_md"
+        android:textColor="@color/gt_text_primary"
+        android:textColorHint="@color/gt_text_disabled" />
+
+    <TextView
+        android:id="@+id/textRegError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/gt_spacing_md"
+        android:textColor="@color/gt_text_error"
+        android:textSize="@dimen/gt_text_sm"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/btnDoRegister"
+        style="@style/GT.Button"
+        android:layout_width="match_parent"
+        android:layout_marginBottom="@dimen/gt_spacing_md"
+        android:text="@string/login_register" />
+
+    <Button
+        android:id="@+id/btnRegCancel"
+        style="@style/GT.Button.Secondary"
+        android:layout_width="match_parent"
+        android:text="@string/cancel" />
+</LinearLayout>

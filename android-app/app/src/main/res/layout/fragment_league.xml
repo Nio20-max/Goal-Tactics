@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- League table screen -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="@dimen/gt_spacing_md">
+
+    <TextView
+        android:id="@+id/textLeagueName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        style="@style/GT.Text.Title"
+        android:layout_marginBottom="@dimen/gt_spacing_md" />
+
+    <!-- Table header -->
+    <LinearLayout
+        style="@style/GT.Row.Header"
+        android:orientation="horizontal">
+
+        <TextView android:layout_width="30dp" android:layout_height="wrap_content"
+            android:text="@string/league_position" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="4"
+            android:text="@string/club_team_name" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        <TextView android:layout_width="30dp" android:layout_height="wrap_content"
+            android:text="@string/league_matches" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        <TextView android:layout_width="30dp" android:layout_height="wrap_content"
+            android:text="@string/league_wins" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        <TextView android:layout_width="30dp" android:layout_height="wrap_content"
+            android:text="@string/league_draws" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        <TextView android:layout_width="30dp" android:layout_height="wrap_content"
+            android:text="@string/league_losses" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        <TextView android:layout_width="30dp" android:layout_height="wrap_content"
+            android:text="@string/league_goals_scored" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        <TextView android:layout_width="30dp" android:layout_height="wrap_content"
+            android:text="@string/league_goals_received" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+        <TextView android:layout_width="40dp" android:layout_height="wrap_content"
+            android:text="@string/league_points" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_xs" android:textStyle="bold" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerLeague"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+</LinearLayout>

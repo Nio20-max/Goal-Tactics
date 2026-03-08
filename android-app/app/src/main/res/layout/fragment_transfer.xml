@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Transfer market search and results -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="@dimen/gt_spacing_md">
+
+    <!-- Search filters -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="@dimen/gt_spacing_md">
+
+        <EditText
+            android:id="@+id/editMinBid"
+            android:layout_width="100dp"
+            android:layout_height="@dimen/gt_button_height_small"
+            android:background="@drawable/bg_input_field"
+            android:hint="@string/transfer_min_bid"
+            android:inputType="number"
+            android:padding="@dimen/gt_spacing_sm"
+            android:textColor="@color/gt_text_primary"
+            android:textColorHint="@color/gt_text_disabled"
+            android:textSize="@dimen/gt_text_sm" />
+
+        <EditText
+            android:id="@+id/editMinStrength"
+            android:layout_width="100dp"
+            android:layout_height="@dimen/gt_button_height_small"
+            android:layout_marginStart="@dimen/gt_spacing_md"
+            android:background="@drawable/bg_input_field"
+            android:hint="@string/transfer_min_strength"
+            android:inputType="number"
+            android:padding="@dimen/gt_spacing_sm"
+            android:textColor="@color/gt_text_primary"
+            android:textColorHint="@color/gt_text_disabled"
+            android:textSize="@dimen/gt_text_sm" />
+
+        <CheckBox
+            android:id="@+id/checkKeeper"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/gt_spacing_md"
+            android:text="@string/transfer_only_keeper"
+            android:textColor="@color/gt_text_secondary"
+            android:textSize="@dimen/gt_text_sm" />
+
+        <Button
+            android:id="@+id/btnSearch"
+            style="@style/GT.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/gt_spacing_md"
+            android:text="@string/search" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/btnFavourites"
+            style="@style/GT.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/transfer_favourites" />
+    </LinearLayout>
+
+    <!-- Table header -->
+    <LinearLayout
+        style="@style/GT.Row.Header"
+        android:orientation="horizontal">
+
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="4"
+            android:text="@string/squad_name" android:textColor="@color/white" android:textSize="@dimen/gt_text_sm" android:textStyle="bold" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2"
+            android:text="@string/squad_position" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_sm" android:textStyle="bold" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:text="@string/squad_strength" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_sm" android:textStyle="bold" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2"
+            android:text="@string/transfer_min_bid" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_sm" android:textStyle="bold" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2"
+            android:text="@string/transfer_end_date" android:gravity="center" android:textColor="@color/white" android:textSize="@dimen/gt_text_sm" android:textStyle="bold" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerTransfers"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+</LinearLayout>

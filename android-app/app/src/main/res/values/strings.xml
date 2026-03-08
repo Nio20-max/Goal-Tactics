@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Goal Tactics</string>
+
+    <!-- Login screen -->
+    <string name="login_email_hint">Email</string>
+    <string name="login_password_hint">Password</string>
+    <string name="login_button">Login</string>
+    <string name="login_quickstart">Quick Start</string>
+    <string name="login_new_player">New Player</string>
+    <string name="login_support">Support</string>
+    <string name="login_register">Register</string>
+    <string name="login_manager_name_hint">Your Manager Name</string>
+    <string name="login_confirm_password_hint">Confirm Password</string>
+    <string name="login_error_email">Please enter a valid email</string>
+    <string name="login_error_password">Password must be at least 8 characters</string>
+    <string name="login_error_name">Manager name must be 2–64 characters</string>
+    <string name="login_error_password_match">Passwords don\'t match</string>
+    <string name="login_error_generic">Login failed. Please try again.</string>
+
+    <!-- Navigation / shell -->
+    <string name="nav_club">Club</string>
+    <string name="nav_squad">Squad</string>
+    <string name="nav_lineup">Lineup</string>
+    <string name="nav_training">Training</string>
+    <string name="nav_scouting">Scouting</string>
+    <string name="nav_transfer">Transfer</string>
+    <string name="nav_stadium">Stadium</string>
+    <string name="nav_finances">Finances</string>
+    <string name="nav_league">League</string>
+    <string name="nav_ladder">GT Ladder</string>
+    <string name="nav_friends">Friends</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_live">Live</string>
+    <string name="nav_shop">Shop</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Common -->
+    <string name="loading">Loading…</string>
+    <string name="error_generic">Something went wrong</string>
+    <string name="error_network">No network connection</string>
+    <string name="retry">Retry</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="back">Back</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="accept">Accept</string>
+    <string name="decline">Decline</string>
+    <string name="confirm">Confirm</string>
+    <string name="close">Close</string>
+    <string name="search">Search</string>
+
+    <!-- Currency -->
+    <string name="currency_money">Money</string>
+    <string name="currency_stars">Stars</string>
+    <string name="currency_medipacks">Medipacks</string>
+
+    <!-- Club info -->
+    <string name="club_team_name">Team</string>
+    <string name="club_country">Country</string>
+    <string name="club_league">League</string>
+    <string name="club_market_value">Market Value</string>
+    <string name="club_mood">Team Mood</string>
+    <string name="club_wins">Wins</string>
+    <string name="club_losses">Losses</string>
+    <string name="club_fans">Fans</string>
+    <string name="club_strength">Strength</string>
+    <string name="club_news">Club News</string>
+    <string name="club_accomplishments">Accomplishments</string>
+    <string name="club_next_match">Next Match</string>
+    <string name="club_last_match">Last Match</string>
+
+    <!-- Squad -->
+    <string name="squad_name">Name</string>
+    <string name="squad_position">Position</string>
+    <string name="squad_strength">Str</string>
+    <string name="squad_fitness">Fit</string>
+    <string name="squad_sell">Sell</string>
+    <string name="squad_fire">Fire</string>
+    <string name="squad_extend">Extend Contract</string>
+    <string name="squad_upgrade">Upgrade</string>
+    <string name="squad_heal">Heal</string>
+    <string name="squad_statistics">Statistics</string>
+    <string name="squad_matches">Matches</string>
+    <string name="squad_goals">Goals</string>
+    <string name="squad_yellow_cards">Yellow Cards</string>
+    <string name="squad_red_cards">Red Cards</string>
+
+    <!-- Lineup -->
+    <string name="lineup_system">System</string>
+    <string name="lineup_tactic">Tactic</string>
+    <string name="lineup_save">Save Lineup</string>
+    <string name="lineup_locked">Lineup is locked</string>
+    <string name="lineup_starting">Starting</string>
+    <string name="lineup_bench">Bench</string>
+
+    <!-- Training -->
+    <string name="training_main_skill">Main Skill</string>
+    <string name="training_sub_skill">Sub Skill</string>
+    <string name="training_efficiency">Efficiency</string>
+    <string name="training_camp">Training Camp</string>
+    <string name="training_individual">Individual Training</string>
+    <string name="training_tactic">Tactic Training</string>
+    <string name="training_save">Save Training</string>
+
+    <!-- Skills list -->
+    <string name="skill_agility">Agility</string>
+    <string name="skill_ball_control">Ball Control</string>
+    <string name="skill_cornerkick">Corner Kick</string>
+    <string name="skill_defence">Defence</string>
+    <string name="skill_duel">Duel</string>
+    <string name="skill_experience">Experience</string>
+    <string name="skill_flanks">Flanks</string>
+    <string name="skill_freekicks">Free Kicks</string>
+    <string name="skill_header">Header</string>
+    <string name="skill_keeping">Keeping</string>
+    <string name="skill_one_on_one">One on One</string>
+    <string name="skill_passing">Passing</string>
+    <string name="skill_penalty">Penalty</string>
+    <string name="skill_playmaking">Playmaking</string>
+    <string name="skill_shots">Shots</string>
+    <string name="skill_speed">Speed</string>
+
+    <!-- Transfer market -->
+    <string name="transfer_search">Search Transfer Market</string>
+    <string name="transfer_bid">Place Bid</string>
+    <string name="transfer_favourites">Favourites</string>
+    <string name="transfer_min_bid">Min. Bid</string>
+    <string name="transfer_min_strength">Min. Strength</string>
+    <string name="transfer_only_keeper">Keepers Only</string>
+    <string name="transfer_end_date">Ends</string>
+
+    <!-- Stadium -->
+    <string name="stadium_name">Stadium</string>
+    <string name="stadium_capacity">Capacity</string>
+    <string name="stadium_grass_quality">Grass Quality</string>
+    <string name="stadium_earnings">Avg. Earnings</string>
+    <string name="stadium_build">Build</string>
+    <string name="stadium_renew_grass">Renew Grass</string>
+    <string name="stadium_rename">Rename Stadium</string>
+
+    <!-- Finances -->
+    <string name="finances_today">Today</string>
+    <string name="finances_yesterday">Yesterday</string>
+    <string name="finances_history">Finance History</string>
+    <string name="finances_income">Income</string>
+    <string name="finances_outcome">Expenses</string>
+    <string name="finances_balance">Balance</string>
+
+    <!-- League -->
+    <string name="league_table">League Table</string>
+    <string name="league_position">Pos</string>
+    <string name="league_points">Pts</string>
+    <string name="league_matches">M</string>
+    <string name="league_wins">W</string>
+    <string name="league_draws">D</string>
+    <string name="league_losses">L</string>
+    <string name="league_goals_scored">GF</string>
+    <string name="league_goals_received">GA</string>
+
+    <!-- Ladder -->
+    <string name="ladder_rank">Rank</string>
+    <string name="ladder_points">Points</string>
+    <string name="ladder_challenge">Challenge</string>
+    <string name="ladder_stamina">Stamina</string>
+
+    <!-- Friends -->
+    <string name="friends_search_hint">Search by name…</string>
+    <string name="friends_add">Add Friend</string>
+    <string name="friends_challenge">Challenge</string>
+    <string name="friends_like">Like</string>
+    <string name="friends_unlike">Unlike</string>
+
+    <!-- Chat -->
+    <string name="chat_message_hint">Type a message…</string>
+    <string name="chat_send">Send</string>
+
+    <!-- Live -->
+    <string name="live_match">Live Match</string>
+    <string name="live_report">Match Report</string>
+
+    <!-- Shop -->
+    <string name="shop_products">Products</string>
+    <string name="shop_equipment">Equipment</string>
+    <string name="shop_buy">Buy</string>
+    <string name="shop_use">Use</string>
+
+    <!-- Scouting -->
+    <string name="scouting_instruct">Instruct Scout</string>
+    <string name="scouting_recruit">Recruit</string>
+    <string name="scouting_speedup">Speed Up</string>
+    <string name="scouting_talent">Talent</string>
+
+    <!-- Sponsors -->
+    <string name="sponsors_offers">Sponsor Offers</string>
+    <string name="sponsors_negotiate">Negotiate</string>
+    <string name="sponsors_accept">Accept</string>
+
+    <!-- Settings / User -->
+    <string name="settings_preferences">Preferences</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_daily_reward">Claim Daily Reward</string>
+    <string name="settings_delete_account">Delete Account</string>
+    <string name="settings_logout">Logout</string>
+
+    <!-- Mail -->
+    <string name="mail_inbox">Mail</string>
+    <string name="mail_mark_read">Mark as Read</string>
+    <string name="mail_mark_all_read">Mark All as Read</string>
+    <string name="mail_delete_read">Delete Read</string>
+</resources>

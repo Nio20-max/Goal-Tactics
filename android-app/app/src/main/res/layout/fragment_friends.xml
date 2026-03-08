@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Friends screen -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="@dimen/gt_spacing_md">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="@dimen/gt_spacing_md">
+        <EditText android:id="@+id/editSearch" android:layout_width="0dp" android:layout_height="@dimen/gt_button_height_small" android:layout_weight="1"
+            android:background="@drawable/bg_input_field" android:hint="@string/friends_search_hint" android:inputType="text" android:padding="@dimen/gt_spacing_sm" android:textColor="@color/gt_text_primary" android:textColorHint="@color/gt_text_disabled" android:textSize="@dimen/gt_text_sm" />
+        <Button android:id="@+id/btnSearchFriends" style="@style/GT.Button.Small" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/gt_spacing_md" android:text="@string/search" />
+    </LinearLayout>
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerFriends" android:layout_width="match_parent" android:layout_height="match_parent" />
+</LinearLayout>

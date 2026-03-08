@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Club info screen: 3-pane horizontal like legacy clubinfonew.xml -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal">
+
+    <!-- Left: Team stats -->
+    <LinearLayout
+        android:id="@+id/panelStats"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="3"
+        android:orientation="vertical"
+        android:padding="@dimen/gt_spacing_md">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/nav_club"
+            style="@style/GT.Text.Title"
+            android:layout_marginBottom="@dimen/gt_spacing_md" />
+
+        <include layout="@layout/item_stat_row" android:id="@+id/rowTeamName" />
+        <include layout="@layout/item_stat_row" android:id="@+id/rowCountry" />
+        <include layout="@layout/item_stat_row" android:id="@+id/rowLeague" />
+        <include layout="@layout/item_stat_row" android:id="@+id/rowMarketValue" />
+        <include layout="@layout/item_stat_row" android:id="@+id/rowMood" />
+        <include layout="@layout/item_stat_row" android:id="@+id/rowStrength" />
+        <include layout="@layout/item_stat_row" android:id="@+id/rowWins" />
+        <include layout="@layout/item_stat_row" android:id="@+id/rowLosses" />
+        <include layout="@layout/item_stat_row" android:id="@+id/rowFans" />
+    </LinearLayout>
+
+    <!-- Center: Stadium + match info -->
+    <RelativeLayout
+        android:id="@+id/panelStadium"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="4"
+        android:padding="@dimen/gt_spacing_md">
+
+        <!-- Stadium background image placeholder -->
+        <ImageView
+            android:id="@+id/imgStadium"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:layout_alignParentTop="true"
+            android:background="@color/gt_green_field"
+            android:scaleType="centerCrop" />
+
+        <!-- Club logo -->
+        <ImageView
+            android:id="@+id/imgClubLogo"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_below="@id/imgStadium"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="-30dp" />
+
+        <!-- Match info section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/imgClubLogo"
+            android:layout_marginTop="@dimen/gt_spacing_md"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/textNextMatch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/club_next_match"
+                style="@style/GT.Text.Secondary" />
+
+            <TextView
+                android:id="@+id/textMatchOpponent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gt_spacing_sm"
+                style="@style/GT.Text.Body" />
+
+            <TextView
+                android:id="@+id/textMatchDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                style="@style/GT.Text.Secondary" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <!-- Right: Club news -->
+    <LinearLayout
+        android:id="@+id/panelNews"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="3"
+        android:orientation="vertical"
+        android:padding="@dimen/gt_spacing_md">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/club_news"
+            style="@style/GT.Text.Title"
+            android:layout_marginBottom="@dimen/gt_spacing_md" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerNews"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+</LinearLayout>
