@@ -5,6 +5,7 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
+import dnfile
 import lz4.block
 
 
@@ -79,55 +80,127 @@ def compress_image(raw: bytes, descriptor_index: int) -> bytes:
     return struct.pack("<III", XALZ_MAGIC, descriptor_index, len(raw)) + compressed
 
 
-def patch_fixed_width(haystack: bytes, old: bytes, new: bytes) -> tuple[bytes, int]:
+def detect_assembly_name(payload: bytes) -> str | None:
+    try:
+        pe = dnfile.dnPE(data=payload)
+    except Exception:
+        return None
+
+    try:
+        if not pe.net or not hasattr(pe.net, "mdtables") or not pe.net.mdtables.Assembly:
+            return None
+        return pe.net.mdtables.Assembly.rows[0].Name.value
+    except Exception:
+        return None
+
+
+def patch_fixed_width(haystack: bytes, old: bytes, new: bytes, pad_byte: bytes = b"\x00") -> tuple[bytes, int]:
     if len(new) > len(old):
         raise ValueError(f"Replacement longer than source: {old!r} -> {new!r}")
+    if len(pad_byte) != 1:
+        raise ValueError("pad_byte must be a single byte")
 
-    padded = new + b"\x00" * (len(old) - len(new))
+    padded = new + pad_byte * (len(old) - len(new))
     count = haystack.count(old)
     if count == 0:
         return haystack, 0
     return haystack.replace(old, padded), count
 
 
-def patch_fixed_width_utf16le(haystack: bytes, old_text: str, new_text: str) -> tuple[bytes, int]:
+def patch_fixed_width_utf16le(haystack: bytes, old_text: str, new_text: str, pad_char: str = "\x00") -> tuple[bytes, int]:
     old = old_text.encode("utf-16le")
     new = new_text.encode("utf-16le")
     if len(new) > len(old):
         raise ValueError(f"UTF-16 replacement longer than source: {old_text!r} -> {new_text!r}")
+    if len(pad_char) != 1:
+        raise ValueError("pad_char must be one character")
 
-    padded = new + b"\x00" * (len(old) - len(new))
+    pad_pair = pad_char.encode("utf-16le")
+
+    padded = new + pad_pair * ((len(old) - len(new)) // 2)
     count = haystack.count(old)
     if count == 0:
         return haystack, 0
     return haystack.replace(old, padded), count
 
 
-def patch_gt_core_payload(payload: bytes, host: str) -> tuple[bytes, dict[str, int]]:
+def patch_gt_core_payload(payload: bytes, host: str, force_http: bool = False) -> tuple[bytes, dict[str, int]]:
     host = host.strip().rstrip("/")
 
+    https_base = f"https://{host}/"
+    http_base = f"http://{host}/"
+    new_https_base = http_base if force_http else https_base
+
+    game_https = f"https://{host}/api/"
+    game_http = f"http://{host}/api/"
+    new_game_https = game_http if force_http else game_https
+
     replacements = {
-        b"https://gtwebapp2.azurewebsites.net/": f"https://{host}/".encode("utf-8"),
+        b"https://gtwebapp2.azurewebsites.net/": new_https_base.encode("utf-8"),
         b"http://gtwebapp2-gtwebapp2staging.azurewebsites.net/": f"http://{host}/".encode("utf-8"),
-        b"https://engine.goaltactics.de/GameEngine/": f"https://{host}/api/".encode("utf-8"),
+        b"https://engine.goaltactics.de/GameEngine/": new_game_https.encode("utf-8"),
         b"http://goaltacticswebapp-goaltacticswebappstaging.azurewebsites.net/GameEngine/": f"http://{host}/api/".encode("utf-8"),
+        b"https://xyrality.com/home/privacy-policy/": new_https_base.encode("utf-8"),
+        b"https://play.google.com/store/apps/details?id=com.xyrality.goaltactics": new_https_base.encode("utf-8"),
+        b"https://apps.apple.com/us/developer/xyrality-gmbh/id421864157?see-all=i-phonei-pad-apps": new_https_base.encode("utf-8"),
     }
 
     replacements_utf16 = {
-        "https://gtwebapp2.azurewebsites.net/": f"https://{host}/",
+        "https://gtwebapp2.azurewebsites.net/": new_https_base,
         "http://gtwebapp2-gtwebapp2staging.azurewebsites.net/": f"http://{host}/",
-        "https://engine.goaltactics.de/GameEngine/": f"https://{host}/api/",
+        "https://engine.goaltactics.de/GameEngine/": new_game_https,
         "http://goaltacticswebapp-goaltacticswebappstaging.azurewebsites.net/GameEngine/": f"http://{host}/api/",
+        "https://xyrality.com/home/privacy-policy/": new_https_base,
+        "https://play.google.com/store/apps/details?id=com.xyrality.goaltactics": new_https_base,
+        "https://apps.apple.com/us/developer/xyrality-gmbh/id421864157?see-all=i-phonei-pad-apps": new_https_base,
     }
 
     stats: dict[str, int] = {}
     patched = payload
     for old, new in replacements.items():
-        patched, count = patch_fixed_width(patched, old, new)
+        # Avoid NUL bytes in URL literals; slash padding keeps paths parseable.
+        patched, count = patch_fixed_width(patched, old, new, pad_byte=b"/")
         stats[old.decode("utf-8")] = count
 
     for old_text, new_text in replacements_utf16.items():
-        patched, count = patch_fixed_width_utf16le(patched, old_text, new_text)
+        patched, count = patch_fixed_width_utf16le(patched, old_text, new_text, pad_char="/")
+        stats[f"UTF16:{old_text}"] = count
+
+    return patched, stats
+
+
+def patch_gt_droid_payload(payload: bytes, host: str) -> tuple[bytes, dict[str, int]]:
+    host = host.strip().rstrip("/")
+
+    def fit(text: str, max_len: int) -> str:
+        return text[:max_len]
+
+    # Keep Helpshift credentials unchanged: invalidating these causes install-time
+    # validation failures during MainActivity startup.
+
+    replacements_utf8 = {
+        b"xyrality.helpshift.com": fit(host, len("xyrality.helpshift.com")).encode("utf-8"),
+        b"3tXpUpaBpbZpWF2KPEWQv3": b"0" * len("3tXpUpaBpbZpWF2KPEWQv3"),
+        b"98d71a5a-41a9-4c5a-bf9f-70014a1d0a5f": b"00000000-0000-0000-0000-000000000000",
+        b"1498fe489": b"000000000",
+    }
+
+    replacements_utf16 = {
+        "xyrality.helpshift.com": fit(host, len("xyrality.helpshift.com")),
+        "3tXpUpaBpbZpWF2KPEWQv3": "0" * len("3tXpUpaBpbZpWF2KPEWQv3"),
+        "98d71a5a-41a9-4c5a-bf9f-70014a1d0a5f": "00000000-0000-0000-0000-000000000000",
+        "1498fe489": "000000000",
+    }
+
+    stats: dict[str, int] = {}
+    patched = payload
+
+    for old, new in replacements_utf8.items():
+        patched, count = patch_fixed_width(patched, old, new, pad_byte=b"/")
+        stats[old.decode("utf-8")] = count
+
+    for old_text, new_text in replacements_utf16.items():
+        patched, count = patch_fixed_width_utf16le(patched, old_text, new_text, pad_char="/")
         stats[f"UTF16:{old_text}"] = count
 
     return patched, stats
@@ -223,14 +296,24 @@ def main() -> None:
     parser.add_argument("--patched-gt-core", type=Path)
     parser.add_argument("--patched-gt-droid", type=Path)
     parser.add_argument(
+        "--force-http",
+        action="store_true",
+        help="Rewrite even original https literals to http for compatibility testing on plain-http gateways.",
+    )
+    parser.add_argument(
         "--allow-unsafe-gt-droid-payload",
         action="store_true",
         help="Allow reinjecting a rewritten GT.Droid payload. This is unsafe for the legacy Xamarin assembly-store startup path and is blocked by default.",
     )
+    parser.add_argument(
+        "--strip-third-party",
+        action="store_true",
+        help="Neutralize known third-party SDK literals in GT.Droid (Helpshift/AppCenter/AppsFlyer/IronSource) and legal/share URLs in GT.Core.",
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
-    if args.patched_gt_droid is not None and not args.allow_unsafe_gt_droid_payload:
+    if (args.patched_gt_droid is not None or args.strip_third_party) and not args.allow_unsafe_gt_droid_payload:
         raise SystemExit(
             "Refusing to inject a patched GT.Droid payload without --allow-unsafe-gt-droid-payload. "
             "The startup-bypass experiment produced crash-prone compatibility builds; prefer GT.Core-only URL patching."
@@ -242,19 +325,27 @@ def main() -> None:
 
     gt_core_index: int | None = None
     gt_droid_index: int | None = None
-    for i, _entry in enumerate(locals_):
-        m = manifest.get((store_id, i))
-        if not m:
-            continue
-        if m.name == "GT.Core":
+    for i, entry in enumerate(locals_):
+        assembly_name: str | None = None
+        if entry.data_offset and entry.data_size:
+            image = blob[entry.data_offset : entry.data_offset + entry.data_size]
+            raw, _was_compressed, _descriptor_index = decompress_image(image)
+            assembly_name = detect_assembly_name(raw)
+
+        if assembly_name is None:
+            m = manifest.get((store_id, i))
+            if m:
+                assembly_name = m.name
+
+        if assembly_name == "GT.Core":
             gt_core_index = i
-        elif m.name == "GT.Droid":
+        elif assembly_name == "GT.Droid":
             gt_droid_index = i
 
     if gt_core_index is None:
         raise RuntimeError("Could not find GT.Core in manifest for this store id")
 
-    if args.patched_gt_droid is not None and gt_droid_index is None:
+    if (args.patched_gt_droid is not None or args.strip_third_party) and gt_droid_index is None:
         raise RuntimeError("Could not find GT.Droid in manifest for this store id")
 
     patched_stats: dict[str, int] = {}
@@ -268,18 +359,47 @@ def main() -> None:
         if e.data_offset and e.data_size:
             image = blob[e.data_offset : e.data_offset + e.data_size]
             raw, was_compressed, descriptor_index = decompress_image(image)
+            entry_modified = False
 
             if i == gt_core_index:
                 if args.patched_gt_core is not None:
                     raw = args.patched_gt_core.read_bytes()
                     patched_stats = {"patched_gt_core_payload": 1}
+                    entry_modified = True
                 else:
-                    raw, patched_stats = patch_gt_core_payload(raw, args.host)
-            elif args.patched_gt_droid is not None and i == gt_droid_index:
-                raw = args.patched_gt_droid.read_bytes()
-                patched_stats["patched_gt_droid_payload"] = 1
+                    original_raw = raw
+                    raw, patched_stats = patch_gt_core_payload(raw, args.host, force_http=args.force_http)
+                    entry_modified = raw != original_raw
+            elif i == gt_droid_index:
+                if args.patched_gt_droid is not None:
+                    raw = args.patched_gt_droid.read_bytes()
+                    patched_stats["patched_gt_droid_payload"] = 1
+                    entry_modified = True
+                elif args.strip_third_party:
+                    original_raw = raw
+                    raw, droid_stats = patch_gt_droid_payload(raw, args.host)
+                    entry_modified = raw != original_raw
+                    for key, value in droid_stats.items():
+                        patched_stats[f"GT.Droid:{key}"] = value
 
-            data_payload = compress_image(raw, descriptor_index) if was_compressed else raw
+            if entry_modified:
+                if was_compressed:
+                    data_payload = compress_image(raw, descriptor_index)
+                    if len(data_payload) > len(image):
+                        raise RuntimeError(
+                            "Patched payload exceeds original compressed entry size for "
+                            f"store index {i}: original={len(image)} rebuilt={len(data_payload)}. "
+                            "This would produce a crash-prone Xamarin assembly store."
+                        )
+                else:
+                    if len(raw) > len(image):
+                        raise RuntimeError(
+                            "Patched payload exceeds original uncompressed entry size for "
+                            f"store index {i}: original={len(image)} rebuilt={len(raw)}."
+                        )
+                    data_payload = raw
+            else:
+                data_payload = image
 
         if e.debug_data_offset and e.debug_data_size:
             debug_payload = blob[e.debug_data_offset : e.debug_data_offset + e.debug_data_size]

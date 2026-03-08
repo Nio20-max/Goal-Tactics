@@ -2,7 +2,8 @@
 set -euo pipefail
 
 HOST="${1:-https://gt.nikolai-linschmann.de}"
-APK_PATH="${2:-analysis/phase3_compat/out/GoalTactics-compat-debug.apk}"
+APK_PATH="${2:-analysis/phase3_compat/out/GoalTactics-compat-originalblob-debug.apk}"
+PACKAGE_NAME="${3:-com.xyrality.goaltactics}"
 
 echo "[1/6] Host preflight: $HOST"
 
@@ -49,12 +50,23 @@ echo "[3/6] Installing APK: $APK_PATH"
 adb install -r "$APK_PATH"
 
 echo "[4/6] Launching app"
-adb shell monkey -p de.goaltactics.app 1 >/tmp/gt_phase4_monkey.out 2>&1 || true
+launcher_output=$(adb shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>/tmp/gt_phase4_resolve.err || true)
+launcher_component=$(printf '%s\n' "$launcher_output" | tail -n 1)
+if [[ -z "$launcher_component" || "$launcher_component" != */* ]]; then
+  echo "ERROR: could not resolve launcher activity for package $PACKAGE_NAME"
+  cat /tmp/gt_phase4_resolve.err || true
+  exit 3
+fi
+
+adb logcat -c || true
+adb shell am start -W -n "$launcher_component" >/tmp/gt_phase4_start.out 2>&1
+cat /tmp/gt_phase4_start.out
 
 sleep 8
 
 echo "[5/6] Capturing focused logs"
 adb logcat -d | grep -Ei "goaltactics|signalr|websocket|auth|login|exception|error" | tail -n 200 > /tmp/gt_phase4_logcat_tail.txt || true
+adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|$PACKAGE_NAME" | tail -n 80 > /tmp/gt_phase4_activity_tail.txt || true
 
 echo "[6/6] Summary"
 echo "- Host health status: $health_status (expected 200)"
@@ -62,5 +74,7 @@ echo "- /api/Login probe: $auth_status (expected 400 for empty payload indicates
 echo "- /GameEngine/Login probe: $legacy_status (expected 400 for empty payload indicates rewrite works)"
 echo "- /chat hub probe: $chat_status (expected 401/403 before auth)"
 echo "- /auc hub probe: $auc_status (expected 401/403 before auth)"
+echo "- Launch component: $launcher_component"
 echo "- Device install/launch completed"
 echo "- Logs: /tmp/gt_phase4_logcat_tail.txt"
+echo "- Activity state: /tmp/gt_phase4_activity_tail.txt"
