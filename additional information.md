@@ -1,9 +1,13 @@
-what about the names of the bot clubs
+The stadium should have no level but a number of seats. You should only be able to build VIP seats in bulks of 10 and sitting and standing seats in bulks of 100. 
+100 standing places: 1 hour 40 minutes
+100 sitting seats: 2 hours 20 minutes
+10 VIP seats: 50 minutes
 
-
-
-
-
+The upgrade time of the facilitys should depend on their level. 
+Level 0 -> Level 1: 30 minutes
+Level 19 -> Level 20: 50 hours
+The needed time should rise linear. 
+Implement that the time in the simulation goes by as well. With one game per day. 
 
 
 seat earnings per league per seat:
@@ -18,14 +22,3 @@ max seats per league:
 1. League: VIP: 2800; sit: 35000
 
 You can build an unlimited number of standing seats. But not all will be filled. The maximum number depends on the League and how the team is doing. So if the team wins often or looses often. 
-
-
-
-The time left on the market place would jump back to 20 seconds if it was below 20 seconds every time someone bid. 
-
-The training increase per player differs by age and by talent. A newly scouted player has a fitness of below 100. That increases to 100 over time and stays there. The increase of the fitness brings a huge boost in strength. With a maxed training center, level 20, the daily increase is 4. The training gain also depends on the level of the training center. 
-
-There is a maximum strength per player at 700. 
-
-
-All facilitys can only be upgraded up to level 20. But only as high as the office. 

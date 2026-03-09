@@ -20,7 +20,8 @@ public sealed class BotSimulationRunner(
     {
         ValidateScheduleOrThrow();
 
-        var expectedBotCount = options.TeamsPerLeague * (1 + 2 + 3);
+        // expected population: TeamsPerLeague * (1 + 5 + 15) per requested league structure
+        var expectedBotCount = options.TeamsPerLeague * (1 + 5 + 15);
         var botCount = options.BotCount == expectedBotCount ? options.BotCount : expectedBotCount;
         var bots = registry.CreatePopulation(botCount);
 
@@ -44,6 +45,9 @@ public sealed class BotSimulationRunner(
             playerCareerTracker.TrySellPlayers(season, seasonTransfers);
             playerCareerTracker.AdvanceSeason(season);
             teamSeasonTracker.CaptureSeason(season, bots);
+
+            // apply promotion/relegation after season capture (adjusts Tier/LeagueGroup/Position)
+            ApplyPromotionRelegation(bots);
 
             var snapshotLine = $"{clock.CurrentUtc:O}|season-end|season={season}|matches={report.MatchesPlayed}|goals={report.TotalGoals}|bids={report.AuctionBids}|ads={report.AdsWatched}|chat={report.ChatMessages}";
             await logWriter.WriteAsync("season-summary.log", snapshotLine);
@@ -82,6 +86,7 @@ public sealed class BotSimulationRunner(
 
             await ResolveLeagueMatchesAsync(bots, report);
             ApplyDailyStadiumIncome(bots, DateOnly.FromDateTime(clock.CurrentUtc));
+            ApplyDailyConstructionProgress(bots);
             clock.AdvanceDay();
             clock.AdvanceMatchday();
 
@@ -129,6 +134,52 @@ public sealed class BotSimulationRunner(
                 report.StarsEarned += options.ShortSponsorStarsPerDay;
                 bot.StarsInSeason += options.ShortSponsorStarsPerDay;
                 bot.ShortSponsorLastPayoutDate = payoutDay;
+            }
+        }
+    }
+
+    private void ApplyDailyConstructionProgress(IReadOnlyList<BotClubProfile> bots)
+    {
+        // reduce remaining minutes by one simulated day (24h)
+        var minutesPerDay = 24 * 60;
+        foreach (var bot in bots)
+        {
+            if (bot.BuildQueue.Count == 0) continue;
+
+            for (var i = bot.BuildQueue.Count - 1; i >= 0; i--)
+            {
+                var task = bot.BuildQueue[i];
+                task.RemainingMinutes -= minutesPerDay;
+                if (task.RemainingMinutes <= 0)
+                {
+                    // apply completed task
+                    switch (task.Type)
+                    {
+                        case BuildTaskType.VipSeatsBulk:
+                            bot.VipSeats += task.Count;
+                            break;
+                        case BuildTaskType.SitSeatsBulk:
+                            bot.SitSeats += task.Count;
+                            break;
+                        case BuildTaskType.StandSeatsBulk:
+                            bot.StandSeats += task.Count;
+                            break;
+                        case BuildTaskType.OfficeUpgrade:
+                            bot.OfficeLevel = Math.Min(20, task.TargetLevel);
+                            break;
+                        case BuildTaskType.TrainingCenterUpgrade:
+                            bot.TrainingCenterLevel = Math.Min(20, task.TargetLevel);
+                            break;
+                        case BuildTaskType.FanShopUpgrade:
+                            bot.FanShopLevel = Math.Min(20, task.TargetLevel);
+                            break;
+                        case BuildTaskType.ParkingUpgrade:
+                            bot.ParkingLevel = Math.Min(20, task.TargetLevel);
+                            break;
+                    }
+
+                    bot.BuildQueue.RemoveAt(i);
+                }
             }
         }
     }
@@ -241,51 +292,95 @@ public sealed class BotSimulationRunner(
                 }
             }
 
-            if (bot.StadiumLevel < 20 && bot.OfficeLevel >= (bot.StadiumLevel + 1) && bot.Money > 250_000m && random.NextDouble() < 0.60)
+            // Stadium: build seat bulks instead of a stadium level.
+            if (bot.Money > 50_000m && random.NextDouble() < 0.60)
             {
-                var cost = 90_000m + (20_000m * bot.StadiumLevel);
-                if (bot.Money >= cost)
+                // choose bulk: priority standing, sitting, vip
+                var pick = random.NextDouble();
+                if (pick < 0.55)
                 {
-                    bot.Money -= cost;
-                    bot.MoneyOutSeason += cost;
-                    metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.stadium", cost);
-                    bot.StadiumLevel++;
+                    // 100 standing seats
+                    var cost = 15_000m;
+                    if (bot.Money >= cost)
+                    {
+                        bot.Money -= cost;
+                        bot.MoneyOutSeason += cost;
+                        metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.stand_seats", cost);
+                        bot.BuildQueue.Add(new BuildTask { Type = BuildTaskType.StandSeatsBulk, Count = 100, RemainingMinutes = 100 });
+                    }
+                }
+                else if (pick < 0.90)
+                {
+                    // 100 sitting seats
+                    var cost = 30_000m;
+                    if (bot.Money >= cost)
+                    {
+                        bot.Money -= cost;
+                        bot.MoneyOutSeason += cost;
+                        metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.sit_seats", cost);
+                        bot.BuildQueue.Add(new BuildTask { Type = BuildTaskType.SitSeatsBulk, Count = 100, RemainingMinutes = 140 });
+                    }
+                }
+                else
+                {
+                    // 10 vip seats
+                    var cost = 40_000m;
+                    if (bot.Money >= cost)
+                    {
+                        bot.Money -= cost;
+                        bot.MoneyOutSeason += cost;
+                        metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.vip_seats", cost);
+                        bot.BuildQueue.Add(new BuildTask { Type = BuildTaskType.VipSeatsBulk, Count = 10, RemainingMinutes = 50 });
+                    }
                 }
             }
 
             if (bot.TrainingCenterLevel < 20 && bot.OfficeLevel >= (bot.TrainingCenterLevel + 1) && bot.Stars > 2_500m && random.NextDouble() < 0.70)
             {
+                var nextLevel = bot.TrainingCenterLevel + 1;
                 var starsCost = 1_200m + (180m * bot.TrainingCenterLevel);
                 if (bot.Stars >= starsCost)
                 {
                     bot.Stars -= starsCost;
                     bot.StarsOutSeason += starsCost;
-                    metricsCollector.RecordSpend(bot.Persona, "stars", "infrastructure.training_center", starsCost);
-                    bot.TrainingCenterLevel++;
+                    metricsCollector.RecordSpend(bot.Persona, "stars", "infrastructure.training_center.queued", starsCost);
+                    // compute linear time (minutes) for L->L+1: L=0->1 =>30min, L=19->20 =>3000min
+                    var minMinutes = 30.0;
+                    var maxMinutes = 3000.0; // 50 hours
+                    var minutes = (int)Math.Round(minMinutes + (bot.TrainingCenterLevel) * ((maxMinutes - minMinutes) / 19.0));
+                    bot.BuildQueue.Add(new BuildTask { Type = BuildTaskType.TrainingCenterUpgrade, TargetLevel = nextLevel, RemainingMinutes = minutes });
                 }
             }
 
             if (bot.FanShopLevel < 20 && bot.OfficeLevel >= (bot.FanShopLevel + 1) && bot.Money > 200_000m && random.NextDouble() < 0.45)
             {
+                var nextLevel = bot.FanShopLevel + 1;
                 var fanShopCost = 55_000m + (18_000m * bot.FanShopLevel);
                 if (bot.Money >= fanShopCost)
                 {
                     bot.Money -= fanShopCost;
                     bot.MoneyOutSeason += fanShopCost;
-                    metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.fan_shop", fanShopCost);
-                    bot.FanShopLevel++;
+                    metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.fan_shop.queued", fanShopCost);
+                    var minMinutes = 30.0;
+                    var maxMinutes = 3000.0;
+                    var minutes = (int)Math.Round(minMinutes + (bot.FanShopLevel) * ((maxMinutes - minMinutes) / 19.0));
+                    bot.BuildQueue.Add(new BuildTask { Type = BuildTaskType.FanShopUpgrade, TargetLevel = nextLevel, RemainingMinutes = minutes });
                 }
             }
 
             if (bot.ParkingLevel < 20 && bot.OfficeLevel >= (bot.ParkingLevel + 1) && bot.Money > 180_000m && random.NextDouble() < 0.40)
             {
+                var nextLevel = bot.ParkingLevel + 1;
                 var parkingCost = 45_000m + (14_000m * bot.ParkingLevel);
                 if (bot.Money >= parkingCost)
                 {
                     bot.Money -= parkingCost;
                     bot.MoneyOutSeason += parkingCost;
-                    metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.parking", parkingCost);
-                    bot.ParkingLevel++;
+                    metricsCollector.RecordSpend(bot.Persona, "money", "infrastructure.parking.queued", parkingCost);
+                    var minMinutes = 30.0;
+                    var maxMinutes = 3000.0;
+                    var minutes = (int)Math.Round(minMinutes + (bot.ParkingLevel) * ((maxMinutes - minMinutes) / 19.0));
+                    bot.BuildQueue.Add(new BuildTask { Type = BuildTaskType.ParkingUpgrade, TargetLevel = nextLevel, RemainingMinutes = minutes });
                 }
             }
         }
@@ -298,11 +393,11 @@ public sealed class BotSimulationRunner(
             var ticket = GetTicketPricesByTier(bot.Tier);
             var seatCaps = GetSeatCapsByTier(bot.Tier);
 
-            var vipSeats = Math.Min(seatCaps.MaxVipSeats, 200 + (bot.StadiumLevel * 130));
-            var sitSeats = Math.Min(seatCaps.MaxSitSeats, 2_500 + (bot.StadiumLevel * 1_750));
+            var vipSeats = Math.Min(seatCaps.MaxVipSeats, bot.VipSeats);
+            var sitSeats = Math.Min(seatCaps.MaxSitSeats, bot.SitSeats);
 
             // Standing seats are theoretically uncapped, but attendance is demand-limited.
-            var standBuilt = 3_000 + (bot.StadiumLevel * 2_200);
+            var standBuilt = bot.StandSeats;
             var standingDemandCap = GetStandingDemandCap(bot.Tier, bot.SeasonWins, bot.SeasonLosses);
             var standSold = Math.Min(standBuilt, standingDemandCap);
 
@@ -446,6 +541,121 @@ public sealed class BotSimulationRunner(
         if (options.TrainingTickUtc != new TimeOnly(8, 0))
         {
             throw new InvalidOperationException("Training tick must be 08:00 UTC for this simulation run.");
+        }
+    }
+
+    private void ApplyPromotionRelegation(IReadOnlyList<BotClubProfile> bots)
+    {
+        var teamsPerLeague = options.TeamsPerLeague;
+
+        static int Points(BotClubProfile b) => (b.SeasonWins * 3) + b.SeasonDraws;
+        // Snapshot standings before any mutations to avoid interference between steps
+        var tier1Standings = bots
+            .Where(b => b.Tier == 1 && b.LeagueGroup == 1)
+            .OrderByDescending(b => Points(b))
+            .ThenByDescending(b => b.SeasonWins)
+            .ThenByDescending(b => b.Strength)
+            .ThenBy(b => b.TeamName, StringComparer.Ordinal)
+            .ToList();
+
+        var tier2Standings = new Dictionary<int, List<BotClubProfile>>();
+        for (var g = 1; g <= 5; g++)
+        {
+            tier2Standings[g] = bots
+                .Where(b => b.Tier == 2 && b.LeagueGroup == g)
+                .OrderByDescending(b => Points(b))
+                .ThenByDescending(b => b.SeasonWins)
+                .ThenByDescending(b => b.Strength)
+                .ThenBy(b => b.TeamName, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        var tier3Standings = new Dictionary<int, List<BotClubProfile>>();
+        for (var g = 1; g <= 15; g++)
+        {
+            tier3Standings[g] = bots
+                .Where(b => b.Tier == 3 && b.LeagueGroup == g)
+                .OrderByDescending(b => Points(b))
+                .ThenByDescending(b => b.SeasonWins)
+                .ThenByDescending(b => b.Strength)
+                .ThenBy(b => b.TeamName, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        // Determine moves from snapshots
+        var relegatedFromTier1 = new List<BotClubProfile>();
+        if (tier1Standings.Count == teamsPerLeague)
+        {
+            relegatedFromTier1.AddRange(tier1Standings.Skip(teamsPerLeague - 5).Take(5));
+        }
+
+        var promotedFromTier2 = new List<BotClubProfile>();
+        var relegatedFromTier2 = new List<BotClubProfile>();
+        for (var g = 1; g <= 5; g++)
+        {
+            var s = tier2Standings[g];
+            if (s.Count != teamsPerLeague) continue;
+            promotedFromTier2.Add(s[0]);
+            relegatedFromTier2.AddRange(s.Skip(teamsPerLeague - 6).Take(6));
+        }
+
+        var promotedFromTier3 = new List<BotClubProfile>();
+        for (var g = 1; g <= 15; g++)
+        {
+            var s = tier3Standings[g];
+            if (s.Count != teamsPerLeague) continue;
+            promotedFromTier3.AddRange(s.Take(2));
+        }
+
+        // Apply promotions first (tier2 -> tier1, tier3 -> tier2)
+        foreach (var p in promotedFromTier2)
+        {
+            p.Tier = 1;
+            p.LeagueGroup = 1;
+        }
+
+        for (var i = 0; i < promotedFromTier3.Count; i++)
+        {
+            var t = promotedFromTier3[i];
+            var group = 1 + (i / 6);
+            t.Tier = 2;
+            t.LeagueGroup = group;
+        }
+
+        // Then apply relegations (tier1 -> tier2, tier2 -> tier3)
+        for (var i = 0; i < relegatedFromTier1.Count; i++)
+        {
+            var t = relegatedFromTier1[i];
+            t.Tier = 2;
+            t.LeagueGroup = 1 + i; // distribute across tier2 groups 1..5
+        }
+
+        for (var i = 0; i < relegatedFromTier2.Count; i++)
+        {
+            var t = relegatedFromTier2[i];
+            t.Tier = 3;
+            t.LeagueGroup = 1 + (i % 15);
+        }
+
+        // Recompute positions within each group after mutations
+        for (var tier = 1; tier <= 3; tier++)
+        {
+            var maxGroups = tier == 1 ? 1 : tier == 2 ? 5 : 15;
+            for (var g = 1; g <= maxGroups; g++)
+            {
+                var members = bots
+                    .Where(b => b.Tier == tier && b.LeagueGroup == g)
+                    .OrderByDescending(b => Points(b))
+                    .ThenByDescending(b => b.SeasonWins)
+                    .ThenByDescending(b => b.Strength)
+                    .ThenBy(b => b.TeamName, StringComparer.Ordinal)
+                    .ToArray();
+
+                for (var pos = 0; pos < members.Length; pos++)
+                {
+                    members[pos].Position = pos + 1;
+                }
+            }
         }
     }
 }

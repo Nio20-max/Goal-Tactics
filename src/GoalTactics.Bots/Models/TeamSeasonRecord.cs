@@ -30,6 +30,12 @@ public sealed class TeamSeasonRecord
 
     public int StadiumLevel { get; init; }
 
+    public int VipSeats { get; init; }
+
+    public int SitSeats { get; init; }
+
+    public int StandSeats { get; init; }
+
     public int TrainingCenterLevel { get; init; }
 
     public int OfficeLevel { get; init; }

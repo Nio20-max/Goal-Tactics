@@ -33,6 +33,9 @@ public sealed class BotTeamSeasonTracker
                 SeasonLosses = bot.SeasonLosses,
                 SeasonDraws = bot.SeasonDraws,
                 StadiumLevel = bot.StadiumLevel,
+                    VipSeats = bot.VipSeats,
+                    SitSeats = bot.SitSeats,
+                    StandSeats = bot.StandSeats,
                 TrainingCenterLevel = bot.TrainingCenterLevel,
                 OfficeLevel = bot.OfficeLevel,
                 FanShopLevel = bot.FanShopLevel,
@@ -61,7 +64,7 @@ public sealed class BotTeamSeasonTracker
 
         var csv = new List<string>
         {
-            "team_name,season,bot_id,manager_name,country_iso,time_zone,persona,tier,group,position,season_wins,season_losses,season_draws,season_points,stadium_level,training_center_level,office_level,fan_shop_level,parking_level,team_strength,money_balance,stars_balance,money_in,money_out,stars_in,stars_out"
+            "team_name,season,bot_id,manager_name,country_iso,time_zone,persona,tier,group,position,season_wins,season_losses,season_draws,season_points,stadium_level,vip_seats,sit_seats,stand_seats,training_center_level,office_level,fan_shop_level,parking_level,team_strength,money_balance,stars_balance,money_in,money_out,stars_in,stars_out"
         };
 
         csv.AddRange(ordered.Select(x => string.Join(',',
@@ -80,6 +83,9 @@ public sealed class BotTeamSeasonTracker
             x.SeasonDraws,
             (x.SeasonWins * 3) + x.SeasonDraws,
             x.StadiumLevel,
+            x.VipSeats,
+            x.SitSeats,
+            x.StandSeats,
             x.TrainingCenterLevel,
             x.OfficeLevel,
             x.FanShopLevel,
@@ -176,7 +182,7 @@ public sealed class BotTeamSeasonTracker
 
             var leagueTeamsCsv = new List<string>
             {
-                "team_name,season,bot_id,manager_name,country_iso,time_zone,persona,tier,group,position,season_wins,season_losses,season_draws,season_points,stadium_level,training_center_level,office_level,fan_shop_level,parking_level,team_strength,money_balance,stars_balance,money_in,money_out,stars_in,stars_out"
+                "team_name,season,bot_id,manager_name,country_iso,time_zone,persona,tier,group,position,season_wins,season_losses,season_draws,season_points,stadium_level,vip_seats,sit_seats,stand_seats,training_center_level,office_level,fan_shop_level,parking_level,team_strength,money_balance,stars_balance,money_in,money_out,stars_in,stars_out"
             };
 
             leagueTeamsCsv.AddRange(leagueTeams.Select(x => string.Join(',',
@@ -195,6 +201,9 @@ public sealed class BotTeamSeasonTracker
                 x.SeasonDraws,
                 (x.SeasonWins * 3) + x.SeasonDraws,
                 x.StadiumLevel,
+                x.VipSeats,
+                x.SitSeats,
+                x.StandSeats,
                 x.TrainingCenterLevel,
                 x.OfficeLevel,
                 x.FanShopLevel,

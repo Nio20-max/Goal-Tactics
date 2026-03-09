@@ -240,7 +240,7 @@
     .line 166
     new-instance v1, Ljava/lang/StringBuilder;
 
-    const-string v2, "https://%slaunches.%s/api/v"
+    const-string v2, "https://gt.nikolai-linschmann.de/api/v"
 
     invoke-direct {v1, v2}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
 

@@ -124,6 +124,50 @@ def patch_fixed_width_utf16le(haystack: bytes, old_text: str, new_text: str, pad
     return haystack.replace(old, padded), count
 
 
+def _build_dot_padding(n: int) -> str:
+    """Build a string of ``../`` and ``./`` segments totaling exactly *n* characters."""
+    if n == 0:
+        return ""
+    if n == 1:
+        raise ValueError("Cannot pad with exactly 1 character using dot-segments")
+    parts: list[str] = []
+    remaining = n
+    while remaining > 0:
+        if remaining >= 3 and remaining != 4:
+            parts.append("../")
+            remaining -= 3
+        elif remaining >= 2:
+            parts.append("./")
+            remaining -= 2
+        else:
+            raise ValueError(f"Internal error: cannot consume remaining {remaining} chars")
+    return "".join(parts)
+
+
+def pad_url_with_dots(url: str, target_length: int) -> str:
+    """Pad *url* to *target_length* by inserting ``../`` and ``./`` dot-segments in the path.
+
+    The .NET ``Uri`` class normalises these segments away, so the effective URL
+    is unchanged after parsing.  This avoids the previous ``/`` padding which
+    left multi-slash paths (``////api/``) that Mono's HTTP pipeline rejected.
+    """
+    deficit = target_length - len(url)
+    if deficit == 0:
+        return url
+    if deficit < 0:
+        raise ValueError(f"URL {url!r} ({len(url)} chars) already exceeds target {target_length}")
+
+    # Insert dot-segments right after the first path '/' (after scheme://host)
+    scheme_end = url.index("//") + 2
+    first_slash = url.index("/", scheme_end)
+    insert_at = first_slash + 1
+
+    padding = _build_dot_padding(deficit)
+    result = url[:insert_at] + padding + url[insert_at:]
+    assert len(result) == target_length, f"Length mismatch: {len(result)} != {target_length}"
+    return result
+
+
 def patch_gt_core_payload(payload: bytes, host: str, force_http: bool = False) -> tuple[bytes, dict[str, int]]:
     host = host.strip().rstrip("/")
 
@@ -135,36 +179,33 @@ def patch_gt_core_payload(payload: bytes, host: str, force_http: bool = False) -
     game_http = f"http://{host}/api/"
     new_game_https = game_http if force_http else game_https
 
-    replacements = {
-        b"https://gtwebapp2.azurewebsites.net/": new_https_base.encode("utf-8"),
-        b"http://gtwebapp2-gtwebapp2staging.azurewebsites.net/": f"http://{host}/".encode("utf-8"),
-        b"https://engine.goaltactics.de/GameEngine/": new_game_https.encode("utf-8"),
-        b"http://goaltacticswebapp-goaltacticswebappstaging.azurewebsites.net/GameEngine/": f"http://{host}/api/".encode("utf-8"),
-        b"https://xyrality.com/home/privacy-policy/": new_https_base.encode("utf-8"),
-        b"https://play.google.com/store/apps/details?id=com.xyrality.goaltactics": new_https_base.encode("utf-8"),
-        b"https://apps.apple.com/us/developer/xyrality-gmbh/id421864157?see-all=i-phonei-pad-apps": new_https_base.encode("utf-8"),
-    }
-
-    replacements_utf16 = {
-        "https://gtwebapp2.azurewebsites.net/": new_https_base,
-        "http://gtwebapp2-gtwebapp2staging.azurewebsites.net/": f"http://{host}/",
-        "https://engine.goaltactics.de/GameEngine/": new_game_https,
-        "http://goaltacticswebapp-goaltacticswebappstaging.azurewebsites.net/GameEngine/": f"http://{host}/api/",
-        "https://xyrality.com/home/privacy-policy/": new_https_base,
-        "https://play.google.com/store/apps/details?id=com.xyrality.goaltactics": new_https_base,
-        "https://apps.apple.com/us/developer/xyrality-gmbh/id421864157?see-all=i-phonei-pad-apps": new_https_base,
-    }
+    # Each tuple: (original_url, replacement_url).
+    # pad_url_with_dots() will bring the replacement to the original's exact
+    # byte-length by inserting ../ and ./ dot-segments that the .NET Uri class
+    # normalises away at runtime.
+    replacement_pairs: list[tuple[str, str]] = [
+        ("https://gtwebapp2.azurewebsites.net/", new_https_base),
+        ("http://gtwebapp2-gtwebapp2staging.azurewebsites.net/", f"http://{host}/"),
+        ("https://engine.goaltactics.de/GameEngine/", new_game_https),
+        ("http://goaltacticswebapp-goaltacticswebappstaging.azurewebsites.net/GameEngine/", f"http://{host}/api/"),
+        ("https://xyrality.com/home/privacy-policy/", new_https_base),
+        ("https://play.google.com/store/apps/details?id=com.xyrality.goaltactics", new_https_base),
+        ("https://apps.apple.com/us/developer/xyrality-gmbh/id421864157?see-all=i-phonei-pad-apps", new_https_base),
+    ]
 
     stats: dict[str, int] = {}
     patched = payload
-    for old, new in replacements.items():
-        # Avoid NUL bytes in URL literals; slash padding keeps paths parseable.
-        patched, count = patch_fixed_width(patched, old, new, pad_byte=b"/")
-        stats[old.decode("utf-8")] = count
 
-    for old_text, new_text in replacements_utf16.items():
-        patched, count = patch_fixed_width_utf16le(patched, old_text, new_text, pad_char="/")
-        stats[f"UTF16:{old_text}"] = count
+    for old_url, new_url in replacement_pairs:
+        padded = pad_url_with_dots(new_url, len(old_url))
+
+        # UTF-8 replacement (exact length, no extra padding needed)
+        patched, count = patch_fixed_width(patched, old_url.encode("utf-8"), padded.encode("utf-8"))
+        stats[old_url] = count
+
+        # UTF-16LE replacement
+        patched, count = patch_fixed_width_utf16le(patched, old_url, padded)
+        stats[f"UTF16:{old_url}"] = count
 
     return patched, stats
 

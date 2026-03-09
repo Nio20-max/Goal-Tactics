@@ -4,7 +4,7 @@ namespace GoalTactics.Contracts.Shop;
 
 public sealed class ShopPurchaseVerifyRequest : RequestObject
 {
-    public string? Platform { get; init; }
+    public new string? Platform { get; init; }
 
     public string? ProductIdentifier { get; init; }
 

@@ -1,0 +1,17 @@
+rank,season,tier,group,team_name,bot_id,persona,wins,draws,losses,points,team_strength,money_balance,stars_balance
+1,4,3,14,PT Club 310,fe5a44a9-ce25-4b0c-805f-aa58fad6f508,YouthFocusedBot,16,6,8,54,179,20619934,734
+2,4,3,14,NL Club 315,cdac6461-18e6-4ea7-96ea-fc23ca7f1516,AggressiveTraderBot,15,6,9,51,177,-174754,1800
+3,4,3,14,ES Club 64,20ac27c2-f80e-4cfd-8f92-415bb8148245,YouthFocusedBot,13,9,8,48,199,14167049,377
+4,4,3,14,PT Club 320,96be8948-bc1b-4b84-af9b-0a7693f9a9bb,ConservativeBot,12,9,9,45,189,45779512,7571
+5,4,3,14,CH Club 308,d55da4fb-efd6-4874-84c4-2c95a6452cd1,ConservativeBot,11,11,8,44,200,18283296,11417
+6,4,3,14,BE Club 309,188259ae-f01d-418c-b8b3-8d260c056a73,AggressiveTraderBot,11,10,9,43,195,6284894,934
+7,4,3,14,NL Club 305,e1edb26b-96f4-43ca-93ea-383795273365,LadderGrinderBot,10,13,7,43,196,45726361,11719
+8,4,3,14,DE Club 311,1482ea13-d43f-4c4a-b270-24864d6c2dd9,LadderGrinderBot,8,14,8,38,195,6887122,11506
+9,4,3,14,IT Club 313,9fdda90e-0d4e-4c12-9dc8-1007000548a8,NewManagerBot,8,14,8,38,186,21209363,13725
+10,4,3,14,PL Club 316,d93663fb-8e4e-48b8-8793-3b45d3651426,YouthFocusedBot,9,10,11,37,191,19030306,585
+11,4,3,14,PL Club 306,766cf4e6-f46e-45ee-8f13-d46eb14dee2b,SocialBot,9,9,12,36,188,18835323,9518
+12,4,3,14,NL Club 55,d599d6f9-83d6-4dd5-aa33-26c62bc02dbb,NewManagerBot,8,11,11,35,184,40473740,10878
+13,4,3,14,ES Club 314,3de018d4-d0e5-48d6-8039-685d6fb455d9,ConservativeBot,7,13,10,34,175,8931447,14620
+14,4,3,14,AT Club 307,ba673f0e-c45f-4c1b-abfd-a12efc683d73,NewManagerBot,9,6,15,33,191,3609927,5915
+15,4,3,14,CH Club 318,49b1df9c-a60a-4aca-84fa-498d9f4cf4af,SocialBot,8,9,13,33,180,41747437,6790
+16,4,3,14,CH Club 58,8ec3792b-7f3a-4055-ba8b-3e90217e5a4e,YouthFocusedBot,8,6,16,30,168,34847851,109

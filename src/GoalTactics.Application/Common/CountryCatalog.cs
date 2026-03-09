@@ -11,10 +11,10 @@ public sealed class InMemoryCountryCatalog : ICountryCatalog
 {
     private static readonly IReadOnlyList<CountryDto> Countries =
     [
-        new CountryDto { Id = 1, Name = "Germany", IsoCode = "DE" },
-        new CountryDto { Id = 2, Name = "Austria", IsoCode = "AT" },
-        new CountryDto { Id = 3, Name = "Switzerland", IsoCode = "CH" },
-        new CountryDto { Id = 4, Name = "Netherlands", IsoCode = "NL" }
+        new CountryDto { Id = Guid.Parse("00000000-0000-0000-0000-000000000001"), Name = "Germany", IsoCode = "DE" },
+        new CountryDto { Id = Guid.Parse("00000000-0000-0000-0000-000000000002"), Name = "Austria", IsoCode = "AT" },
+        new CountryDto { Id = Guid.Parse("00000000-0000-0000-0000-000000000003"), Name = "Switzerland", IsoCode = "CH" },
+        new CountryDto { Id = Guid.Parse("00000000-0000-0000-0000-000000000004"), Name = "Netherlands", IsoCode = "NL" }
     ];
 
     public IReadOnlyList<CountryDto> GetCountries() => Countries;

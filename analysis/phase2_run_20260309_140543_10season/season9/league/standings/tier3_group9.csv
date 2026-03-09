@@ -1,0 +1,17 @@
+rank,season,tier,group,team_name,bot_id,persona,wins,draws,losses,points,team_strength,money_balance,stars_balance
+1,9,3,9,NL Club 235,f0478c1e-b4b9-4ce1-9bbc-f88d6a9e8442,NewManagerBot,19,4,7,61,316,97051087,20590
+2,9,3,9,AT Club 227,c95b8b8e-554e-422c-a66c-d2e6e5e6fbb6,LadderGrinderBot,14,6,10,48,337,47933365,14186
+3,9,3,9,FR Club 232,f5d01f5a-dffe-4682-adcb-4b5cf426340b,YouthFocusedBot,12,8,10,44,325,44318800,1231
+4,9,3,9,IT Club 243,57eeb85d-9fd3-4c86-bc74-881bb0616ec0,AggressiveTraderBot,10,14,6,44,332,38700511,1389
+5,9,3,9,PT Club 160,e6721176-f64f-47bd-9d13-860308346657,YouthFocusedBot,10,12,8,42,327,103590330,740
+6,9,3,9,PL Club 146,498d2e73-5d20-4a36-9099-e2ad585d8017,ConservativeBot,9,15,6,42,353,74266583,14749
+7,9,3,9,NL Club 15,66ae8f2e-8ac4-4b98-8460-ffeaeb99340d,AggressiveTraderBot,11,8,11,41,335,22088591,1317
+8,9,3,9,NL Club 225,b0416165-d302-4781-9fb0-999f91c7c570,AggressiveTraderBot,11,8,11,41,317,33760261,967
+9,9,3,9,PT Club 240,3df323f7-54e6-4aea-a922-78d28a7e9a7b,SocialBot,9,14,7,41,315,96626925,35953
+10,9,3,9,AT Club 267,e3b70cb6-1354-400b-85e6-a68e77dc686d,AggressiveTraderBot,10,8,12,38,323,22727890,1233
+11,9,3,9,IT Club 233,ed4bacb7-638a-4081-b1bc-c2704a08a0ee,LadderGrinderBot,10,6,14,36,333,43457249,21554
+12,9,3,9,BE Club 259,b828ba92-3787-49ca-83d1-66ed8b43da8a,NewManagerBot,8,12,10,36,315,69811030,18250
+13,9,3,9,CH Club 288,27cf0581-ccc5-4343-b33a-311ef5a6e1da,SocialBot,7,14,9,35,332,102066824,29361
+14,9,3,9,CH Club 238,e8ae7945-27c8-4a95-a035-d5ddf08ebb45,YouthFocusedBot,6,15,9,33,337,96741113,-330
+15,9,3,9,IT Club 3,e5fadf32-ef6f-4b8b-9eb5-5dc8ad48463d,AggressiveTraderBot,6,14,10,32,316,43647745,830
+16,9,3,9,BE Club 239,aac97cd2-4015-4ebd-8173-40e2c488b36f,LadderGrinderBot,7,4,19,25,332,97050893,26885

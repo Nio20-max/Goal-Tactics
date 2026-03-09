@@ -64,13 +64,27 @@ public sealed class BotRegistry
             });
         }
 
+        // initialize seat counts from initial stadium level
+        var seatCaps = new[] { (Vip: 2800, Sit: 35000), (Vip: 2300, Sit: 28500), (Vip: 1900, Sit: 24000) };
+        foreach (var r in result)
+        {
+            var tierIndex = Math.Clamp(r.Tier - 1, 0, 2);
+            var caps = seatCaps[tierIndex];
+            r.VipSeats = Math.Min(caps.Vip, 200 + (r.StadiumLevel * 130));
+            r.SitSeats = Math.Min(caps.Sit, 2_500 + (r.StadiumLevel * 1_750));
+            r.StandSeats = 3_000 + (r.StadiumLevel * 2_200);
+        }
+
         return result;
     }
 
     private static int ResolveTier(int index, int teamsPerLeague)
     {
-        var tier1 = teamsPerLeague;
-        var tier2 = teamsPerLeague * 2;
+        // New league structure: 1 top league, 5 second-tier leagues, 15 third-tier leagues
+        var tier1 = teamsPerLeague * 1;   // 1 group
+        var tier2 = teamsPerLeague * 5;   // 5 groups
+        // var tier3 = teamsPerLeague * 15; // remaining
+
         if (index < tier1)
         {
             return 1;
@@ -91,13 +105,17 @@ public sealed class BotRegistry
             return 1;
         }
 
+        var tier1Count = teamsPerLeague * 1;
+        var tier2Count = teamsPerLeague * 5;
+
         if (tier == 2)
         {
-            var relative = index - teamsPerLeague;
+            var relative = index - tier1Count;
             return 1 + (relative / teamsPerLeague);
         }
 
-        var relativeTier3 = index - (teamsPerLeague * 3);
+        // tier == 3
+        var relativeTier3 = index - (tier1Count + tier2Count);
         return 1 + (relativeTier3 / teamsPerLeague);
     }
 }

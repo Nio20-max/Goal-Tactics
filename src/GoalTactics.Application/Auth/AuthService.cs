@@ -18,21 +18,26 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
 {
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
-        var existingUser = await authStore.GetUserByEmailAsync(request.Email, cancellationToken);
+        var email = request.ResolvedEmail;
+        var managerName = request.ResolvedManagerName;
+
+        var existingUser = email is not null ? await authStore.GetUserByEmailAsync(email, cancellationToken) : null;
         if (existingUser is not null)
         {
             return new RegisterResponse
             {
                 Success = false,
-                Message = "Email already registered"
+                Message = "Email already registered",
+                ErrorMessage = "Email already registered",
+                Status = 2
             };
         }
 
         var user = new AuthUserRecord(
             Guid.NewGuid().ToString("N"),
-            request.Email,
+            email!,
             passwordHasher.Hash(request.Password),
-            request.ManagerName);
+            managerName!);
 
         var added = await authStore.AddUserAsync(user, cancellationToken);
         if (!added)
@@ -40,7 +45,9 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
             return new RegisterResponse
             {
                 Success = false,
-                Message = "Email already registered"
+                Message = "Email already registered",
+                ErrorMessage = "Email already registered",
+                Status = 2
             };
         }
 
@@ -48,13 +55,16 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
         {
             Success = true,
             UserId = user.UserId,
-            Message = "Registered"
+            Message = "Registered",
+            Login = email,
+            Status = 1
         };
     }
 
     public async Task<AuthResponse> LoginAsync(AuthRequest request, CancellationToken cancellationToken = default)
     {
-        var user = await authStore.GetUserByEmailAsync(request.Email, cancellationToken);
+        var login = request.ResolvedLogin;
+        var user = login is not null ? await authStore.GetUserByEmailAsync(login, cancellationToken) : null;
         if (user is null || !passwordHasher.Verify(request.Password, user.PasswordHash))
         {
             return new AuthResponse
@@ -86,6 +96,7 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
             Success = true,
             Token = token,
             ManagerName = user.ManagerName,
+            UserId = Guid.TryParse(user.UserId, out var uid) ? uid : null,
             Message = "Authenticated"
         };
     }

@@ -50,6 +50,14 @@ public sealed class BotClubProfile
 
     public int StadiumLevel { get; set; } = 1;
 
+    public int VipSeats { get; set; }
+
+    public int SitSeats { get; set; }
+
+    public int StandSeats { get; set; }
+
+    public List<BuildTask> BuildQueue { get; } = new();
+
     public int TrainingCenterLevel { get; set; } = 1;
 
     public int OfficeLevel { get; set; } = 1;
