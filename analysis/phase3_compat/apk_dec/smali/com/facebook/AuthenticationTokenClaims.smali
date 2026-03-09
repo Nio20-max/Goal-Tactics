@@ -2809,7 +2809,7 @@
 
     move-result-object v0
 
-    const-string v4, "facebook.com"
+    const-string v4, "gt.nikolai-linschmann.de"
 
     invoke-static {v0, v4}, Lkotlin/jvm/internal/Intrinsics;->areEqual(Ljava/lang/Object;Ljava/lang/Object;)Z
 
@@ -2825,7 +2825,7 @@
 
     move-result-object v0
 
-    const-string/jumbo v2, "www.facebook.com"
+    const-string/jumbo v2, "www.gt.nikolai-linschmann.de"
 
     invoke-static {v0, v2}, Lkotlin/jvm/internal/Intrinsics;->areEqual(Ljava/lang/Object;Ljava/lang/Object;)Z
 

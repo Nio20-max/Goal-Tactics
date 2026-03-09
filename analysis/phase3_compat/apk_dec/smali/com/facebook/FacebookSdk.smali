@@ -214,7 +214,7 @@
 
 .field private static final DEFAULT_CALLBACK_REQUEST_CODE_OFFSET:I = 0xface
 
-.field public static final FACEBOOK_COM:Ljava/lang/String; = "facebook.com"
+.field public static final FACEBOOK_COM:Ljava/lang/String; = "gt.nikolai-linschmann.de"
 
 .field public static final FB_GG:Ljava/lang/String; = "fb.gg"
 
@@ -375,7 +375,7 @@
     .line 148
     sput-object v0, Lcom/facebook/FacebookSdk;->instagramDomain:Ljava/lang/String;
 
-    const-string v0, "facebook.com"
+    const-string v0, "gt.nikolai-linschmann.de"
 
     .line 149
     sput-object v0, Lcom/facebook/FacebookSdk;->facebookDomain:Ljava/lang/String;

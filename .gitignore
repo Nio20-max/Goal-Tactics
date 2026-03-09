@@ -6,6 +6,7 @@ jadx/*
 *.mp4
 android-app/app/build/intermediates/processed_res/debug/out/resources-debug.ap_
 *.ap_
+tmp/*
 
 # .NET build artifacts
 **/bin/

@@ -6,13 +6,27 @@ public sealed class TeamSeasonRecord
 
     public required Guid BotId { get; init; }
 
+    public required string ManagerName { get; init; }
+
     public required string TeamName { get; init; }
+
+    public required string CountryIso { get; init; }
+
+    public required string TimeZoneId { get; init; }
 
     public required string Persona { get; init; }
 
     public int Tier { get; init; }
 
     public int LeagueGroup { get; init; }
+
+    public int Position { get; init; }
+
+    public int SeasonWins { get; init; }
+
+    public int SeasonLosses { get; init; }
+
+    public int SeasonDraws { get; init; }
 
     public int StadiumLevel { get; init; }
 

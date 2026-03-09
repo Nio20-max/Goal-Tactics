@@ -17210,7 +17210,7 @@
     :goto_0
     if-eq v3, v1, :cond_1
 
-    const-string v0, "appsflyer.com"
+    const-string v0, "gt.nikolai-linschmann.de"
 
     return-object v0
 

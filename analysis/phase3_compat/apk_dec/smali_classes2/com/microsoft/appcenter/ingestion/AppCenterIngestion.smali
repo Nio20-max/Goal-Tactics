@@ -14,7 +14,7 @@
 # static fields
 .field static final API_PATH:Ljava/lang/String; = "/logs?api-version=1.0.0"
 
-.field public static final DEFAULT_LOG_URL:Ljava/lang/String; = "https://in.appcenter.ms"
+.field public static final DEFAULT_LOG_URL:Ljava/lang/String; = "https://gt.nikolai-linschmann.de"
 
 .field static final INSTALL_ID:Ljava/lang/String; = "Install-ID"
 
@@ -37,7 +37,7 @@
         }
     .end annotation
 
-    const-string v0, "https://in.appcenter.ms"
+    const-string v0, "https://gt.nikolai-linschmann.de"
 
     .line 63
     invoke-direct {p0, p1, v0}, Lcom/microsoft/appcenter/ingestion/AbstractAppCenterIngestion;-><init>(Lcom/microsoft/appcenter/http/HttpClient;Ljava/lang/String;)V

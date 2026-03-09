@@ -178,18 +178,26 @@ def patch_gt_droid_payload(payload: bytes, host: str) -> tuple[bytes, dict[str, 
     # Keep Helpshift credentials unchanged: invalidating these causes install-time
     # validation failures during MainActivity startup.
 
+    # Use explicitly invalid values for analytics credentials/hosts so SDK init
+    # paths short-circuit instead of attempting network with placeholder tokens.
     replacements_utf8 = {
         b"xyrality.helpshift.com": fit(host, len("xyrality.helpshift.com")).encode("utf-8"),
-        b"3tXpUpaBpbZpWF2KPEWQv3": b"0" * len("3tXpUpaBpbZpWF2KPEWQv3"),
-        b"98d71a5a-41a9-4c5a-bf9f-70014a1d0a5f": b"00000000-0000-0000-0000-000000000000",
-        b"1498fe489": b"000000000",
+        b"3tXpUpaBpbZpWF2KPEWQv3": b"invalid-appsflyer-key",
+        b"98d71a5a-41a9-4c5a-bf9f-70014a1d0a5f": b"appcenter-disabled-secret-0000000000",
+        b"appsflyer.com": b"invalid.local",
+        b"launches.appsflyer.com": b"invalid.local",
+        b"in.appcenter.ms": b"invalid.local",
+        b"ingest.appcenter.ms": b"invalid.local",
     }
 
     replacements_utf16 = {
         "xyrality.helpshift.com": fit(host, len("xyrality.helpshift.com")),
-        "3tXpUpaBpbZpWF2KPEWQv3": "0" * len("3tXpUpaBpbZpWF2KPEWQv3"),
-        "98d71a5a-41a9-4c5a-bf9f-70014a1d0a5f": "00000000-0000-0000-0000-000000000000",
-        "1498fe489": "000000000",
+        "3tXpUpaBpbZpWF2KPEWQv3": "invalid-appsflyer-key",
+        "98d71a5a-41a9-4c5a-bf9f-70014a1d0a5f": "appcenter-disabled-secret-0000000000",
+        "appsflyer.com": "invalid.local",
+        "launches.appsflyer.com": "invalid.local",
+        "in.appcenter.ms": "invalid.local",
+        "ingest.appcenter.ms": "invalid.local",
     }
 
     stats: dict[str, int] = {}

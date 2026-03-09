@@ -828,21 +828,21 @@
     :try_start_0
     sget-object v0, Lcom/facebook/internal/Utility;->INSTANCE:Lcom/facebook/internal/Utility;
 
-    const-string v1, "facebook.com"
+    const-string v1, "gt.nikolai-linschmann.de"
 
     invoke-direct {v0, p0, v1}, Lcom/facebook/internal/Utility;->clearCookiesForDomain(Landroid/content/Context;Ljava/lang/String;)V
 
-    const-string v1, ".facebook.com"
+    const-string v1, ".gt.nikolai-linschmann.de"
 
     .line 471
     invoke-direct {v0, p0, v1}, Lcom/facebook/internal/Utility;->clearCookiesForDomain(Landroid/content/Context;Ljava/lang/String;)V
 
-    const-string v1, "https://facebook.com"
+    const-string v1, "https://gt.nikolai-linschmann.de"
 
     .line 472
     invoke-direct {v0, p0, v1}, Lcom/facebook/internal/Utility;->clearCookiesForDomain(Landroid/content/Context;Ljava/lang/String;)V
 
-    const-string v1, "https://.facebook.com"
+    const-string v1, "https://.gt.nikolai-linschmann.de"
 
     .line 473
     invoke-direct {v0, p0, v1}, Lcom/facebook/internal/Utility;->clearCookiesForDomain(Landroid/content/Context;Ljava/lang/String;)V
@@ -1831,7 +1831,7 @@
 
     const/4 v6, 0x0
 
-    const-string v2, "facebook.com"
+    const-string v2, "gt.nikolai-linschmann.de"
 
     const-string v3, "fb.gg"
 
@@ -1857,7 +1857,7 @@
 
     const/4 v6, 0x0
 
-    const-string v2, "facebook.com"
+    const-string v2, "gt.nikolai-linschmann.de"
 
     const-string v3, "instagram.com"
 
