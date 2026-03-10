@@ -8,11 +8,19 @@ public class TeamData
 
     public string? Name { get; init; }
 
+    public string? Logo { get; init; }
+
     public string? Country { get; init; }
 
     public string? CountryName { get; init; }
 
+    public Guid LeagueId { get; init; }
+
     public string? LeagueName { get; init; }
+
+    public string? HomeTrikot { get; init; }
+
+    public string? AwayTrikot { get; init; }
 
     public decimal MarketValue { get; init; }
 

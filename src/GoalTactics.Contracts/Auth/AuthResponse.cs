@@ -8,7 +8,7 @@ public sealed class AuthResponse : ResponseObject
 
     public string? ManagerName { get; init; }
 
-    public Guid? UserId { get; init; }
+    public Guid UserId { get; init; }
 
     public int Level { get; init; }
 

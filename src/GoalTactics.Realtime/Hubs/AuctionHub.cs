@@ -1,10 +1,8 @@
 using GoalTactics.Contracts.Realtime;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
 namespace GoalTactics.Realtime.Hubs;
 
-[Authorize]
 public sealed class AuctionHub : Hub
 {
     public Task Subscribe(Guid auctionId)

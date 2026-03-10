@@ -1,4 +1,5 @@
 using GoalTactics.Contracts.Scouting;
+using GoalTactics.Contracts.Squad;
 
 namespace GoalTactics.Application.Scouting;
 
@@ -20,13 +21,16 @@ public sealed class ScoutingService : IScoutingService
         return Task.FromResult(new ScoutingPlayersResponse
         {
             Success = true,
+            ScoutingCost = 500,
+            PremiumScoutingCost = 5,
+            SpeedupCost = 3,
             Players =
             [
-                new ScoutedPlayerData
+                new SquadPlayerData
                 {
                     Id = Guid.NewGuid(),
                     Name = "Young Prospect",
-                    Position = "ST",
+                    Position = 9, // ST
                     Talent = 80,
                     Strength = 58
                 }

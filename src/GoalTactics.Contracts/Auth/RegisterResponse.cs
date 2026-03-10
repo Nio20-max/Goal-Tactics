@@ -16,5 +16,8 @@ public sealed class RegisterResponse
     /// <summary>Legacy app expects Login echoed back on success.</summary>
     public string? Login { get; init; }
 
+    /// <summary>Legacy app expects Password echoed back (especially for guest registration).</summary>
+    public string? Password { get; init; }
+
     public int Punishment { get; init; }
 }

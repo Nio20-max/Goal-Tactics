@@ -156,7 +156,18 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
         var relation = await dbContext.FriendRelations.FirstOrDefaultAsync(x => x.Id == relationId.ToString("N"), cancellationToken);
         if (relation is null || relation.AddresseeUserId != userId)
         {
-            return;
+            // Fallback: treat relationId as a team ID and resolve the pair
+            var targetUserId = await ResolveTargetUserIdAsync(userId, relationId, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(targetUserId))
+            {
+                var pairKey = BuildPairKey(userId, targetUserId);
+                relation = await dbContext.FriendRelations.FirstOrDefaultAsync(x => x.PairKey == pairKey, cancellationToken);
+            }
+
+            if (relation is null || relation.AddresseeUserId != userId)
+            {
+                return;
+            }
         }
 
         relation.Status = AcceptedStatus;

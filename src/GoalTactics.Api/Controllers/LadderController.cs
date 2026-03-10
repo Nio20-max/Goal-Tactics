@@ -46,7 +46,7 @@ public sealed class LadderController(ILadderService ladderService) : ControllerB
         }
 
         await ladderService.RestoreStaminaAsync(userId, cancellationToken);
-        return Ok(new TextResponse { Value = "Stamina restored" });
+        return Ok(new TextResponse { Text = "Stamina restored" });
     }
 
     [HttpPost("RunMatch")]

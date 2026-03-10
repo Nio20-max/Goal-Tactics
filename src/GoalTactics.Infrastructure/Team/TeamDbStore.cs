@@ -926,6 +926,17 @@ public sealed class TeamDbStore(
         };
     }
 
+    public async Task<Guid> GetLeagueIdForTeamAsync(string teamId, CancellationToken cancellationToken = default)
+    {
+        var membership = await dbContext.LeagueTeams.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TeamId == teamId, cancellationToken);
+
+        if (membership is null)
+            return Guid.Empty;
+
+        return Guid.TryParse(membership.LeagueId, out var leagueId) ? leagueId : Guid.Empty;
+    }
+
     private static TeamRecord ToRecord(TeamEntity team, string userEmail, DateTime userCreatedAtUtc, DateTime? userLastActivityAtUtc)
     {
         return new TeamRecord(

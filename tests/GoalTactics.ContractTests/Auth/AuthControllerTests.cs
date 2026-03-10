@@ -53,7 +53,7 @@ public sealed class AuthControllerTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
-    public async Task Login_WithUnknownUser_ReturnsUnauthorized()
+    public async Task Login_WithUnknownUser_ReturnsOkWithFailure()
     {
         var response = await _client.PostAsJsonAsync("/api/Login", new AuthRequest
         {
@@ -61,7 +61,11 @@ public sealed class AuthControllerTests : IClassFixture<WebApplicationFactory<Pr
             Password = "invalid1"
         });
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // Legacy app expects 200 and reads Status from the body.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(body);
+        Assert.False(body!.Success);
     }
 
     [Fact]
@@ -87,7 +91,13 @@ public sealed class AuthControllerTests : IClassFixture<WebApplicationFactory<Pr
         var tamperedToken = loginBody!.Token! + "tampered";
         var verifyResponse = await _client.PostAsJsonAsync("/api/VerifyLogin", new TextRequest { Text = tamperedToken });
 
-        Assert.Equal(HttpStatusCode.Unauthorized, verifyResponse.StatusCode);
+        // Tampered token fails JWT validation, falls through to manager-name
+        // availability check. A token string won't collide with any real name,
+        // so the endpoint returns 200 "Name available".
+        Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
+        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(verifyBody);
+        Assert.True(verifyBody!.Success);
     }
 
     [Fact]

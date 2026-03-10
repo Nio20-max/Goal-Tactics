@@ -6,6 +6,8 @@ public interface IAuthStore
 
     Task<AuthUserRecord?> GetUserByIdAsync(string userId, CancellationToken cancellationToken = default);
 
+    Task<bool> IsManagerNameTakenAsync(string managerName, CancellationToken cancellationToken = default);
+
     Task<bool> AddUserAsync(AuthUserRecord user, CancellationToken cancellationToken = default);
 
     Task AddSessionAsync(AuthSessionRecord session, CancellationToken cancellationToken = default);

@@ -50,7 +50,7 @@ public sealed class LadderControllerTests : IClassFixture<WebApplicationFactory<
         Assert.NotNull(runMatchBody);
         Assert.True(runMatchBody!.Success);
         Assert.NotNull(runMatchBody.MatchReport);
-        Assert.True(runMatchBody.Stamina <= challengeBody.Stamina - 25);
+        Assert.True(int.TryParse(runMatchBody.Stamina, out var staminaAfter) && staminaAfter <= challengeBody.Stamina - 25);
 
         var restoreResponse = await client.PostAsJsonAsync("/api/RestoreStamina", new RequestObject());
         Assert.Equal(HttpStatusCode.OK, restoreResponse.StatusCode);

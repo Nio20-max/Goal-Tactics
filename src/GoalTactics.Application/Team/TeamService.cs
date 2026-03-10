@@ -59,6 +59,7 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
         var news = await teamStore.GetTeamNewsAsync(team.TeamId, cancellationToken);
         var stadium = await teamStore.GetStadiumStateAsync(userId, cancellationToken);
         var players = await teamStore.GetSquadPlayersAsync(userId, cancellationToken);
+        var leagueId = await teamStore.GetLeagueIdForTeamAsync(team.TeamId, cancellationToken);
 
         return new ExtendedTeamDataResponse
         {
@@ -69,6 +70,7 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
                 Name = team.Name,
                 Country = team.Country,
                 CountryName = team.CountryName,
+                LeagueId = leagueId,
                 LeagueName = team.LeagueName,
                 MarketValue = team.MarketValue,
                 Mood = team.Mood,

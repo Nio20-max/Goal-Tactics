@@ -75,6 +75,18 @@ builder.Services
 
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                // SignalR sends token as query string parameter for WebSocket connections
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken)
+                    && (path.StartsWithSegments("/chat") || path.StartsWithSegments("/auc")))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var tokenId = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
@@ -200,6 +212,9 @@ using (var scope = app.Services.CreateScope())
 app.UseMiddleware<ErrorEnvelopeMiddleware>();
 
 app.UseForwardedHeaders();
+
+// Extract JWT from request body "Token" field for the legacy Xamarin app.
+app.UseMiddleware<BodyTokenAuthMiddleware>();
 
 app.UseRateLimiter();
 app.UseAuthentication();

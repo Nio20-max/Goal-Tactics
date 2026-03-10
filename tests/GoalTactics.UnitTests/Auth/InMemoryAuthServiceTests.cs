@@ -118,6 +118,12 @@ public sealed class InMemoryAuthServiceTests
 
             return Task.CompletedTask;
         }
+
+        public Task<bool> IsManagerNameTakenAsync(string managerName, CancellationToken cancellationToken = default)
+        {
+            var taken = usersByEmail.Values.Any(u => string.Equals(u.ManagerName, managerName, StringComparison.OrdinalIgnoreCase));
+            return Task.FromResult(taken);
+        }
     }
 
     private sealed class FakeTokenService : ITokenService

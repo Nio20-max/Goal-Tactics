@@ -1,12 +1,15 @@
+using GoalTactics.Contracts.Squad;
+
 namespace GoalTactics.Contracts.Lineup;
 
-public sealed class MatchLineupPlayerData
+/// <summary>LineupPlayerData : SquadPlayerData in decompiled app.</summary>
+public sealed class MatchLineupPlayerData : SquadPlayerData
 {
-    public Guid PlayerId { get; init; }
+    public List<PositionStrength>? Positions { get; init; }
+}
 
-    public string? Name { get; init; }
-
-    public string? Position { get; init; }
-
-    public bool IsStarting { get; init; }
+public sealed class PositionStrength
+{
+    public Guid PositionId { get; init; }
+    public decimal Strength { get; init; }
 }

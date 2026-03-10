@@ -39,10 +39,10 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         Assert.NotNull(incomingFriendsBody);
         Assert.True(incomingFriendsBody!.Success);
         Assert.NotEmpty(incomingFriendsBody.Friends);
-        Assert.True(incomingFriendsBody.Friends[0].IsRequestIncoming);
+        Assert.True(incomingFriendsBody.Friends[0].LikesMe);
 
-        var relationId = incomingFriendsBody.Friends[0].Id;
-        var acceptResponse = await client.PostAsJsonAsync("/api/Accept", new IdRequest { Id = relationId });
+        var friendTeamId = incomingFriendsBody.Friends[0].TeamId;
+        var acceptResponse = await client.PostAsJsonAsync("/api/Accept", new IdRequest { Id = friendTeamId });
         Assert.Equal(HttpStatusCode.OK, acceptResponse.StatusCode);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", userA.Token);
@@ -50,7 +50,7 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         Assert.Equal(HttpStatusCode.OK, friendsAfterAcceptResponse.StatusCode);
         var friendsAfterAcceptBody = await friendsAfterAcceptResponse.Content.ReadFromJsonAsync<FriendsResponse>();
         Assert.NotNull(friendsAfterAcceptBody);
-        Assert.Contains(friendsAfterAcceptBody!.Friends, x => x.ForeignTeamId == teamBId && x.IsFriend);
+        Assert.Contains(friendsAfterAcceptBody!.Friends, x => x.TeamId == teamBId);
 
         var sendChallengeResponse = await client.PostAsJsonAsync("/api/SendChallenge", new IdRequest { Id = teamBId });
         Assert.Equal(HttpStatusCode.OK, sendChallengeResponse.StatusCode);
@@ -70,16 +70,16 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         Assert.Equal(HttpStatusCode.OK, replyResponse.StatusCode);
         var replyBody = await replyResponse.Content.ReadFromJsonAsync<ChallengesResponse>();
         Assert.NotNull(replyBody);
-        Assert.Contains(replyBody!.Challenges, x => x.Id == challengeId && x.Accepted);
+        Assert.Contains(replyBody!.Challenges, x => x.Id == challengeId && x.IsAccepted);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", userA.Token);
-        var unlikeResponse = await client.PostAsJsonAsync("/api/Unlike", new IdRequest { Id = relationId });
+        var unlikeResponse = await client.PostAsJsonAsync("/api/Unlike", new IdRequest { Id = teamBId });
         Assert.Equal(HttpStatusCode.OK, unlikeResponse.StatusCode);
 
         var friendsAfterUnlikeResponse = await client.PostAsJsonAsync("/api/GetFriends", new SearchRequest());
         var friendsAfterUnlikeBody = await friendsAfterUnlikeResponse.Content.ReadFromJsonAsync<FriendsResponse>();
         Assert.NotNull(friendsAfterUnlikeBody);
-        Assert.DoesNotContain(friendsAfterUnlikeBody!.Friends, x => x.ForeignTeamId == teamBId);
+        Assert.DoesNotContain(friendsAfterUnlikeBody!.Friends, x => x.TeamId == teamBId);
     }
 
     private async Task<(string Token, string Email)> RegisterAndLoginAsync(string managerName)

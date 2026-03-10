@@ -1,11 +1,9 @@
 using GoalTactics.Contracts.Realtime;
 using GoalTactics.Realtime.HubState;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
 namespace GoalTactics.Realtime.Hubs;
 
-[Authorize]
 public sealed class ChatHub(UserConnectionRegistry registry) : Hub
 {
     public override async Task OnConnectedAsync()

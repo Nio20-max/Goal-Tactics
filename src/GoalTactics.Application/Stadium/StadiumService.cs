@@ -16,6 +16,8 @@ public interface IStadiumService
     Task RenewGrassAsync(string userId, CancellationToken cancellationToken = default);
 
     Task RenameAsync(string userId, string? name, CancellationToken cancellationToken = default);
+
+    Task<UnderConstructionResponse> GetUnderConstructionAsync(string userId, CancellationToken cancellationToken = default);
 }
 
 public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
@@ -26,13 +28,13 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
         return new StadiumResponse
         {
             Success = true,
-            Stadium = new StadiumData
-            {
-                Name = stadium.Name,
-                GrassQuality = stadium.GrassQuality,
-                Capacity = stadium.Capacity,
-                EarningsAverage = stadium.EarningsAverage
-            }
+            Name = stadium.Name,
+            GrassQuality = stadium.GrassQuality,
+            Buildings = [],
+            ChangeNameCost = 5,
+            RenewGrassCost = 3,
+            SpeedupCost = 5,
+            MaxBuildingLevel = 10
         };
     }
 
@@ -76,4 +78,7 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
     {
         return teamStore.RenameStadiumAsync(userId, string.IsNullOrWhiteSpace(name) ? "My Stadium" : name.Trim(), cancellationToken);
     }
+
+    public Task<UnderConstructionResponse> GetUnderConstructionAsync(string userId, CancellationToken cancellationToken = default)
+        => Task.FromResult(new UnderConstructionResponse { Success = true });
 }

@@ -13,6 +13,7 @@ namespace GoalTactics.Api.Controllers;
 public sealed class SponsorController(ISponsorService sponsorService) : ControllerBase
 {
     [HttpPost("GetSponsorOffers")]
+    [HttpPost("GetSponsors")]
     public async Task<ActionResult<SponsorOffersResponse>> GetSponsorOffers([FromBody] RequestObject request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();

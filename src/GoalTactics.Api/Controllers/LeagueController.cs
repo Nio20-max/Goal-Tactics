@@ -24,4 +24,28 @@ public sealed class LeagueController(ILeagueService leagueService) : ControllerB
         var response = await leagueService.GetLeagueTableAsync(userId, request.Id, cancellationToken);
         return Ok(response);
     }
+
+    [HttpPost("GetMatches")]
+    public async Task<ActionResult<MatchesResponse>> GetMatches([FromBody] IdRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new MatchesResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        return Ok(await leagueService.GetMatchesAsync(userId, request.Id, cancellationToken));
+    }
+
+    [HttpPost("GetGoalGetters")]
+    public async Task<ActionResult<GoalGettersResponse>> GetGoalGetters([FromBody] IdRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new GoalGettersResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        return Ok(await leagueService.GetGoalGettersAsync(userId, request.Id, cancellationToken));
+    }
 }

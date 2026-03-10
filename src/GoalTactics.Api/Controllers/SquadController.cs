@@ -99,6 +99,18 @@ public sealed class SquadController(ISquadService squadService) : ControllerBase
     public Task<ActionResult<ResponseObject>> HealPlayer([FromBody] IdRequest request, CancellationToken cancellationToken) =>
         ExecuteMutation(request.Id, cancellationToken, squadService.HealPlayerAsync, "Player healed");
 
+    [HttpPost("GetSkillCards")]
+    public async Task<ActionResult<SkillCardsResponse>> GetSkillCards([FromBody] RequestObject request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new SkillCardsResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        return Ok(await squadService.GetSkillCardsAsync(userId, cancellationToken));
+    }
+
     private async Task<ActionResult<ResponseObject>> ExecuteMutation(
         Guid id,
         CancellationToken cancellationToken,

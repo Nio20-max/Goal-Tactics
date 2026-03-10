@@ -57,6 +57,8 @@ public interface ITeamStore
     Task<bool> UpdatePlayerOriginAsync(string userId, Guid playerId, string? value, CancellationToken cancellationToken = default);
 
     Task<bool> UpdatePlayerShirtAsync(string userId, Guid playerId, int shirtNumber, CancellationToken cancellationToken = default);
+
+    Task<Guid> GetLeagueIdForTeamAsync(string teamId, CancellationToken cancellationToken = default);
 }
 
 public sealed record TeamRecord(string TeamId, string UserId, string Name, string Country, string CountryName, string LeagueName, decimal MarketValue, int Mood, string TeamMood, int Wins, int Losses, int Fans, int Members, int Strength, string MatchTrend, string UserEmail, DateTime UserCreatedAtUtc, DateTime? UserLastActivityAtUtc);

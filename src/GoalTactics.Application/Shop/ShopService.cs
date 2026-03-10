@@ -26,10 +26,11 @@ public sealed class ShopService : IShopService
             [
                 new ShopProductData
                 {
-                    Id = Guid.NewGuid(),
-                    Name = "Medi Pack",
-                    Category = "Consumable",
-                    Price = 100
+                    Identifier = "medi_pack_1",
+                    Image = "medi_pack",
+                    Money = 100,
+                    Medipacks = 1,
+                    GTStars = 0
                 }
             ]
         });
@@ -40,15 +41,28 @@ public sealed class ShopService : IShopService
         return Task.FromResult(new ShopEquipmentResponse
         {
             Success = true,
-            Equipment =
+            Shirts =
             [
                 new EquipmentData
                 {
                     Id = Guid.NewGuid(),
-                    Name = "Home Shirt",
-                    CostStars = 50
+                    Image = "shirt_default",
+                    Cost = 50,
+                    InUse = 1
                 }
-            ]
+            ],
+            Emblems = [],
+            MyShirts =
+            [
+                new EquipmentData
+                {
+                    Id = Guid.NewGuid(),
+                    Image = "shirt_default",
+                    Cost = 0,
+                    InUse = 1
+                }
+            ],
+            MyEmblems = []
         });
     }
 

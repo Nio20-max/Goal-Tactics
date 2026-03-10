@@ -17,7 +17,8 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     public async Task<ActionResult<RegisterResponse>> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         var result = await authService.RegisterAsync(request, cancellationToken);
-        return result.Success ? Ok(result) : Conflict(result);
+        // Always return 200 — legacy app reads Status from the body, not HTTP status.
+        return Ok(result);
     }
 
     [EnableRateLimiting("auth-sensitive")]
@@ -25,7 +26,8 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     public async Task<ActionResult<AuthResponse>> Login([FromBody] AuthRequest request, CancellationToken cancellationToken)
     {
         var result = await authService.LoginAsync(request, cancellationToken);
-        return result.Success ? Ok(result) : Unauthorized(result);
+        // Always return 200 — legacy app reads Status from the body, not HTTP status.
+        return Ok(result);
     }
 
     [EnableRateLimiting("auth-sensitive")]
@@ -33,7 +35,8 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     public async Task<ActionResult<AuthResponse>> VerifyLogin([FromBody] TextRequest request, CancellationToken cancellationToken)
     {
         var result = await authService.VerifyLoginAsync(request.Text, cancellationToken);
-        return result.Success ? Ok(result) : Unauthorized(result);
+        // Always return 200 — the legacy app checks Status in the body, not HTTP status.
+        return Ok(result);
     }
 
     [Authorize]

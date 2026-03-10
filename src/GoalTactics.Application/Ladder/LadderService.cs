@@ -35,8 +35,8 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
         return new LadderChallengeResponse
         {
             Success = true,
-            HomeTeam = MapTeam(challenge.HomeTeam),
-            AwayTeam = MapTeam(challenge.AwayTeam),
+            HomeTeam = MapChallengeTeam(challenge.HomeTeam),
+            AwayTeam = MapChallengeTeam(challenge.AwayTeam),
             WinPoints = challenge.WinPoints,
             LosePoints = challenge.LosePoints,
             Stamina = challenge.Stamina,
@@ -52,8 +52,13 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
         return new LadderMatchResponse
         {
             Success = true,
-            MatchReport = result.MatchReport,
-            Stamina = result.Stamina
+            MatchReport = new LadderMatchData
+            {
+                Events = [],
+                Home = new MatchTeamData { TeamName = "My Team", Strength = 50 },
+                Away = new MatchTeamData { TeamName = "Opponent", Strength = 50 }
+            },
+            Stamina = result.Stamina.ToString()
         };
     }
 
@@ -67,10 +72,22 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
         return new LadderTeamData
         {
             TeamId = team.TeamId,
-            TeamName = team.TeamName,
-            TeamLogo = team.TeamLogo,
+            Name = team.TeamName,
+            Logo = team.TeamLogo,
             Points = team.Points,
-            Rank = team.Rank,
+            Strength = team.Strength,
+            IsMine = team.IsMine
+        };
+    }
+
+    private static LadderChallengeTeamData MapChallengeTeam(LadderTeamRecord team)
+    {
+        return new LadderChallengeTeamData
+        {
+            TeamId = team.TeamId,
+            Name = team.TeamName,
+            Logo = team.TeamLogo,
+            Points = team.Points,
             Strength = team.Strength,
             IsMine = team.IsMine
         };

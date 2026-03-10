@@ -56,6 +56,6 @@ public sealed class CommonControllerTests : IClassFixture<WebApplicationFactory<
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<TextResponse>();
         Assert.NotNull(body);
-        Assert.Equal("Season ongoing", body!.Value);
+        Assert.Equal("Season ongoing", body!.Text);
     }
 }

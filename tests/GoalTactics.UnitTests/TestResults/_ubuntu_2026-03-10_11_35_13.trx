@@ -1,0 +1,64 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="7ac2b11c-b5c2-4cae-9d66-898b7141fe8f" name="@ubuntu 2026-03-10 11:35:13" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-03-10T11:35:13.9055851+01:00" queuing="2026-03-10T11:35:13.9055852+01:00" start="2026-03-10T11:35:07.0986929+01:00" finish="2026-03-10T11:35:13.9607888+01:00" />
+  <TestSettings name="default" id="3699cba1-b9bd-42ae-ac82-d830c7291d4a">
+    <Deployment runDeploymentRoot="_ubuntu_2026-03-10_11_35_13" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="b2628dcf-bfcd-40b9-91e4-185368936937" testId="c6b857ab-3c68-d0ff-027e-acecaab96365" testName="GoalTactics.UnitTests.Auth.InMemoryAuthServiceTests.Login_WithWrongPassword_Fails" computerName="ubuntu" duration="00:00:00.0068351" startTime="2026-03-10T11:35:13.0848765+01:00" endTime="2026-03-10T11:35:13.0849502+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b2628dcf-bfcd-40b9-91e4-185368936937" />
+    <UnitTestResult executionId="1b7ee35d-dea6-4d78-813a-e09d8489266c" testId="c82b3e8b-7b89-4f38-104c-525f22967041" testName="GoalTactics.UnitTests.Mechanics.MechanicsServicesTests.TransferAuctionService_RejectsLowBid" computerName="ubuntu" duration="00:00:00.0002516" startTime="2026-03-10T11:35:13.0927245+01:00" endTime="2026-03-10T11:35:13.0927923+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1b7ee35d-dea6-4d78-813a-e09d8489266c" />
+    <UnitTestResult executionId="1f9cc45f-f3dd-4025-a0bd-5c86f70883ce" testId="26b0df8e-eda9-e724-650e-9f01dfa7c696" testName="GoalTactics.UnitTests.Mechanics.MechanicsServicesTests.TeamStrengthCalculator_ComputesPositiveStrength" computerName="ubuntu" duration="00:00:00.0002961" startTime="2026-03-10T11:35:13.0929787+01:00" endTime="2026-03-10T11:35:13.0974249+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1f9cc45f-f3dd-4025-a0bd-5c86f70883ce" />
+    <UnitTestResult executionId="bee9efbc-d26d-43d7-8218-8da24aa137bc" testId="917c57fd-c05c-9940-e8f9-615ebb53083b" testName="GoalTactics.UnitTests.Auth.InMemoryAuthServiceTests.Register_ThenLogin_ThenVerify_Works" computerName="ubuntu" duration="00:00:00.0455382" startTime="2026-03-10T11:35:13.0762930+01:00" endTime="2026-03-10T11:35:13.0763987+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bee9efbc-d26d-43d7-8218-8da24aa137bc" />
+    <UnitTestResult executionId="a2b5c931-e658-4cea-81f7-7f4da38e83c8" testId="31728dd2-0eaf-bbc6-eac8-5c9dc099515e" testName="GoalTactics.UnitTests.Mechanics.MechanicsServicesTests.InjuryAndCardService_RedCardCreatesSuspension" computerName="ubuntu" duration="00:00:00.0172717" startTime="2026-03-10T11:35:13.0923951+01:00" endTime="2026-03-10T11:35:13.0924982+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a2b5c931-e658-4cea-81f7-7f4da38e83c8" />
+    <UnitTestResult executionId="149e96ac-9e26-4c8e-a04d-d0d5211e75c4" testId="0d30c0a1-6880-e1eb-e6ff-3db15dafdd1d" testName="GoalTactics.UnitTests.Common.CountryCatalogTests.GetCountries_ReturnsStableCountries" computerName="ubuntu" duration="00:00:00.0654381" startTime="2026-03-10T11:35:12.9443408+01:00" endTime="2026-03-10T11:35:12.9795208+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="149e96ac-9e26-4c8e-a04d-d0d5211e75c4" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="GoalTactics.UnitTests.Auth.InMemoryAuthServiceTests.Login_WithWrongPassword_Fails" storage="/root/projekte/goal-tactics/tests/goaltactics.unittests/bin/debug/net10.0/goaltactics.unittests.dll" id="c6b857ab-3c68-d0ff-027e-acecaab96365">
+      <Execution id="b2628dcf-bfcd-40b9-91e4-185368936937" />
+      <TestMethod codeBase="/root/projekte/Goal-Tactics/tests/GoalTactics.UnitTests/bin/Debug/net10.0/GoalTactics.UnitTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GoalTactics.UnitTests.Auth.InMemoryAuthServiceTests" name="Login_WithWrongPassword_Fails" />
+    </UnitTest>
+    <UnitTest name="GoalTactics.UnitTests.Mechanics.MechanicsServicesTests.InjuryAndCardService_RedCardCreatesSuspension" storage="/root/projekte/goal-tactics/tests/goaltactics.unittests/bin/debug/net10.0/goaltactics.unittests.dll" id="31728dd2-0eaf-bbc6-eac8-5c9dc099515e">
+      <Execution id="a2b5c931-e658-4cea-81f7-7f4da38e83c8" />
+      <TestMethod codeBase="/root/projekte/Goal-Tactics/tests/GoalTactics.UnitTests/bin/Debug/net10.0/GoalTactics.UnitTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GoalTactics.UnitTests.Mechanics.MechanicsServicesTests" name="InjuryAndCardService_RedCardCreatesSuspension" />
+    </UnitTest>
+    <UnitTest name="GoalTactics.UnitTests.Mechanics.MechanicsServicesTests.TransferAuctionService_RejectsLowBid" storage="/root/projekte/goal-tactics/tests/goaltactics.unittests/bin/debug/net10.0/goaltactics.unittests.dll" id="c82b3e8b-7b89-4f38-104c-525f22967041">
+      <Execution id="1b7ee35d-dea6-4d78-813a-e09d8489266c" />
+      <TestMethod codeBase="/root/projekte/Goal-Tactics/tests/GoalTactics.UnitTests/bin/Debug/net10.0/GoalTactics.UnitTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GoalTactics.UnitTests.Mechanics.MechanicsServicesTests" name="TransferAuctionService_RejectsLowBid" />
+    </UnitTest>
+    <UnitTest name="GoalTactics.UnitTests.Common.CountryCatalogTests.GetCountries_ReturnsStableCountries" storage="/root/projekte/goal-tactics/tests/goaltactics.unittests/bin/debug/net10.0/goaltactics.unittests.dll" id="0d30c0a1-6880-e1eb-e6ff-3db15dafdd1d">
+      <Execution id="149e96ac-9e26-4c8e-a04d-d0d5211e75c4" />
+      <TestMethod codeBase="/root/projekte/Goal-Tactics/tests/GoalTactics.UnitTests/bin/Debug/net10.0/GoalTactics.UnitTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GoalTactics.UnitTests.Common.CountryCatalogTests" name="GetCountries_ReturnsStableCountries" />
+    </UnitTest>
+    <UnitTest name="GoalTactics.UnitTests.Auth.InMemoryAuthServiceTests.Register_ThenLogin_ThenVerify_Works" storage="/root/projekte/goal-tactics/tests/goaltactics.unittests/bin/debug/net10.0/goaltactics.unittests.dll" id="917c57fd-c05c-9940-e8f9-615ebb53083b">
+      <Execution id="bee9efbc-d26d-43d7-8218-8da24aa137bc" />
+      <TestMethod codeBase="/root/projekte/Goal-Tactics/tests/GoalTactics.UnitTests/bin/Debug/net10.0/GoalTactics.UnitTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GoalTactics.UnitTests.Auth.InMemoryAuthServiceTests" name="Register_ThenLogin_ThenVerify_Works" />
+    </UnitTest>
+    <UnitTest name="GoalTactics.UnitTests.Mechanics.MechanicsServicesTests.TeamStrengthCalculator_ComputesPositiveStrength" storage="/root/projekte/goal-tactics/tests/goaltactics.unittests/bin/debug/net10.0/goaltactics.unittests.dll" id="26b0df8e-eda9-e724-650e-9f01dfa7c696">
+      <Execution id="1f9cc45f-f3dd-4025-a0bd-5c86f70883ce" />
+      <TestMethod codeBase="/root/projekte/Goal-Tactics/tests/GoalTactics.UnitTests/bin/Debug/net10.0/GoalTactics.UnitTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GoalTactics.UnitTests.Mechanics.MechanicsServicesTests" name="TeamStrengthCalculator_ComputesPositiveStrength" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="c6b857ab-3c68-d0ff-027e-acecaab96365" executionId="b2628dcf-bfcd-40b9-91e4-185368936937" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c82b3e8b-7b89-4f38-104c-525f22967041" executionId="1b7ee35d-dea6-4d78-813a-e09d8489266c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="26b0df8e-eda9-e724-650e-9f01dfa7c696" executionId="1f9cc45f-f3dd-4025-a0bd-5c86f70883ce" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="917c57fd-c05c-9940-e8f9-615ebb53083b" executionId="bee9efbc-d26d-43d7-8218-8da24aa137bc" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="31728dd2-0eaf-bbc6-eac8-5c9dc099515e" executionId="a2b5c931-e658-4cea-81f7-7f4da38e83c8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0d30c0a1-6880-e1eb-e6ff-3db15dafdd1d" executionId="149e96ac-9e26-4c8e-a04d-d0d5211e75c4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="6" executed="6" passed="6" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.14] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.3)
+[xUnit.net 00:00:00.89]   Discovering: GoalTactics.UnitTests
+[xUnit.net 00:00:02.00]   Discovered:  GoalTactics.UnitTests
+[xUnit.net 00:00:02.21]   Starting:    GoalTactics.UnitTests
+[xUnit.net 00:00:02.92]   Finished:    GoalTactics.UnitTests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

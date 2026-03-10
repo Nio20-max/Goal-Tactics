@@ -18,10 +18,24 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
 {
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
-        var email = request.ResolvedEmail;
         var managerName = request.ResolvedManagerName;
 
-        var existingUser = email is not null ? await authStore.GetUserByEmailAsync(email, cancellationToken) : null;
+        // For guest registration, generate credentials server-side.
+        string email;
+        string password;
+        if (request.IsGuest)
+        {
+            var guestId = Guid.NewGuid().ToString("N")[..12];
+            email = $"guest_{guestId}@guests.goaltactics.local";
+            password = Guid.NewGuid().ToString("N");
+        }
+        else
+        {
+            email = request.ResolvedEmail!;
+            password = request.Password!;
+        }
+
+        var existingUser = await authStore.GetUserByEmailAsync(email, cancellationToken);
         if (existingUser is not null)
         {
             return new RegisterResponse
@@ -35,8 +49,8 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
 
         var user = new AuthUserRecord(
             Guid.NewGuid().ToString("N"),
-            email!,
-            passwordHasher.Hash(request.Password),
+            email,
+            passwordHasher.Hash(password),
             managerName!);
 
         var added = await authStore.AddUserAsync(user, cancellationToken);
@@ -57,6 +71,7 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
             UserId = user.UserId,
             Message = "Registered",
             Login = email,
+            Password = password,
             Status = 1
         };
     }
@@ -96,49 +111,50 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
             Success = true,
             Token = token,
             ManagerName = user.ManagerName,
-            UserId = Guid.TryParse(user.UserId, out var uid) ? uid : null,
+            UserId = Guid.TryParse(user.UserId, out var uid) ? uid : Guid.Empty,
             Message = "Authenticated"
         };
     }
 
-    public async Task<AuthResponse> VerifyLoginAsync(string token, CancellationToken cancellationToken = default)
+    public async Task<AuthResponse> VerifyLoginAsync(string text, CancellationToken cancellationToken = default)
     {
-        var validation = tokenService.ValidateToken(token);
-        if (!validation.IsValid || string.IsNullOrWhiteSpace(validation.UserId) || string.IsNullOrWhiteSpace(validation.TokenId))
+        // Try JWT token validation first (session resume flow).
+        var validation = tokenService.ValidateToken(text);
+        if (validation.IsValid && !string.IsNullOrWhiteSpace(validation.UserId) && !string.IsNullOrWhiteSpace(validation.TokenId))
         {
-            return new AuthResponse
+            var isActive = await authStore.IsSessionActiveAsync(validation.TokenId, cancellationToken);
+            if (isActive)
             {
-                Success = false,
-                Message = "Invalid token"
-            };
+                var user = await authStore.GetUserByIdAsync(validation.UserId, cancellationToken);
+                if (user is not null)
+                {
+                    return new AuthResponse
+                    {
+                        Success = true,
+                        Token = text,
+                        ManagerName = user.ManagerName,
+                        UserId = Guid.TryParse(user.UserId, out var uid2) ? uid2 : Guid.Empty,
+                        Message = "Token valid"
+                    };
+                }
+            }
         }
 
-        var isActive = await authStore.IsSessionActiveAsync(validation.TokenId, cancellationToken);
-        if (!isActive)
+        // Fallback: treat text as a manager-name availability check (registration flow).
+        var nameTaken = await authStore.IsManagerNameTakenAsync(text, cancellationToken);
+        if (nameTaken)
         {
             return new AuthResponse
             {
                 Success = false,
-                Message = "Invalid token"
-            };
-        }
-
-        var user = await authStore.GetUserByIdAsync(validation.UserId, cancellationToken);
-        if (user is null)
-        {
-            return new AuthResponse
-            {
-                Success = false,
-                Message = "Invalid token"
+                Message = "Manager name already taken"
             };
         }
 
         return new AuthResponse
         {
             Success = true,
-            Token = token,
-            ManagerName = user.ManagerName,
-            Message = "Token valid"
+            Message = "Name available"
         };
     }
 

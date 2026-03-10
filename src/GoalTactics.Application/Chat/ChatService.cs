@@ -25,9 +25,9 @@ public sealed class ChatService(IChatStore chatStore) : IChatService
             {
                 Id = Guid.TryParse(x.Id, out var messageId) ? messageId : Guid.Empty,
                 UserId = Guid.TryParse(x.UserId, out var parsedUserId) ? parsedUserId : Guid.Empty,
-                UserName = x.UserName,
+                Name = x.UserName,
                 Message = x.Message,
-                CreatedAt = x.CreatedAtUtc.ToString("O")
+                Date = x.CreatedAtUtc.ToString("O")
             }).ToArray()
         };
     }

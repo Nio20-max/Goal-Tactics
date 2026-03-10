@@ -18,34 +18,48 @@ public sealed class LineupService : ILineupService
         return Task.FromResult(new LineupsResponse
         {
             Success = true,
-            Lineups =
-            [
-                new LineupSummaryData
-                {
-                    MatchId = Guid.NewGuid(),
-                    Opponent = "Rivals FC",
-                    IsLocked = false
-                }
-            ]
+            Lineups = []
         });
     }
 
     public Task<MatchLineupResponse> GetMatchLineupAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
     {
+        var systemId = Guid.NewGuid();
+        var tacticId = Guid.NewGuid();
+
         return Task.FromResult(new MatchLineupResponse
         {
             Success = true,
             IsLocked = false,
-            Systems = ["4-4-2", "4-3-3"],
-            Tactics = ["Balanced", "Pressing"],
+            Systems =
+            [
+                new MatchSystemData
+                {
+                    Id = systemId,
+                    Name = "4-4-2",
+                    Fields =
+                    [
+                        new MatchSystemFieldData { Id = Guid.NewGuid(), PositionId = Guid.NewGuid() }
+                    ]
+                }
+            ],
+            Tactics =
+            [
+                new TacticData { ID = tacticId, Name = "Balanced", Value = 0 }
+            ],
+            FormationData = new MatchFormationData
+            {
+                MatchSystemID = systemId,
+                MatchTacticID = tacticId,
+                Players = []
+            },
             Players =
             [
                 new MatchLineupPlayerData
                 {
-                    PlayerId = Guid.NewGuid(),
+                    Id = Guid.NewGuid(),
                     Name = "Captain",
-                    Position = "MID",
-                    IsStarting = true
+                    Position = 3
                 }
             ]
         });

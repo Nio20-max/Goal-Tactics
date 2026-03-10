@@ -33,6 +33,11 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             : new AuthUserRecord(user.Id, user.Email, user.PasswordHash, user.ManagerName);
     }
 
+    public async Task<bool> IsManagerNameTakenAsync(string managerName, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Users.AnyAsync(x => x.ManagerName == managerName, cancellationToken);
+    }
+
     public async Task<bool> AddUserAsync(AuthUserRecord user, CancellationToken cancellationToken = default)
     {
         var exists = await dbContext.Users.AnyAsync(x => x.Email == user.Email, cancellationToken);

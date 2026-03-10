@@ -1,4 +1,5 @@
 using GoalTactics.Contracts.Live;
+using GoalTactics.Contracts.Team;
 
 namespace GoalTactics.Application.Live;
 
@@ -16,14 +17,15 @@ public sealed class LiveService : ILiveService
         return Task.FromResult(new LiveMatchResponse
         {
             Success = true,
-            Match = new LiveMatchData
+            Report = "Match has not started",
+            Match = new MatchData
             {
-                MatchId = matchId == Guid.Empty ? Guid.NewGuid() : matchId,
-                HomeTeam = "My Team",
-                AwayTeam = "Opponent",
+                Id = matchId == Guid.Empty ? Guid.NewGuid() : matchId,
+                HomeName = "My Team",
+                AwayName = "Opponent",
                 HomeScore = 0,
                 AwayScore = 0,
-                Report = "Match has not started"
+                Date = DateTime.UtcNow.ToString("O")
             }
         });
     }
@@ -33,14 +35,15 @@ public sealed class LiveService : ILiveService
         return Task.FromResult(new LiveMatchResponse
         {
             Success = true,
-            Match = new LiveMatchData
+            Report = "Generated report placeholder",
+            Match = new MatchData
             {
-                MatchId = matchId == Guid.Empty ? Guid.NewGuid() : matchId,
-                HomeTeam = "My Team",
-                AwayTeam = "Opponent",
+                Id = matchId == Guid.Empty ? Guid.NewGuid() : matchId,
+                HomeName = "My Team",
+                AwayName = "Opponent",
                 HomeScore = 1,
                 AwayScore = 0,
-                Report = "Generated report placeholder"
+                Date = DateTime.UtcNow.ToString("O")
             }
         });
     }

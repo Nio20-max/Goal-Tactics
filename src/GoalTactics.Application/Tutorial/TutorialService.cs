@@ -49,6 +49,12 @@ public sealed class TutorialService(ITutorialStore tutorialStore) : ITutorialSer
 
     private static TutorialResponse BuildResponse(string topicId, string? nextTopicId, bool canSkip)
     {
+        // The app treats CurrentStep == null as "tutorial finished" and unlocks the UI.
+        if (topicId == "tutorial-finished")
+        {
+            return new TutorialResponse { Success = true };
+        }
+
         return new TutorialResponse
         {
             Success = true,

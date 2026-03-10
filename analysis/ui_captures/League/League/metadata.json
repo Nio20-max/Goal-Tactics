@@ -1,0 +1,12 @@
+{
+  "category": "League",
+  "subcategory": "League",
+  "timestamp": "20260310_141743",
+  "device": "10.8.0.2:34343",
+  "files": {
+    "screenshot": "screenshot.png",
+    "ui_dump": "ui_dump.xml",
+    "image_matches": null,
+    "analysis": null
+  }
+}

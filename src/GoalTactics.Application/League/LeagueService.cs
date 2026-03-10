@@ -5,6 +5,10 @@ namespace GoalTactics.Application.League;
 public interface ILeagueService
 {
     Task<LeagueTableResponse> GetLeagueTableAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default);
+
+    Task<MatchesResponse> GetMatchesAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default);
+
+    Task<GoalGettersResponse> GetGoalGettersAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default);
 }
 
 public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
@@ -38,4 +42,10 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
             }).ToArray()
         };
     }
+
+    public Task<MatchesResponse> GetMatchesAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default)
+        => Task.FromResult(new MatchesResponse { Success = true });
+
+    public Task<GoalGettersResponse> GetGoalGettersAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default)
+        => Task.FromResult(new GoalGettersResponse { Success = true });
 }

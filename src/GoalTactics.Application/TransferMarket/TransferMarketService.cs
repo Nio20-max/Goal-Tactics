@@ -21,11 +21,12 @@ public sealed class TransferMarketService : ITransferMarketService
     {
         var player = new TransferPlayerData
         {
-            Id = Guid.NewGuid(),
+            ID = Guid.NewGuid(),
             Name = "Transfer Player",
-            Position = "DEF",
+            Position = 4, // DEF
             Strength = 66,
-            MinimumBid = 20000,
+            AuctionId = Guid.NewGuid(),
+            Bid = 20000,
             EndDate = DateTime.UtcNow.AddHours(6).ToString("O")
         };
 
@@ -48,11 +49,11 @@ public sealed class TransferMarketService : ITransferMarketService
                 ? null
                 : new TransferPlayerData
                 {
-                    Id = id == Guid.Empty ? player.Id : id,
+                    ID = id == Guid.Empty ? player.ID : id,
                     Name = player.Name,
                     Position = player.Position,
                     Strength = player.Strength,
-                    MinimumBid = player.MinimumBid,
+                    Bid = player.Bid,
                     EndDate = player.EndDate
                 }
         };

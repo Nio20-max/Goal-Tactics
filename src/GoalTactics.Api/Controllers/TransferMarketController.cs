@@ -26,7 +26,7 @@ public sealed class TransferMarketController(ITransferMarketService transferMark
     }
 
     [HttpPost("GetTransferDetails")]
-    public async Task<ActionResult<TransferDetailsResponse>> GetTransferDetails([FromBody] IdRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<TransferDetailsResponse>> GetTransferDetails([FromBody] TransferDetailsRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
@@ -34,7 +34,7 @@ public sealed class TransferMarketController(ITransferMarketService transferMark
             return Unauthorized(new TransferDetailsResponse { Success = false, Message = "Invalid token context" });
         }
 
-        return Ok(await transferMarketService.GetDetailsAsync(userId, request.Id, cancellationToken));
+        return Ok(await transferMarketService.GetDetailsAsync(userId, request.AuctionId, cancellationToken));
     }
 
     [HttpPost("BidPlayer")]

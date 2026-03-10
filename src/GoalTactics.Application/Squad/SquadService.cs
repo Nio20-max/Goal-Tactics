@@ -26,6 +26,8 @@ public interface ISquadService
     Task UseSkillCardAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
 
     Task HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
+
+    Task<SkillCardsResponse> GetSkillCardsAsync(string userId, CancellationToken cancellationToken = default);
 }
 
 public sealed class SquadService(ITeamStore teamStore) : ISquadService
@@ -40,7 +42,7 @@ public sealed class SquadService(ITeamStore teamStore) : ISquadService
             {
                 Id = x.Id,
                 Name = x.Name,
-                Position = x.Position,
+                Position = int.TryParse(x.Position, out var pos) ? pos : 0,
                 Strength = x.Strength,
                 Fitness = x.Fitness
             }).ToArray()
@@ -58,14 +60,18 @@ public sealed class SquadService(ITeamStore teamStore) : ISquadService
         return new PlayerStatisticsResponse
         {
             Success = true,
-            Statistics = new PlayerStatisticsData
-            {
-                PlayerId = playerId,
-                Matches = player.Matches,
-                Goals = player.Goals,
-                YellowCards = player.YellowCards,
-                RedCards = player.RedCards
-            }
+            MatchesThisSeason = player.Matches,
+            MatchesTotalThisTeam = player.Matches,
+            MatchesTotal = player.Matches,
+            GoalsScoredThisSeason = player.Goals,
+            GoalsScoredTotalThisTeam = player.Goals,
+            GoalsScoredTotal = player.Goals,
+            YellowCardsThisSeason = player.YellowCards,
+            YellowCardsTotalThisTeam = player.YellowCards,
+            YellowCardsTotal = player.YellowCards,
+            RedCardsThisSeason = player.RedCards,
+            RedCardsTotalThisTeam = player.RedCards,
+            RedCardsTotal = player.RedCards
         };
     }
 
@@ -107,4 +113,7 @@ public sealed class SquadService(ITeamStore teamStore) : ISquadService
     public Task UseSkillCardAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Task HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task<SkillCardsResponse> GetSkillCardsAsync(string userId, CancellationToken cancellationToken = default)
+        => Task.FromResult(new SkillCardsResponse { Success = true });
 }

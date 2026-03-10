@@ -1,0 +1,12 @@
+{
+  "category": "Equipment",
+  "subcategory": "Buy_a_shirt",
+  "timestamp": "20260310_140932",
+  "device": "10.8.0.2:34343",
+  "files": {
+    "screenshot": "screenshot.png",
+    "ui_dump": "ui_dump.xml",
+    "image_matches": null,
+    "analysis": null
+  }
+}

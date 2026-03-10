@@ -1,6 +1,6 @@
 namespace GoalTactics.Contracts.Common;
 
-public sealed class TextResponse
+public sealed class TextResponse : ResponseObject
 {
-    public required string Value { get; init; }
+    public string? Text { get; init; }
 }

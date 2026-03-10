@@ -39,6 +39,6 @@ public sealed class CommonController(ICountryCatalog countryCatalog, IConfigurat
     [HttpPost("GetSeasonInfo")]
     public ActionResult<TextResponse> GetSeasonInfo([FromBody] RequestObject request)
     {
-        return Ok(new TextResponse { Value = "Season ongoing" });
+        return Ok(new TextResponse { Text = "Season ongoing" });
     }
 }

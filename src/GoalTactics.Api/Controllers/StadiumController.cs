@@ -70,6 +70,18 @@ public sealed class StadiumController(IStadiumService stadiumService) : Controll
         return Ok(new ResponseObject { Success = true, Message = "Renamed" });
     }
 
+    [HttpPost("GetUnderConstruction")]
+    public async Task<ActionResult<UnderConstructionResponse>> GetUnderConstruction([FromBody] RequestObject request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new UnderConstructionResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        return Ok(await stadiumService.GetUnderConstructionAsync(userId, cancellationToken));
+    }
+
     private async Task<ActionResult<ResponseObject>> ExecuteMutation(
         Guid id,
         CancellationToken cancellationToken,
