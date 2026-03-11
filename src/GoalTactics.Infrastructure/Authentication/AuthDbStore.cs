@@ -1,4 +1,5 @@
 using GoalTactics.Application.Auth;
+using GoalTactics.Application.Common;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,9 @@ namespace GoalTactics.Infrastructure.Authentication;
 public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 {
     private const int ClubsPerLeague = 16;
+    private const int StartingMoney = 10_000_000;
+    private const int StartingMedipacks = 3;
+    private const int StartingGtStars = 5_000;
     private static readonly IReadOnlyDictionary<int, int> LeagueGroupsPerTier = new Dictionary<int, int>
     {
         [1] = 1,
@@ -278,12 +282,34 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
         if (targetSlot is null)
         {
+            var nextGroupNumber = await dbContext.Leagues
+                .Where(x => x.Tier == 3)
+                .Select(x => x.GroupNumber)
+                .DefaultIfEmpty(0)
+                .MaxAsync(cancellationToken) + 1;
+
+            var league = new LeagueEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Tier = 3,
+                GroupNumber = nextGroupNumber,
+                Name = BuildLeagueName(3, nextGroupNumber),
+                Mount = GetMountForTier(3),
+                Dismount = GetDismountForTier(3)
+            };
+
+            dbContext.Leagues.Add(league);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            for (var slotIndex = 1; slotIndex <= ClubsPerLeague; slotIndex++)
+            {
+                await CreateBotLeagueSlotAsync(league, slotIndex, cancellationToken);
+            }
+
             targetSlot = await dbContext.LeagueTeams
                 .Join(dbContext.Leagues, lt => lt.LeagueId, l => l.Id, (lt, l) => new { Slot = lt, League = l })
-                .Where(x => x.Slot.IsBot && x.Slot.TeamId != null)
-                .OrderBy(x => x.League.Tier)
-                .ThenBy(x => x.League.GroupNumber)
-                .ThenBy(x => x.Slot.TeamName)
+                .Where(x => x.League.Id == league.Id && x.Slot.IsBot && x.Slot.TeamId != null)
+                .OrderBy(x => x.Slot.TeamName)
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
@@ -298,17 +324,34 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             return;
         }
 
+        var user = await dbContext.Users.FirstAsync(x => x.Id == userId, cancellationToken);
+        var now = DateTime.UtcNow;
+
         var previousBotUserId = team.UserId;
 
         team.UserId = userId;
+        team.Name = user.ManagerName;
+        team.Country = "DE";
         team.LeagueName = targetSlot.League.Name;
         team.LeagueTier = targetSlot.League.Tier;
+        team.CountryName = "Deutschland";
+        team.MarketValue = 100000;
+        team.Mood = 50;
+        team.TeamMood = "Neutral";
+        team.Wins = 0;
+        team.Losses = 0;
+        team.Fans = 100;
+        team.Members = 100;
+        team.MatchTrend = "Stable";
         team.StadiumName = "My Stadium";
         team.GrassQuality = 80;
 
         var resources = await dbContext.TeamResources.FirstOrDefaultAsync(x => x.TeamId == team.Id, cancellationToken);
         if (resources is not null)
         {
+            resources.Money = StartingMoney;
+            resources.Medipacks = StartingMedipacks;
+            resources.GTStars = StartingGtStars;
             resources.OfficeLevel = 1;
             resources.TrainingCenterLevel = 1;
             resources.MedicalCenterLevel = 1;
@@ -323,14 +366,46 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             resources.StadiumEarningsLastMatch = 0m;
             resources.StadiumEarningsTotal = 0m;
             resources.StadiumMatchesCount = 0;
+            resources.LastEconomyTickUtc = now;
+            resources.LastTrainingTickUtc = now;
+            resources.LastSponsorPayoutUtc = now.Date;
+            resources.ActiveConstructionId = null;
+            resources.ActiveConstructionPlaceId = null;
+            resources.ActiveConstructionType = null;
+            resources.ActiveConstructionCurrentValue = 0;
+            resources.ActiveConstructionNewValue = 0;
+            resources.ActiveConstructionUpgradeCost = 0m;
+            resources.ActiveConstructionUpgradeCostPremium = 0m;
+            resources.ActiveConstructionStartUtc = null;
+            resources.ActiveConstructionEndUtc = null;
+            resources.ProgressDayCounter = 0;
         }
+
+        var existingPlayers = await dbContext.TeamPlayers.Where(x => x.TeamId == team.Id).ToListAsync(cancellationToken);
+        if (existingPlayers.Count > 0)
+        {
+            dbContext.TeamPlayers.RemoveRange(existingPlayers);
+        }
+
+        var playerSeed = new Random(HashCode.Combine(team.Id, userId, "human-assignment"));
+        var rebuiltPlayers = BuildInitialPlayers(team.Id, playerSeed).ToArray();
+        foreach (var player in rebuiltPlayers)
+        {
+            dbContext.TeamPlayers.Add(player);
+        }
+
+        team.Strength = rebuiltPlayers
+            .OrderBy(player => player.ShirtNumber)
+            .ThenByDescending(player => player.Strength)
+            .Take(11)
+            .Sum(player => (int)Math.Round(player.Strength, MidpointRounding.AwayFromZero));
 
         targetSlot.Slot.IsBot = false;
         targetSlot.Slot.IsOnline = true;
         targetSlot.Slot.TeamName = team.Name;
         targetSlot.Slot.Strength = team.Strength;
         targetSlot.Slot.Country = team.Country;
-        targetSlot.Slot.Logo = "logo_default";
+        targetSlot.Slot.Logo = LegacyAppCompatibility.BuildLogoId(team.Id);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -382,25 +457,38 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
     private static IReadOnlyList<TeamPlayerEntity> BuildInitialPlayers(string teamId, Random random)
     {
-        var players = new List<TeamPlayerEntity>(16);
-        var positions = new[] { "GK", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "FWD", "FWD", "MID", "DEF", "MID", "FWD", "DEF" };
+        var firstNames = new[] { "Ehrmut", "Dragoljub", "Manuel", "Hendrik", "Calvin", "Nikolai", "Lukas", "Jonas", "David", "Mika", "Tobias", "Felix", "Marco", "Adrian", "Dominik", "Sebastian", "Florian", "Jan", "Leon", "Patrick" };
+        var lastNames = new[] { "Hoschatt", "Kumer", "Neuer", "Haintzl", "Johnston", "Pfalz-Sulzbach", "Morante", "Raizgys", "Schneider", "Vogel", "Mertens", "Lindner", "Baumann", "Reiter", "Hartmann", "Keller", "Schuster", "Brandt", "Scholz", "Bergmann" };
+        var origins = new[] { "Deutschland", "Osterreich", "Schweiz", "Slowenien", "Irland", "Litauen" };
+        var positions = new[] { "GK", "GK", "DEF", "DEF", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "MID", "MID", "FWD", "FWD", "FWD", "FWD" };
+        var players = new List<TeamPlayerEntity>(positions.Length);
 
         for (var i = 0; i < positions.Length; i++)
         {
+            var position = positions[i];
+            var baseStrength = position switch
+            {
+                "GK" => 74,
+                "DEF" => 68,
+                "MID" => 69,
+                "FWD" => 70,
+                _ => 65
+            };
+
             players.Add(new TeamPlayerEntity
             {
                 Id = Guid.NewGuid().ToString("N"),
                 TeamId = teamId,
-                Name = $"Bot Player {i + 1}",
-                Origin = "DE",
-                Position = positions[i],
+                Name = $"{firstNames[(random.Next(firstNames.Length) + i) % firstNames.Length]} {lastNames[(random.Next(lastNames.Length) + (i * 3)) % lastNames.Length]}",
+                Origin = origins[(random.Next(origins.Length) + i) % origins.Length],
+                Position = position,
                 ShirtNumber = i + 1,
-                Age = random.Next(18, 34),
-                Talent = random.Next(40, 95),
-                Strength = random.Next(35, 85),
-                Fitness = random.Next(70, 101),
+                Age = i < 4 ? random.Next(18, 24) : random.Next(18, 33),
+                Talent = random.Next(4, 11),
+                Strength = Math.Clamp(baseStrength + random.Next(-6, 12) + random.Next(0, 6), 55, 95),
+                Fitness = random.Next(86, 101),
                 Matches = random.Next(0, 30),
-                Goals = positions[i] == "FWD" ? random.Next(0, 20) : random.Next(0, 6),
+                Goals = position == "FWD" ? random.Next(0, 20) : random.Next(0, 6),
                 YellowCards = random.Next(0, 6),
                 RedCards = random.Next(0, 2)
             });

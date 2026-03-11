@@ -169,6 +169,16 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.StadiumMatchesCount).HasColumnName("stadium_matches_count").IsRequired();
             entity.Property(x => x.LastEconomyTickUtc).HasColumnName("last_economy_tick_utc");
             entity.Property(x => x.LastTrainingTickUtc).HasColumnName("last_training_tick_utc");
+            entity.Property(x => x.LastSponsorPayoutUtc).HasColumnName("last_sponsor_payout_utc");
+            entity.Property(x => x.ActiveConstructionId).HasColumnName("active_construction_id").HasMaxLength(64);
+            entity.Property(x => x.ActiveConstructionPlaceId).HasColumnName("active_construction_place_id").HasMaxLength(64);
+            entity.Property(x => x.ActiveConstructionType).HasColumnName("active_construction_type").HasMaxLength(64);
+            entity.Property(x => x.ActiveConstructionCurrentValue).HasColumnName("active_construction_current_value").IsRequired();
+            entity.Property(x => x.ActiveConstructionNewValue).HasColumnName("active_construction_new_value").IsRequired();
+            entity.Property(x => x.ActiveConstructionUpgradeCost).HasColumnName("active_construction_upgrade_cost").IsRequired();
+            entity.Property(x => x.ActiveConstructionUpgradeCostPremium).HasColumnName("active_construction_upgrade_cost_premium").IsRequired();
+            entity.Property(x => x.ActiveConstructionStartUtc).HasColumnName("active_construction_start_utc");
+            entity.Property(x => x.ActiveConstructionEndUtc).HasColumnName("active_construction_end_utc");
             entity.Property(x => x.ProgressDayCounter).HasColumnName("progress_day_counter").IsRequired();
             entity.HasOne(x => x.Team)
                 .WithOne()

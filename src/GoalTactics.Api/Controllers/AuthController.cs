@@ -10,6 +10,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Authentication")]
 public sealed class AuthController(IAuthService authService) : ControllerBase
 {
     [EnableRateLimiting("auth-sensitive")]

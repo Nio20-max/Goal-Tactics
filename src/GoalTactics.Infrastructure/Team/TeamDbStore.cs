@@ -16,12 +16,22 @@ public sealed class TeamDbStore(
     private const int FacilityMaxLevel = 20;
     private const int SeasonLengthDays = 30;
     private const int IndividualTrainingWeeklyStars = 1_000;
+    private const int DailyMainSponsorStars = 300;
+    private const int DailySecondarySponsorStars = 200;
+    private const int TransferBidStarsCost = 200;
+    private const int StartingMoney = 10_000_000;
+    private const int StartingGtStars = 5_000;
+    private static readonly string[] InitialSquadPositions = ["GK", "GK", "DEF", "DEF", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "MID", "MID", "FWD", "FWD", "FWD", "FWD"];
+    private static readonly string[] FirstNames = ["Ehrmut", "Dragoljub", "Manuel", "Hendrik", "Calvin", "Nikolai", "Lukas", "Jonas", "David", "Mika", "Tobias", "Felix", "Marco", "Adrian", "Dominik", "Sebastian", "Florian", "Jan", "Leon", "Patrick"];
+    private static readonly string[] LastNames = ["Hoschatt", "Kumer", "Neuer", "Haintzl", "Johnston", "Pfalz-Sulzbach", "Morante", "Raizgys", "Schneider", "Vogel", "Mertens", "Lindner", "Baumann", "Reiter", "Hartmann", "Keller", "Schuster", "Brandt", "Scholz", "Bergmann"];
+    private static readonly string[] Origins = ["Deutschland", "Osterreich", "Schweiz", "Slowenien", "Irland", "Litauen"];
 
     public async Task<TeamRecord> GetOrCreateMyTeamAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await dbContext.Teams.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
         if (team is null)
         {
+            var now = DateTime.UtcNow;
             var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken)
                 ?? throw new InvalidOperationException("User not found for team initialization");
 
@@ -31,7 +41,7 @@ public sealed class TeamDbStore(
                 UserId = userId,
                 Name = string.IsNullOrWhiteSpace(user.ManagerName) ? "My Team" : user.ManagerName,
                 Country = "DE",
-                CountryName = "Germany",
+                CountryName = "Deutschland",
                 LeagueName = "Amateur",
                 MarketValue = 100000,
                 Mood = 50,
@@ -48,11 +58,12 @@ public sealed class TeamDbStore(
             dbContext.TeamResources.Add(new TeamResourcesEntity
             {
                 TeamId = team.Id,
-                Money = 50000,
+                Money = StartingMoney,
                 Medipacks = 3,
-                GTStars = 0,
-                LastEconomyTickUtc = DateTime.UtcNow,
-                LastTrainingTickUtc = DateTime.UtcNow,
+                GTStars = StartingGtStars,
+                LastEconomyTickUtc = now,
+                LastTrainingTickUtc = now,
+                LastSponsorPayoutUtc = now.Date,
                 ProgressDayCounter = 0
             });
 
@@ -105,7 +116,7 @@ public sealed class TeamDbStore(
         }
 
         var profile = await dbContext.Users.AsNoTracking().FirstAsync(x => x.Id == userId, cancellationToken);
-        return ToRecord(team, profile.Email, profile.CreatedAtUtc, profile.LastActivityAtUtc);
+        return ToRecord(team, profile.ManagerName, profile.Email, profile.CreatedAtUtc, profile.LastActivityAtUtc);
     }
 
     public async Task<TeamRecord?> GetTeamByIdAsync(string teamId, CancellationToken cancellationToken = default)
@@ -117,7 +128,7 @@ public sealed class TeamDbStore(
         }
 
         var user = await dbContext.Users.AsNoTracking().FirstAsync(x => x.Id == team.UserId, cancellationToken);
-        return ToRecord(team, user.Email, user.CreatedAtUtc, user.LastActivityAtUtc);
+        return ToRecord(team, user.ManagerName, user.Email, user.CreatedAtUtc, user.LastActivityAtUtc);
     }
 
     public async Task<TeamResourcesRecord> GetTeamResourcesAsync(string teamId, CancellationToken cancellationToken = default)
@@ -265,28 +276,37 @@ public sealed class TeamDbStore(
     public async Task<IReadOnlyList<BuildPlaceRecord>> GetBuildPlacesAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
         var resources = await dbContext.TeamResources.AsNoTracking().FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        var teamEntity = await dbContext.Teams.AsNoTracking().FirstAsync(x => x.Id == team.TeamId, cancellationToken);
+        var hasActiveConstruction = HasActiveConstruction(resources);
 
         return
         [
-            ToBuildPlace(StadiumBuildingCatalog.Office, "Office", resources.OfficeLevel, resources.OfficeLevel < FacilityMaxLevel),
-            ToBuildPlace(StadiumBuildingCatalog.TrainingCenter, "TrainingCenter", resources.TrainingCenterLevel, CanUpgrade(resources.TrainingCenterLevel, resources.OfficeLevel)),
-            ToBuildPlace(StadiumBuildingCatalog.MedicalCenter, "MedicalCenter", resources.MedicalCenterLevel, CanUpgrade(resources.MedicalCenterLevel, resources.OfficeLevel)),
-            ToBuildPlace(StadiumBuildingCatalog.YouthAcademy, "YouthAcademy", resources.YouthAcademyLevel, CanUpgrade(resources.YouthAcademyLevel, resources.OfficeLevel)),
-            ToBuildPlace(StadiumBuildingCatalog.FanShop, "FanShop", resources.FanShopLevel, CanUpgrade(resources.FanShopLevel, resources.OfficeLevel)),
-            ToBuildPlace(StadiumBuildingCatalog.Parking, "Parking", resources.ParkingLevel, CanUpgrade(resources.ParkingLevel, resources.OfficeLevel)),
-            ToBuildPlace(StadiumBuildingCatalog.StadiumStands, "StadiumStands", resources.StadiumStandSeats, CanUpgradeStadium(resources, resources.OfficeLevel, StadiumBuildingCatalog.StadiumStands)),
-            ToBuildPlace(StadiumBuildingCatalog.StadiumSeats, "StadiumSeats", resources.StadiumSitSeats, CanUpgradeStadium(resources, resources.OfficeLevel, StadiumBuildingCatalog.StadiumSeats)),
-            ToBuildPlace(StadiumBuildingCatalog.StadiumVips, "StadiumVips", resources.StadiumVipSeats, CanUpgradeStadium(resources, resources.OfficeLevel, StadiumBuildingCatalog.StadiumVips))
+            ToBuildPlace(StadiumBuildingCatalog.Office, "Office", resources.OfficeLevel, !hasActiveConstruction && resources.OfficeLevel < FacilityMaxLevel),
+            ToBuildPlace(StadiumBuildingCatalog.TrainingCenter, "TrainingCenter", resources.TrainingCenterLevel, !hasActiveConstruction && CanUpgrade(resources.TrainingCenterLevel, resources.OfficeLevel)),
+            ToBuildPlace(StadiumBuildingCatalog.MedicalCenter, "MedicalCenter", resources.MedicalCenterLevel, !hasActiveConstruction && CanUpgrade(resources.MedicalCenterLevel, resources.OfficeLevel)),
+            ToBuildPlace(StadiumBuildingCatalog.YouthAcademy, "YouthAcademy", resources.YouthAcademyLevel, !hasActiveConstruction && CanUpgrade(resources.YouthAcademyLevel, resources.OfficeLevel)),
+            ToBuildPlace(StadiumBuildingCatalog.FanShop, "FanShop", resources.FanShopLevel, !hasActiveConstruction && CanUpgrade(resources.FanShopLevel, resources.OfficeLevel)),
+            ToBuildPlace(StadiumBuildingCatalog.Parking, "Parking", resources.ParkingLevel, !hasActiveConstruction && CanUpgrade(resources.ParkingLevel, resources.OfficeLevel)),
+            ToBuildPlace(StadiumBuildingCatalog.StadiumStands, "StadiumStands", resources.StadiumStandSeats, !hasActiveConstruction && CanUpgradeStadium(resources, resources.OfficeLevel, teamEntity.LeagueTier, StadiumBuildingCatalog.StadiumStands)),
+            ToBuildPlace(StadiumBuildingCatalog.StadiumSeats, "StadiumSeats", resources.StadiumSitSeats, !hasActiveConstruction && CanUpgradeStadium(resources, resources.OfficeLevel, teamEntity.LeagueTier, StadiumBuildingCatalog.StadiumSeats)),
+            ToBuildPlace(StadiumBuildingCatalog.StadiumVips, "StadiumVips", resources.StadiumVipSeats, !hasActiveConstruction && CanUpgradeStadium(resources, resources.OfficeLevel, teamEntity.LeagueTier, StadiumBuildingCatalog.StadiumVips))
         ];
     }
 
     public async Task<bool> BuildPlaceAsync(string userId, Guid placeId, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
         var teamEntity = await dbContext.Teams.FirstAsync(x => x.Id == team.TeamId, cancellationToken);
         var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
         var teamIdGuid = BuildDeterministicGuid(team.TeamId);
+
+        if (HasActiveConstruction(resources))
+        {
+            return false;
+        }
 
         if (placeId == StadiumBuildingCatalog.Office)
         {
@@ -302,23 +322,28 @@ public sealed class TeamDbStore(
             }
 
             resources.Money -= cost;
-            resources.OfficeLevel++;
+            QueueConstruction(resources, placeId, "Office", resources.OfficeLevel, resources.OfficeLevel + 1, cost, GetFacilityBuildDurationMinutes(resources.OfficeLevel), DateTime.UtcNow);
             await AddFinanceHistoryAsync(userId, income: 0m, outcome: cost, resources.Money, cancellationToken);
+            AddConstructionNews(team.TeamId, "Geschäftsstelle", resources.OfficeLevel + 1, resources.ActiveConstructionEndUtc);
             await dbContext.SaveChangesAsync(cancellationToken);
             return true;
         }
 
         if (placeId == StadiumBuildingCatalog.StadiumVips || placeId == StadiumBuildingCatalog.StadiumSeats || placeId == StadiumBuildingCatalog.StadiumStands)
         {
-            if (!CanUpgradeStadium(resources, resources.OfficeLevel, placeId))
+            if (!CanUpgradeStadium(resources, resources.OfficeLevel, teamEntity.LeagueTier, placeId))
             {
                 return false;
             }
 
-            var seatBlock = placeId == StadiumBuildingCatalog.StadiumVips ? 100 : (placeId == StadiumBuildingCatalog.StadiumSeats ? 1000 : 1500);
+            var seatBlock = placeId == StadiumBuildingCatalog.StadiumVips ? 10 : 100;
+            var currentValue = placeId == StadiumBuildingCatalog.StadiumVips
+                ? resources.StadiumVipSeats
+                : (placeId == StadiumBuildingCatalog.StadiumSeats ? resources.StadiumSitSeats : resources.StadiumStandSeats);
+
             var currentLevel = placeId == StadiumBuildingCatalog.StadiumVips
-                ? resources.StadiumVipSeats / 100
-                : (placeId == StadiumBuildingCatalog.StadiumSeats ? resources.StadiumSitSeats / 1000 : resources.StadiumStandSeats / 1500);
+                ? resources.StadiumVipSeats / 10
+                : (placeId == StadiumBuildingCatalog.StadiumSeats ? resources.StadiumSitSeats / 100 : resources.StadiumStandSeats / 100);
 
             var cost = GetFacilityUpgradeCost(currentLevel, teamIdGuid, 8_500m, 2_200m);
             if (resources.Money < cost)
@@ -327,32 +352,21 @@ public sealed class TeamDbStore(
             }
 
             resources.Money -= cost;
-            if (placeId == StadiumBuildingCatalog.StadiumVips)
-            {
-                resources.StadiumVipSeats += seatBlock;
-            }
-            else if (placeId == StadiumBuildingCatalog.StadiumSeats)
-            {
-                resources.StadiumSitSeats += seatBlock;
-            }
-            else
-            {
-                resources.StadiumStandSeats += seatBlock;
-            }
-
+            QueueConstruction(resources, placeId, GetSeatConstructionType(placeId), currentValue, currentValue + seatBlock, cost, GetSeatBuildDurationMinutes(placeId), DateTime.UtcNow);
             await AddFinanceHistoryAsync(userId, income: 0m, outcome: cost, resources.Money, cancellationToken);
+            AddConstructionNews(team.TeamId, GetSeatDisplayName(placeId), currentValue + seatBlock, resources.ActiveConstructionEndUtc);
             await dbContext.SaveChangesAsync(cancellationToken);
             return true;
         }
 
         var result = placeId switch
         {
-            _ when placeId == StadiumBuildingCatalog.TrainingCenter => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.TrainingCenterLevel, teamIdGuid),
-            _ when placeId == StadiumBuildingCatalog.MedicalCenter => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.MedicalCenterLevel, teamIdGuid),
-            _ when placeId == StadiumBuildingCatalog.YouthAcademy => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.YouthAcademyLevel, teamIdGuid),
-            _ when placeId == StadiumBuildingCatalog.FanShop => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.FanShopLevel, teamIdGuid),
-            _ when placeId == StadiumBuildingCatalog.Parking => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.ParkingLevel, teamIdGuid),
-            _ => (Success: false, Cost: 0m, NewLevel: 0)
+            _ when placeId == StadiumBuildingCatalog.TrainingCenter => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.TrainingCenterLevel, teamIdGuid, "TrainingCenter"),
+            _ when placeId == StadiumBuildingCatalog.MedicalCenter => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.MedicalCenterLevel, teamIdGuid, "MedicalCenter"),
+            _ when placeId == StadiumBuildingCatalog.YouthAcademy => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.YouthAcademyLevel, teamIdGuid, "YouthAcademy"),
+            _ when placeId == StadiumBuildingCatalog.FanShop => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.FanShopLevel, teamIdGuid, "FanShop"),
+            _ when placeId == StadiumBuildingCatalog.Parking => TryUpgradeFacility(resources, resources.OfficeLevel, x => x.ParkingLevel, teamIdGuid, "Parking"),
+            _ => (Success: false, Cost: 0m, CurrentLevel: 0, NewLevel: 0, BuildingType: string.Empty)
         };
 
         if (!result.Success)
@@ -365,29 +379,35 @@ public sealed class TeamDbStore(
             return false;
         }
 
-        if (placeId == StadiumBuildingCatalog.TrainingCenter)
+        resources.Money -= result.Cost;
+        QueueConstruction(resources, placeId, result.BuildingType, result.CurrentLevel, result.NewLevel, result.Cost, GetFacilityBuildDurationMinutes(result.CurrentLevel), DateTime.UtcNow);
+        await AddFinanceHistoryAsync(userId, income: 0m, outcome: result.Cost, resources.Money, cancellationToken);
+        AddConstructionNews(team.TeamId, GetFacilityDisplayName(result.BuildingType), result.NewLevel, resources.ActiveConstructionEndUtc);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<ConstructionRecord?> GetUnderConstructionAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
+        var resources = await dbContext.TeamResources.AsNoTracking().FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        return ToConstructionRecord(resources);
+    }
+
+    public async Task<bool> SpeedupConstructionAsync(string userId, Guid constructionId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        var matchesConstructionId = Guid.TryParse(resources.ActiveConstructionId, out var activeId) && activeId == constructionId;
+        var matchesPlaceId = Guid.TryParse(resources.ActiveConstructionPlaceId, out var placeId) && placeId == constructionId;
+        if (!matchesConstructionId && !matchesPlaceId)
         {
-            resources.TrainingCenterLevel = result.NewLevel;
-        }
-        else if (placeId == StadiumBuildingCatalog.MedicalCenter)
-        {
-            resources.MedicalCenterLevel = result.NewLevel;
-        }
-        else if (placeId == StadiumBuildingCatalog.YouthAcademy)
-        {
-            resources.YouthAcademyLevel = result.NewLevel;
-        }
-        else if (placeId == StadiumBuildingCatalog.FanShop)
-        {
-            resources.FanShopLevel = result.NewLevel;
-        }
-        else if (placeId == StadiumBuildingCatalog.Parking)
-        {
-            resources.ParkingLevel = result.NewLevel;
+            return false;
         }
 
-        resources.Money -= result.Cost;
-        await AddFinanceHistoryAsync(userId, income: 0m, outcome: result.Cost, resources.Money, cancellationToken);
+        resources.ActiveConstructionEndUtc = DateTime.UtcNow;
+        await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -418,6 +438,21 @@ public sealed class TeamDbStore(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> TrySpendStarsAsync(string userId, decimal stars, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
+        var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        if (resources.GTStars < stars)
+        {
+            return false;
+        }
+
+        resources.GTStars -= stars;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<TeamTrainingStateRecord> GetTrainingStateAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
@@ -433,7 +468,9 @@ public sealed class TeamDbStore(
             state.SubSkillIndex,
             GetEfficiencyText(efficiency),
             efficiency,
-            trainPrice);
+            trainPrice,
+            state.CampType,
+            state.CampActiveUntilUtc);
     }
 
     public async Task SaveTeamTrainingAsync(string userId, int mainSkillIndex, int subSkillIndex, CancellationToken cancellationToken = default)
@@ -472,6 +509,15 @@ public sealed class TeamDbStore(
         return true;
     }
 
+    public async Task CancelCampAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var state = await EnsureTrainingStateAsync(team.TeamId, cancellationToken);
+        state.CampType = string.Empty;
+        state.CampActiveUntilUtc = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<SquadPlayerRecord>> GetSquadPlayersAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
@@ -479,6 +525,19 @@ public sealed class TeamDbStore(
 
         var players = await dbContext.TeamPlayers.AsNoTracking()
             .Where(x => x.TeamId == team.TeamId)
+            .OrderBy(x => x.ShirtNumber)
+            .ToListAsync(cancellationToken);
+
+        return players.Select(MapPlayer).ToArray();
+    }
+
+    public async Task<IReadOnlyList<SquadPlayerRecord>> GetSquadPlayersForTeamAsync(Guid teamId, CancellationToken cancellationToken = default)
+    {
+        var teamKey = teamId.ToString("N");
+        await ApplyProgressionTicksAsync(teamKey, cancellationToken);
+
+        var players = await dbContext.TeamPlayers.AsNoTracking()
+            .Where(x => x.TeamId == teamKey)
             .OrderBy(x => x.ShirtNumber)
             .ToListAsync(cancellationToken);
 
@@ -631,6 +690,7 @@ public sealed class TeamDbStore(
         var team = await dbContext.Teams.FirstAsync(x => x.Id == teamId, cancellationToken);
         var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == teamId, cancellationToken);
         var training = await EnsureTrainingStateAsync(teamId, cancellationToken);
+        CompleteConstructionIfFinished(resources, now, team.Id);
         var players = await dbContext.TeamPlayers.Where(x => x.TeamId == teamId).ToListAsync(cancellationToken);
         if (players.Count == 0)
         {
@@ -674,6 +734,13 @@ public sealed class TeamDbStore(
             resources.LastEconomyTickUtc = now.Date;
         }
 
+        var sponsorDays = resources.LastSponsorPayoutUtc is null ? 1 : FullDaysElapsed(resources.LastSponsorPayoutUtc, now);
+        if (sponsorDays > 0)
+        {
+            resources.GTStars += sponsorDays * (DailyMainSponsorStars + DailySecondarySponsorStars);
+            resources.LastSponsorPayoutUtc = now.Date;
+        }
+
         var trainingDays = FullDaysElapsed(resources.LastTrainingTickUtc, now);
         if (trainingDays > 0)
         {
@@ -696,8 +763,12 @@ public sealed class TeamDbStore(
             resources.LastTrainingTickUtc = now.Date;
             team.Strength = RecalculateTeamStrength(players);
         }
+        else if (players.Count > 0)
+        {
+            team.Strength = RecalculateTeamStrength(players);
+        }
 
-        if (economyDays > 0 || trainingDays > 0)
+        if (economyDays > 0 || sponsorDays > 0 || trainingDays > 0)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
@@ -741,9 +812,13 @@ public sealed class TeamDbStore(
             return 1;
         }
 
-        var baseStrength = (int)Math.Round(players.Average(x => x.Strength));
-        var fitnessAverage = (int)Math.Round(players.Average(x => x.Fitness));
-        return strengthCalculator.Calculate(baseStrength, tacticBonus: 0, fitnessAverage);
+        var startingLineupStrength = players
+            .OrderBy(x => x.ShirtNumber)
+            .ThenByDescending(x => x.Strength)
+            .Take(11)
+            .Sum(x => (int)Math.Round(x.Strength, MidpointRounding.AwayFromZero));
+
+        return strengthCalculator.Calculate(startingLineupStrength, tacticBonus: 0, fitnessAverage: 0);
     }
 
     private async Task<TeamTrainingStateEntity> EnsureTrainingStateAsync(string teamId, CancellationToken cancellationToken)
@@ -825,59 +900,73 @@ public sealed class TeamDbStore(
         return officeLevel >= (level + 1);
     }
 
-    private static bool CanUpgradeStadium(TeamResourcesEntity resources, int officeLevel, Guid placeId)
+    private bool CanUpgradeStadium(TeamResourcesEntity resources, int officeLevel, int leagueTier, Guid placeId)
     {
         if (officeLevel < 1)
         {
             return false;
         }
 
+        var caps = stadiumEconomy.GetSeatCaps(leagueTier);
+
         return placeId switch
         {
-            _ when placeId == StadiumBuildingCatalog.StadiumVips => resources.StadiumVipSeats < (officeLevel * 140),
-            _ when placeId == StadiumBuildingCatalog.StadiumSeats => resources.StadiumSitSeats < (officeLevel * 1750),
+            _ when placeId == StadiumBuildingCatalog.StadiumVips => resources.StadiumVipSeats + 10 <= caps.MaxVipSeats,
+            _ when placeId == StadiumBuildingCatalog.StadiumSeats => resources.StadiumSitSeats + 100 <= caps.MaxSitSeats,
             _ when placeId == StadiumBuildingCatalog.StadiumStands => true,
             _ => false
         };
     }
 
-    private static (bool Success, decimal Cost, int NewLevel) TryUpgradeFacility(
+    private static (bool Success, decimal Cost, int CurrentLevel, int NewLevel, string BuildingType) TryUpgradeFacility(
         TeamResourcesEntity resources,
         int officeLevel,
         Func<TeamResourcesEntity, int> getter,
-        Guid seed)
+        Guid seed,
+        string buildingType)
     {
         var level = getter(resources);
         if (!CanUpgrade(level, officeLevel))
         {
-            return (false, 0m, level);
+            return (false, 0m, level, level, buildingType);
         }
 
         var cost = GetFacilityUpgradeCost(level, seed, 12_000m, 2_400m);
-        return (true, cost, level + 1);
+        return (true, cost, level, level + 1, buildingType);
     }
 
     private static IReadOnlyList<TeamPlayerEntity> BuildInitialPlayers(string teamId)
     {
         var seed = HashCode.Combine(teamId, "squad-seed");
         var random = new Random(seed);
-        var positions = new[] { "GK", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "FWD", "FWD", "FWD", "DEF", "MID", "FWD", "GK", "MID" };
 
-        var result = new List<TeamPlayerEntity>(positions.Length);
-        for (var i = 0; i < positions.Length; i++)
+        var result = new List<TeamPlayerEntity>(InitialSquadPositions.Length);
+        for (var i = 0; i < InitialSquadPositions.Length; i++)
         {
-            var age = random.Next(16, 33);
-            var talent = random.Next(1, 11);
-            var fitness = random.Next(82, 99);
-            var strength = Math.Clamp(60m + random.Next(-5, 11) + (talent >= 9 ? random.Next(0, 8) : 0), 50m, 90m);
+            var position = InitialSquadPositions[i];
+            var age = i < 4 ? random.Next(18, 24) : random.Next(18, 33);
+            var talent = random.Next(4, 11);
+            var fitness = random.Next(86, 101);
+            var baseStrength = position switch
+            {
+                "GK" => 74m,
+                "DEF" => 68m,
+                "MID" => 69m,
+                "FWD" => 70m,
+                _ => 65m
+            };
+            var strength = Math.Clamp(baseStrength + random.Next(-6, 12) + (talent >= 9 ? random.Next(2, 10) : 0), 55m, 95m);
+            var firstName = FirstNames[(random.Next(FirstNames.Length) + i) % FirstNames.Length];
+            var lastName = LastNames[(random.Next(LastNames.Length) + (i * 3)) % LastNames.Length];
+            var origin = Origins[(random.Next(Origins.Length) + i) % Origins.Length];
 
             result.Add(new TeamPlayerEntity
             {
                 Id = Guid.NewGuid().ToString("N"),
                 TeamId = teamId,
-                Name = $"Player {i + 1}",
-                Origin = "DE",
-                Position = positions[i],
+                Name = $"{firstName} {lastName}",
+                Origin = origin,
+                Position = position,
                 ShirtNumber = i + 1,
                 Age = age,
                 Talent = talent,
@@ -914,6 +1003,199 @@ public sealed class TeamDbStore(
         return new BuildPlaceRecord(id, type, level, canBuild);
     }
 
+    private static bool HasActiveConstruction(TeamResourcesEntity resources)
+    {
+        return resources.ActiveConstructionEndUtc.HasValue;
+    }
+
+    private static void QueueConstruction(
+        TeamResourcesEntity resources,
+        Guid placeId,
+        string buildingType,
+        int currentValue,
+        int newValue,
+        decimal upgradeCost,
+        decimal durationMinutes,
+        DateTime nowUtc)
+    {
+        resources.ActiveConstructionId = Guid.NewGuid().ToString("N");
+        resources.ActiveConstructionPlaceId = placeId.ToString("N");
+        resources.ActiveConstructionType = buildingType;
+        resources.ActiveConstructionCurrentValue = currentValue;
+        resources.ActiveConstructionNewValue = newValue;
+        resources.ActiveConstructionUpgradeCost = upgradeCost;
+        resources.ActiveConstructionUpgradeCostPremium = Math.Round(upgradeCost / 50m, 2);
+        resources.ActiveConstructionStartUtc = nowUtc;
+        resources.ActiveConstructionEndUtc = nowUtc.AddMinutes((double)durationMinutes);
+    }
+
+    private void CompleteConstructionIfFinished(TeamResourcesEntity resources, DateTime nowUtc, string teamId)
+    {
+        if (!resources.ActiveConstructionEndUtc.HasValue || resources.ActiveConstructionEndUtc.Value > nowUtc)
+        {
+            return;
+        }
+
+        if (!Guid.TryParse(resources.ActiveConstructionPlaceId, out var placeId))
+        {
+            ClearConstruction(resources);
+            return;
+        }
+
+        if (placeId == StadiumBuildingCatalog.Office)
+        {
+            resources.OfficeLevel = resources.ActiveConstructionNewValue;
+        }
+        else if (placeId == StadiumBuildingCatalog.TrainingCenter)
+        {
+            resources.TrainingCenterLevel = resources.ActiveConstructionNewValue;
+        }
+        else if (placeId == StadiumBuildingCatalog.MedicalCenter)
+        {
+            resources.MedicalCenterLevel = resources.ActiveConstructionNewValue;
+        }
+        else if (placeId == StadiumBuildingCatalog.YouthAcademy)
+        {
+            resources.YouthAcademyLevel = resources.ActiveConstructionNewValue;
+        }
+        else if (placeId == StadiumBuildingCatalog.FanShop)
+        {
+            resources.FanShopLevel = resources.ActiveConstructionNewValue;
+        }
+        else if (placeId == StadiumBuildingCatalog.Parking)
+        {
+            resources.ParkingLevel = resources.ActiveConstructionNewValue;
+        }
+        else if (placeId == StadiumBuildingCatalog.StadiumVips)
+        {
+            resources.StadiumVipSeats = resources.ActiveConstructionNewValue;
+        }
+        else if (placeId == StadiumBuildingCatalog.StadiumSeats)
+        {
+            resources.StadiumSitSeats = resources.ActiveConstructionNewValue;
+        }
+        else if (placeId == StadiumBuildingCatalog.StadiumStands)
+        {
+            resources.StadiumStandSeats = resources.ActiveConstructionNewValue;
+        }
+
+        dbContext.TeamNews.Add(new TeamNewsEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            TeamId = teamId,
+            DateText = nowUtc.ToString("O"),
+            Title = "Ausbau fertiggestellt",
+            Text = $"{GetFacilityDisplayName(resources.ActiveConstructionType ?? string.Empty)} wurde soeben fertiggestellt."
+        });
+
+        ClearConstruction(resources);
+    }
+
+    private static void ClearConstruction(TeamResourcesEntity resources)
+    {
+        resources.ActiveConstructionId = null;
+        resources.ActiveConstructionPlaceId = null;
+        resources.ActiveConstructionType = null;
+        resources.ActiveConstructionCurrentValue = 0;
+        resources.ActiveConstructionNewValue = 0;
+        resources.ActiveConstructionUpgradeCost = 0m;
+        resources.ActiveConstructionUpgradeCostPremium = 0m;
+        resources.ActiveConstructionStartUtc = null;
+        resources.ActiveConstructionEndUtc = null;
+    }
+
+    private static ConstructionRecord? ToConstructionRecord(TeamResourcesEntity resources)
+    {
+        if (!resources.ActiveConstructionEndUtc.HasValue
+            || !Guid.TryParse(resources.ActiveConstructionId, out var id)
+            || !Guid.TryParse(resources.ActiveConstructionPlaceId, out var placeId))
+        {
+            return null;
+        }
+
+        return new ConstructionRecord(
+            id,
+            placeId,
+            resources.ActiveConstructionType ?? string.Empty,
+            resources.ActiveConstructionCurrentValue,
+            resources.ActiveConstructionNewValue,
+            resources.ActiveConstructionUpgradeCost,
+            resources.ActiveConstructionUpgradeCostPremium,
+            resources.ActiveConstructionStartUtc ?? resources.ActiveConstructionEndUtc.Value,
+            resources.ActiveConstructionEndUtc.Value);
+    }
+
+    private void AddConstructionNews(string teamId, string buildingName, int newValue, DateTime? endUtc)
+    {
+        if (!endUtc.HasValue)
+        {
+            return;
+        }
+
+        dbContext.TeamNews.Add(new TeamNewsEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            TeamId = teamId,
+            DateText = DateTime.UtcNow.ToString("O"),
+            Title = "Gebäude ausbauen",
+            Text = $"{buildingName} werden ausgebaut und sind voraussichtlich fertig {endUtc.Value:dd.MM.yyyy 'am' HH:mm}."
+        });
+    }
+
+    private static decimal GetFacilityBuildDurationMinutes(int currentLevel)
+    {
+        const decimal minMinutes = 30m;
+        const decimal maxMinutes = 50m * 60m;
+        return Math.Round(minMinutes + (Math.Clamp(currentLevel, 0, 19) * ((maxMinutes - minMinutes) / 19m)), 0);
+    }
+
+    private static decimal GetSeatBuildDurationMinutes(Guid placeId)
+    {
+        return placeId switch
+        {
+            _ when placeId == StadiumBuildingCatalog.StadiumVips => 50m,
+            _ when placeId == StadiumBuildingCatalog.StadiumSeats => 140m,
+            _ => 100m
+        };
+    }
+
+    private static string GetSeatConstructionType(Guid placeId)
+    {
+        return placeId switch
+        {
+            _ when placeId == StadiumBuildingCatalog.StadiumVips => "StadiumVips",
+            _ when placeId == StadiumBuildingCatalog.StadiumSeats => "StadiumSeats",
+            _ => "StadiumStands"
+        };
+    }
+
+    private static string GetSeatDisplayName(Guid placeId)
+    {
+        return placeId switch
+        {
+            _ when placeId == StadiumBuildingCatalog.StadiumVips => "VIP-Sitze",
+            _ when placeId == StadiumBuildingCatalog.StadiumSeats => "Sitzplätze",
+            _ => "Stehplätze"
+        };
+    }
+
+    private static string GetFacilityDisplayName(string buildingType)
+    {
+        return buildingType switch
+        {
+            "Office" => "Geschäftsstelle",
+            "TrainingCenter" => "Trainingsgelände",
+            "MedicalCenter" => "Fitnessstudio",
+            "YouthAcademy" => "Jugendzentrum",
+            "FanShop" => "Fanshop",
+            "Parking" => "Parkplätze",
+            "StadiumVips" => "VIP-Sitze",
+            "StadiumSeats" => "Sitzplätze",
+            "StadiumStands" => "Stehplätze",
+            _ => buildingType
+        };
+    }
+
     private static string GetEfficiencyText(int value)
     {
         return value switch
@@ -937,7 +1219,7 @@ public sealed class TeamDbStore(
         return Guid.TryParse(membership.LeagueId, out var leagueId) ? leagueId : Guid.Empty;
     }
 
-    private static TeamRecord ToRecord(TeamEntity team, string userEmail, DateTime userCreatedAtUtc, DateTime? userLastActivityAtUtc)
+    private static TeamRecord ToRecord(TeamEntity team, string managerName, string userEmail, DateTime userCreatedAtUtc, DateTime? userLastActivityAtUtc)
     {
         return new TeamRecord(
             team.Id,
@@ -955,6 +1237,7 @@ public sealed class TeamDbStore(
             team.Members,
             team.Strength,
             team.MatchTrend,
+            managerName,
             userEmail,
             userCreatedAtUtc,
             userLastActivityAtUtc);

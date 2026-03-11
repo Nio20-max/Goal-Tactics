@@ -1,5 +1,7 @@
 using GoalTactics.Contracts.Team;
 using GoalTactics.Contracts.User;
+using GoalTactics.Application.Common;
+using GoalTactics.Application.League;
 
 namespace GoalTactics.Application.Team;
 
@@ -34,7 +36,7 @@ public interface ITeamService
     Task ChangeTeamNameAsync(string userId, Guid teamId, string name, CancellationToken cancellationToken = default);
 }
 
-public sealed class TeamService(ITeamStore teamStore) : ITeamService
+public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) : ITeamService
 {
     public async Task<TeamDataResponse> GetTeamInfoAsync(Guid teamId, CancellationToken cancellationToken = default)
     {
@@ -44,13 +46,15 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
             return new TeamDataResponse { Success = false, Message = "Team not found" };
         }
 
-        return new TeamDataResponse { Success = true, TeamData = MapTeam(team) };
+        var leagueId = await teamStore.GetLeagueIdForTeamAsync(team.TeamId, cancellationToken);
+        return new TeamDataResponse { Success = true, TeamData = BuildTeamData(team, leagueId, true) };
     }
 
     public async Task<TeamDataResponse> GetMyTeamInfoAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
-        return new TeamDataResponse { Success = true, TeamData = MapTeam(team) };
+        var leagueId = await teamStore.GetLeagueIdForTeamAsync(team.TeamId, cancellationToken);
+        return new TeamDataResponse { Success = true, TeamData = BuildTeamData(team, leagueId, false) };
     }
 
     public async Task<ExtendedTeamDataResponse> GetMyTeamExtendedInfoAsync(string userId, CancellationToken cancellationToken = default)
@@ -60,6 +64,11 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
         var stadium = await teamStore.GetStadiumStateAsync(userId, cancellationToken);
         var players = await teamStore.GetSquadPlayersAsync(userId, cancellationToken);
         var leagueId = await teamStore.GetLeagueIdForTeamAsync(team.TeamId, cancellationToken);
+        var leagueTable = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
+        var leaguePosition = Array.FindIndex(leagueTable.Teams.ToArray(), x => x.IsMine) + 1;
+        var matchday = Math.Clamp(leagueTable.Teams.FirstOrDefault(x => x.IsMine) is { } mineTeam
+            ? mineTeam.MatchesHome + mineTeam.MatchesAway + 1
+            : 1, 1, 30);
 
         return new ExtendedTeamDataResponse
         {
@@ -68,10 +77,13 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
             {
                 Id = team.TeamId,
                 Name = team.Name,
-                Country = team.Country,
+                Logo = LegacyAppCompatibility.BuildLogoId(team.TeamId),
+                Country = LegacyAppCompatibility.NormalizeCountryCode(team.Country),
                 CountryName = team.CountryName,
                 LeagueId = leagueId,
                 LeagueName = team.LeagueName,
+                HomeTrikot = LegacyAppCompatibility.BuildShirtId(team.TeamId, "home"),
+                AwayTrikot = LegacyAppCompatibility.BuildShirtId(team.TeamId, "away"),
                 MarketValue = team.MarketValue,
                 Mood = team.Mood,
                 TeamMood = team.TeamMood,
@@ -80,25 +92,24 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
                 Fans = team.Fans,
                 Members = team.Members,
                 Strength = team.Strength,
-                MatchTrend = team.MatchTrend,
-                UserData = new UserData
-                {
-                    Name = team.Name,
-                    Email = team.UserEmail,
-                    Created = team.UserCreatedAtUtc.ToString("O"),
-                    LastActivity = team.UserLastActivityAtUtc?.ToString("O")
-                },
-                LeaguePosition = 1,
+                MatchTrend = LegacyAppCompatibility.NormalizeMatchTrend(team.MatchTrend),
+                UserData = BuildUserData(team),
+                MyLike = false,
+                LikesMe = false,
+                ChallengeStatus = 0,
+                LeaguePosition = Math.Max(1, leaguePosition),
                 PlayersCount = players.Count,
-                BestVictory = "3-0",
-                WorstDefeat = "0-2",
+                BestVictory = team.Wins > 0 ? "5:0" : "0:0",
+                WorstDefeat = team.Losses > 0 ? "5:1" : "0:0",
                 StadiumSize = stadium.Capacity
             },
             News = news.Select(x => new ClubNews { Date = x.Date, Title = x.Title, Text = x.Text }).ToArray(),
-            Season = "S1",
-            SeasonStartDate = DateTime.UtcNow.Date.ToString("O"),
-            Matchday = 1,
-            RenameTeamCost = 100
+            Season = "#1",
+            SeasonStartDate = DateTime.UtcNow.Date.AddDays(-(matchday - 1)).AddHours(18).ToString("O"),
+            Matchday = matchday,
+            LastMatch = BuildExtendedMatch(leagueTable, team.TeamId, isNextMatch: false),
+            NextMatch = BuildExtendedMatch(leagueTable, team.TeamId, isNextMatch: true),
+            RenameTeamCost = 500
         };
     }
 
@@ -208,15 +219,19 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
         return teamStore.RenameTeamAsync(userId, teamId.ToString("N"), name, cancellationToken);
     }
 
-    private static TeamData MapTeam(TeamRecord team)
+    private static TeamData BuildTeamData(TeamRecord team, Guid leagueId, bool socialTarget)
     {
         return new TeamData
         {
             Id = team.TeamId,
             Name = team.Name,
-            Country = team.Country,
+            Logo = LegacyAppCompatibility.BuildLogoId(team.TeamId),
+            Country = LegacyAppCompatibility.NormalizeCountryCode(team.Country),
             CountryName = team.CountryName,
+            LeagueId = leagueId,
             LeagueName = team.LeagueName,
+            HomeTrikot = LegacyAppCompatibility.BuildShirtId(team.TeamId, "home"),
+            AwayTrikot = LegacyAppCompatibility.BuildShirtId(team.TeamId, "away"),
             MarketValue = team.MarketValue,
             Mood = team.Mood,
             TeamMood = team.TeamMood,
@@ -225,14 +240,72 @@ public sealed class TeamService(ITeamStore teamStore) : ITeamService
             Fans = team.Fans,
             Members = team.Members,
             Strength = team.Strength,
-            MatchTrend = team.MatchTrend,
-            UserData = new UserData
-            {
-                Name = team.Name,
-                Email = team.UserEmail,
-                Created = team.UserCreatedAtUtc.ToString("O"),
-                LastActivity = team.UserLastActivityAtUtc?.ToString("O")
-            }
+            MatchTrend = LegacyAppCompatibility.NormalizeMatchTrend(team.MatchTrend),
+            UserData = BuildUserData(team),
+            MyLike = socialTarget,
+            LikesMe = socialTarget,
+            ChallengeStatus = socialTarget ? 1 : 0
+        };
+    }
+
+    private static UserData BuildUserData(TeamRecord team)
+    {
+        var score = LegacyAppCompatibility.EstimateUserScore(team.Strength, team.Wins, team.Fans, team.Members);
+        return new UserData
+        {
+            Name = team.ManagerName,
+            Email = team.UserEmail,
+            Created = team.UserCreatedAtUtc.ToString("O"),
+            LastActivity = team.UserLastActivityAtUtc?.ToString("O"),
+            FacebookId = null,
+            AppleId = null,
+            Password = null,
+            Score = score,
+            Rank = LegacyAppCompatibility.EstimateRank(score)
+        };
+    }
+
+    private static MatchData? BuildExtendedMatch(LeagueTableRecord leagueTable, string teamId, bool isNextMatch)
+    {
+        var teams = leagueTable.Teams.ToArray();
+        var myIndex = Array.FindIndex(teams, entry => entry.IsMine);
+        if (myIndex < 0 || teams.Length < 2)
+        {
+            return null;
+        }
+
+        var opponents = teams.Where(entry => !entry.IsMine).ToArray();
+        if (opponents.Length == 0)
+        {
+            return null;
+        }
+
+        var mine = teams[myIndex];
+        var rotationSeed = mine.MatchesHome + mine.MatchesAway + (isNextMatch ? 0 : -1);
+        var opponent = opponents[Math.Abs(rotationSeed) % opponents.Length];
+        var isHome = isNextMatch ? (rotationSeed % 2 == 0) : (rotationSeed % 2 != 0);
+        var date = isNextMatch ? DateTime.UtcNow.Date.AddHours(18) : DateTime.UtcNow.Date.AddDays(-1).AddHours(18);
+
+        return new MatchData
+        {
+            Id = Guid.NewGuid(),
+            Date = date.ToString("O"),
+            HomeLogo = isHome ? LegacyAppCompatibility.BuildLogoId(teamId) : opponent.Logo,
+            AwayLogo = isHome ? opponent.Logo : LegacyAppCompatibility.BuildLogoId(teamId),
+            HomeName = isHome ? mine.Name : opponent.Name,
+            AwayName = isHome ? opponent.Name : mine.Name,
+            MyTeam = isHome ? 1 : 2,
+            HomeCountry = string.Empty,
+            AwayCountry = string.Empty,
+            HomeScore = isNextMatch ? -1 : (isHome ? 3 : 1),
+            AwayScore = isNextMatch ? -1 : (isHome ? 1 : 3),
+            OpponentTeamId = opponent.Id,
+            HomeStrength = isNextMatch ? -1 : (int)Math.Round(isHome ? mine.Strength : opponent.Strength, MidpointRounding.AwayFromZero),
+            AwayStrength = isNextMatch ? -1 : (int)Math.Round(isHome ? opponent.Strength : mine.Strength, MidpointRounding.AwayFromZero),
+            HasLineup = false,
+            HomeTrikot = null,
+            AwayTrikot = null,
+            IsFriendly = false
         };
     }
 }

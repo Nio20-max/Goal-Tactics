@@ -9,10 +9,12 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Training")]
 [Authorize]
 public sealed class TrainingController(ITrainingService trainingService) : ControllerBase
 {
     [HttpPost("GetTeamTraining")]
+    [HttpPost("GetTraining")]
     public async Task<ActionResult<TeamTrainingResponse>> GetTeamTraining([FromBody] RequestObject request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
@@ -25,80 +27,131 @@ public sealed class TrainingController(ITrainingService trainingService) : Contr
     }
 
     [HttpPost("SaveTeamTraining")]
-    public async Task<ActionResult<ResponseObject>> SaveTeamTraining([FromBody] TeamTrainingSaveRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<TeamTrainingData>> SaveTeamTraining([FromBody] TeamTrainingSaveRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+            return Unauthorized(new TeamTrainingData { Success = false, Message = "Invalid token context" });
         }
 
         await trainingService.SaveTeamTrainingAsync(userId, request, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Saved" });
+        var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
+        return Ok(response.TeamTraining ?? new TeamTrainingData { Success = true, Message = "Saved" });
     }
 
     [HttpPost("SaveTacticTraining")]
-    public async Task<ActionResult<ResponseObject>> SaveTacticTraining([FromBody] TacticTrainingSaveRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<TacticTrainingData>> SaveTacticTraining([FromBody] TacticTrainingSaveRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+            return Unauthorized(new TacticTrainingData { Success = false, Message = "Invalid token context" });
         }
 
         await trainingService.SaveTacticTrainingAsync(userId, request, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Saved" });
+        var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
+        return Ok(response.TacticTraining ?? new TacticTrainingData { Success = true, Message = "Saved" });
     }
 
     [HttpPost("BookTrainingCamp")]
-    public async Task<ActionResult<ResponseObject>> BookTrainingCamp([FromBody] TrainingCampRequest request, CancellationToken cancellationToken)
+    [HttpPost("BookCamp")]
+    public async Task<ActionResult<TrainingCampData>> BookTrainingCamp([FromBody] TrainingCampRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+            return Unauthorized(new TrainingCampData { Success = false, Message = "Invalid token context" });
         }
 
         await trainingService.BookCampAsync(userId, request, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Booked" });
+        var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
+        return Ok(response.TrainingCamp ?? new TrainingCampData { Success = true, Message = "Booked" });
+    }
+
+    [HttpPost("CancelCamp")]
+    public async Task<ActionResult<TrainingCampData>> CancelCamp([FromBody] RequestObject request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new TrainingCampData { Success = false, Message = "Invalid token context" });
+        }
+
+        await trainingService.CancelCampAsync(userId, cancellationToken);
+        var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
+        return Ok(response.TrainingCamp ?? new TrainingCampData { Success = true, Message = "Canceled" });
+    }
+
+    [HttpPost("UpdateCamps")]
+    public async Task<ActionResult<TrainingCampData>> UpdateCamps([FromBody] RequestObject request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new TrainingCampData { Success = false, Message = "Invalid token context" });
+        }
+
+        await trainingService.UpdateCampsAsync(userId, cancellationToken);
+        var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
+        return Ok(response.TrainingCamp ?? new TrainingCampData { Success = true, Message = "Updated" });
     }
 
     [HttpPost("SaveIndividualTraining")]
-    public async Task<ActionResult<ResponseObject>> SaveIndividualTraining([FromBody] IndividualTrainingRequest request, CancellationToken cancellationToken)
+    [HttpPost("StartIndividualTraining")]
+    public async Task<ActionResult<IndividualTrainingData>> SaveIndividualTraining([FromBody] IndividualTrainingRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+            return Unauthorized(new IndividualTrainingData { Success = false, Message = "Invalid token context" });
         }
 
         await trainingService.SaveIndividualTrainingAsync(userId, request, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Saved" });
+        var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
+        return Ok(response.IndividualTraining ?? new IndividualTrainingData { Success = true, Message = "Saved" });
+    }
+
+    [HttpPost("CancelIndividualTraining")]
+    public async Task<ActionResult<IndividualTrainingData>> CancelIndividualTraining([FromBody] IndividualTrainingRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new IndividualTrainingData { Success = false, Message = "Invalid token context" });
+        }
+
+        await trainingService.CancelIndividualTrainingAsync(userId, request.Id, cancellationToken);
+        var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
+        return Ok(response.IndividualTraining ?? new IndividualTrainingData { Success = true, Message = "Canceled" });
     }
 
     [HttpPost("RenewIndividualTraining")]
-    public async Task<ActionResult<ResponseObject>> RenewIndividualTraining([FromBody] IdRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<IndividualTrainingData>> RenewIndividualTraining([FromBody] IdRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+            return Unauthorized(new IndividualTrainingData { Success = false, Message = "Invalid token context" });
         }
 
         await trainingService.RenewIndividualTrainingAsync(userId, request.Id, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Renewed" });
+        var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
+        return Ok(response.IndividualTraining ?? new IndividualTrainingData { Success = true, Message = "Renewed" });
     }
 
     [HttpPost("RenewAllIndividualTraining")]
-    public async Task<ActionResult<ResponseObject>> RenewAllIndividualTraining([FromBody] RequestObject request, CancellationToken cancellationToken)
+    [HttpPost("RenewAllIndividualTrainings")]
+    public async Task<ActionResult<IndividualTrainingData>> RenewAllIndividualTraining([FromBody] RequestObject request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+            return Unauthorized(new IndividualTrainingData { Success = false, Message = "Invalid token context" });
         }
 
         await trainingService.RenewAllIndividualTrainingAsync(userId, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Renewed" });
+        var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
+        return Ok(response.IndividualTraining ?? new IndividualTrainingData { Success = true, Message = "Renewed" });
     }
 }

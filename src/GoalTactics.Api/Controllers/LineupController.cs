@@ -25,6 +25,7 @@ public sealed class LineupController(ILineupService lineupService) : ControllerB
     }
 
     [HttpPost("GetMatchLineup")]
+    [HttpPost("GetMatchFormation")]
     public async Task<ActionResult<MatchLineupResponse>> GetMatchLineup([FromBody] LineupRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();

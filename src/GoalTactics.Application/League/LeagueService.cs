@@ -43,9 +43,71 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
         };
     }
 
-    public Task<MatchesResponse> GetMatchesAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default)
-        => Task.FromResult(new MatchesResponse { Success = true });
+    public async Task<MatchesResponse> GetMatchesAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default)
+    {
+        var table = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
+        var teams = table.Teams.ToArray();
 
-    public Task<GoalGettersResponse> GetGoalGettersAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default)
-        => Task.FromResult(new GoalGettersResponse { Success = true });
+        return new MatchesResponse
+        {
+            Success = true,
+            HomeTrikot = "trikot0",
+            AwayTrikot = "trikot0",
+            Matches = teams
+                .Chunk(2)
+                .Where(pair => pair.Length == 2)
+                .Select((pair, index) => new MatchData
+                {
+                    Id = Guid.NewGuid(),
+                    Date = DateTime.UtcNow.Date.AddDays(index).AddHours(18).ToString("O"),
+                    HomeLogo = pair[0].Logo,
+                    AwayLogo = pair[1].Logo,
+                    HomeName = pair[0].Name,
+                    AwayName = pair[1].Name,
+                    MyTeam = pair[0].IsMine ? 1 : (pair[1].IsMine ? 2 : 0),
+                    HomeCountry = pair[0].Country,
+                    AwayCountry = pair[1].Country,
+                    HomeScore = pair[0].PointsHome >= pair[1].PointsHome ? 1 : 0,
+                    AwayScore = pair[1].PointsHome > pair[0].PointsHome ? 1 : 0,
+                    OpponentTeamId = pair[0].IsMine ? pair[1].Id : pair[0].Id,
+                    HomeStrength = (int)Math.Round(pair[0].Strength, MidpointRounding.AwayFromZero),
+                    AwayStrength = (int)Math.Round(pair[1].Strength, MidpointRounding.AwayFromZero),
+                    HasLineup = pair[0].IsMine || pair[1].IsMine,
+                    HomeTrikot = "trikot0",
+                    AwayTrikot = "trikot0",
+                    IsFriendly = false
+                })
+                .ToArray()
+        };
+    }
+
+    public async Task<GoalGettersResponse> GetGoalGettersAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default)
+    {
+        var table = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
+
+        return new GoalGettersResponse
+        {
+            Success = true,
+            Players = table.Teams
+                .OrderByDescending(team => team.GoalsScoredHome + team.GoalsScoredAway)
+                .Take(10)
+                .Select((team, index) => new GoalGetterPlayerData
+                {
+                    Id = Guid.NewGuid(),
+                    Name = $"{team.Name} Striker",
+                    Country = team.Country,
+                    Head = $"01_head-A{index % 15:00}",
+                    Strength = team.Strength,
+                    Talent = Math.Clamp(10 - (index / 2), 6, 10),
+                    Age = 18 + index,
+                    Position = 6,
+                    EndDate = DateTime.UtcNow.Date.AddDays(14).ToString("O"),
+                    TeamName = team.Name,
+                    TeamLogo = team.Logo,
+                    IsMine = team.IsMine,
+                    Goals = team.GoalsScoredHome + team.GoalsScoredAway
+                })
+                .ToArray()
+        };
+    }
 }

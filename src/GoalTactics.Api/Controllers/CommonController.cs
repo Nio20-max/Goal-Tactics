@@ -25,6 +25,12 @@ public sealed class CommonController(ICountryCatalog countryCatalog, IConfigurat
         return Ok(version);
     }
 
+    [HttpPost("GetCurrentAppVersion")]
+    public ActionResult<string> GetCurrentAppVersion([FromBody] RequestObject request)
+    {
+        return GetVersion();
+    }
+
     [HttpPost("GetCountries")]
     public ActionResult<CountriesResponse> GetCountries([FromBody] RequestObject request)
     {

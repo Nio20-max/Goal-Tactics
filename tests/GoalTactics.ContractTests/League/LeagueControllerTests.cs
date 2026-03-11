@@ -34,6 +34,33 @@ public sealed class LeagueControllerTests : IClassFixture<WebApplicationFactory<
         Assert.Equal(6, body.Dismount);
     }
 
+    [Fact]
+    public async Task Matches_And_GoalGetters_Return_NonEmpty_Compatibility_Data()
+    {
+        var token = await RegisterAndLoginAsync();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var leagueTableResponse = await client.PostAsJsonAsync("/api/GetLeagueTable", new IdRequest { Id = Guid.Empty });
+        var leagueTable = await leagueTableResponse.Content.ReadFromJsonAsync<LeagueTableResponse>();
+        Assert.NotNull(leagueTable);
+
+        var matchesResponse = await client.PostAsJsonAsync("/api/GetMatches", new IdRequest { Id = Guid.Empty });
+        Assert.Equal(HttpStatusCode.OK, matchesResponse.StatusCode);
+        var matchesBody = await matchesResponse.Content.ReadFromJsonAsync<MatchesResponse>();
+        Assert.NotNull(matchesBody);
+        Assert.True(matchesBody!.Success);
+        Assert.NotEmpty(matchesBody.Matches);
+        Assert.All(matchesBody.Matches, match => Assert.False(string.IsNullOrWhiteSpace(match.HomeLogo)));
+
+        var goalGettersResponse = await client.PostAsJsonAsync("/api/GetGoalGetters", new IdRequest { Id = Guid.Empty });
+        Assert.Equal(HttpStatusCode.OK, goalGettersResponse.StatusCode);
+        var goalGettersBody = await goalGettersResponse.Content.ReadFromJsonAsync<GoalGettersResponse>();
+        Assert.NotNull(goalGettersBody);
+        Assert.True(goalGettersBody!.Success);
+        Assert.NotEmpty(goalGettersBody.Players);
+        Assert.All(goalGettersBody.Players, player => Assert.False(string.IsNullOrWhiteSpace(player.TeamLogo)));
+    }
+
     private async Task<string> RegisterAndLoginAsync()
     {
         var email = $"league_{Guid.NewGuid():N}@example.com";

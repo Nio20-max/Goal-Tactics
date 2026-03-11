@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddSingleton<StadiumEconomyService>();
         services.AddSingleton<TrainingProgressService>();
         services.AddSingleton<TeamStrengthCalculator>();
+        services.AddSingleton<ContractCostService>();
         services.AddScoped<ITeamStore, TeamDbStore>();
         services.AddScoped<ITutorialStore, TutorialDbStore>();
         services.AddScoped<IUserStore, UserDbStore>();

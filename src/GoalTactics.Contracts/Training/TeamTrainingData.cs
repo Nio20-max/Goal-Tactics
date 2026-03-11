@@ -10,4 +10,5 @@ public sealed class TeamTrainingData : ResponseObject
     public string? EfficiencyText { get; init; }
     public int EfficiencyValue { get; init; }
     public bool NoTraining { get; init; }
+    public bool HasAlert { get; init; }
 }

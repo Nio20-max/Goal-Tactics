@@ -9,6 +9,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Team")]
 [Authorize]
 public sealed class TeamController(ITeamService teamService) : ControllerBase
 {

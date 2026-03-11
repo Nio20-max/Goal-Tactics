@@ -34,6 +34,10 @@ public interface ITeamStore
 
     Task<bool> BuildPlaceAsync(string userId, Guid placeId, CancellationToken cancellationToken = default);
 
+    Task<ConstructionRecord?> GetUnderConstructionAsync(string userId, CancellationToken cancellationToken = default);
+
+    Task<bool> SpeedupConstructionAsync(string userId, Guid constructionId, CancellationToken cancellationToken = default);
+
     Task RenewGrassAsync(string userId, CancellationToken cancellationToken = default);
 
     Task RenameStadiumAsync(string userId, string name, CancellationToken cancellationToken = default);
@@ -44,7 +48,11 @@ public interface ITeamStore
 
     Task<bool> BookCampAsync(string userId, string campType, CancellationToken cancellationToken = default);
 
+    Task CancelCampAsync(string userId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<SquadPlayerRecord>> GetSquadPlayersAsync(string userId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SquadPlayerRecord>> GetSquadPlayersForTeamAsync(Guid teamId, CancellationToken cancellationToken = default);
 
     Task<SquadPlayerRecord?> GetSquadPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
 
@@ -58,10 +66,12 @@ public interface ITeamStore
 
     Task<bool> UpdatePlayerShirtAsync(string userId, Guid playerId, int shirtNumber, CancellationToken cancellationToken = default);
 
+    Task<bool> TrySpendStarsAsync(string userId, decimal stars, CancellationToken cancellationToken = default);
+
     Task<Guid> GetLeagueIdForTeamAsync(string teamId, CancellationToken cancellationToken = default);
 }
 
-public sealed record TeamRecord(string TeamId, string UserId, string Name, string Country, string CountryName, string LeagueName, decimal MarketValue, int Mood, string TeamMood, int Wins, int Losses, int Fans, int Members, int Strength, string MatchTrend, string UserEmail, DateTime UserCreatedAtUtc, DateTime? UserLastActivityAtUtc);
+public sealed record TeamRecord(string TeamId, string UserId, string Name, string Country, string CountryName, string LeagueName, decimal MarketValue, int Mood, string TeamMood, int Wins, int Losses, int Fans, int Members, int Strength, string MatchTrend, string ManagerName, string UserEmail, DateTime UserCreatedAtUtc, DateTime? UserLastActivityAtUtc);
 
 public sealed record TeamResourcesRecord(decimal Money, decimal Medipacks, decimal GTStars);
 
@@ -90,7 +100,25 @@ public sealed record StadiumStateRecord(
 
 public sealed record BuildPlaceRecord(Guid Id, string BuildingType, int Level, bool CanBuild);
 
-public sealed record TeamTrainingStateRecord(int MainSkillIndex, int SubSkillIndex, string EfficiencyText, int EfficiencyValue, int TrainPrice);
+public sealed record ConstructionRecord(
+    Guid Id,
+    Guid PlaceId,
+    string BuildingType,
+    int CurrentValue,
+    int NewValue,
+    decimal UpgradeCost,
+    decimal UpgradeCostPremium,
+    DateTime BuildStartUtc,
+    DateTime BuildEndUtc);
+
+public sealed record TeamTrainingStateRecord(
+    int MainSkillIndex,
+    int SubSkillIndex,
+    string EfficiencyText,
+    int EfficiencyValue,
+    int TrainPrice,
+    string CampType,
+    DateTime? CampActiveUntilUtc);
 
 public sealed record SquadPlayerRecord(
     Guid Id,

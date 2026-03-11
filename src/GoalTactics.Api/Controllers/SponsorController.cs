@@ -9,6 +9,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Sponsor")]
 [Authorize]
 public sealed class SponsorController(ISponsorService sponsorService) : ControllerBase
 {

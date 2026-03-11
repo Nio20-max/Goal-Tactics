@@ -41,4 +41,10 @@ public class TeamData
     public string? MatchTrend { get; init; }
 
     public UserData? UserData { get; init; }
+
+    public bool MyLike { get; init; }
+
+    public bool LikesMe { get; init; }
+
+    public int ChallengeStatus { get; init; }
 }

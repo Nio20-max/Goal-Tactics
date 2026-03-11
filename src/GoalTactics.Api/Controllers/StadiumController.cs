@@ -9,6 +9,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Stadium")]
 [Authorize]
 public sealed class StadiumController(IStadiumService stadiumService) : ControllerBase
 {
@@ -37,14 +38,17 @@ public sealed class StadiumController(IStadiumService stadiumService) : Controll
     }
 
     [HttpPost("BuildStadium")]
+    [HttpPost("Build")]
     public Task<ActionResult<ResponseObject>> BuildStadium([FromBody] IdRequest request, CancellationToken cancellationToken) =>
         ExecuteMutation(request.Id, cancellationToken, stadiumService.BuildAsync, "Build started");
 
     [HttpPost("SpeedupBuilding")]
+    [HttpPost("Speedup")]
     public Task<ActionResult<ResponseObject>> SpeedupBuilding([FromBody] IdRequest request, CancellationToken cancellationToken) =>
         ExecuteMutation(request.Id, cancellationToken, stadiumService.SpeedupAsync, "Build sped up");
 
     [HttpPost("RenewStadiumGrass")]
+    [HttpPost("RenewGrass")]
     public async Task<ActionResult<ResponseObject>> RenewStadiumGrass([FromBody] RequestObject request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();

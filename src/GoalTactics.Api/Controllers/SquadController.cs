@@ -1,4 +1,5 @@
 using GoalTactics.Api.Extensions;
+using GoalTactics.Application.Common;
 using GoalTactics.Application.Squad;
 using GoalTactics.Contracts.Common;
 using GoalTactics.Contracts.Squad;
@@ -9,10 +10,12 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Squad")]
 [Authorize]
-public sealed class SquadController(ISquadService squadService) : ControllerBase
+public sealed class SquadController(ISquadService squadService, ICountryCatalog countryCatalog) : ControllerBase
 {
     [HttpPost("GetSquad")]
+    [HttpPost("GetPlayers")]
     public async Task<ActionResult<SquadResponse>> GetSquad([FromBody] RequestObject request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
@@ -36,34 +39,62 @@ public sealed class SquadController(ISquadService squadService) : ControllerBase
         return Ok(await squadService.GetPlayerStatisticsAsync(userId, request.Id, cancellationToken));
     }
 
+    [HttpPost("GetTeamPlayers")]
+    public async Task<ActionResult<TeamPlayersResponse>> GetTeamPlayers([FromBody] IdRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new TeamPlayersResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        return Ok(await squadService.GetTeamPlayersAsync(userId, request.Id, cancellationToken));
+    }
+
+    [HttpPost("GetTrainingProgress")]
+    public async Task<ActionResult<TrainingProgressResponse>> GetTrainingProgress([FromBody] IdRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new TrainingProgressResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        return Ok(await squadService.GetTrainingProgressAsync(userId, request.Id, cancellationToken));
+    }
+
+    [HttpPost("RenamePlayer")]
     [HttpPost("ChangePlayerName")]
-    public async Task<ActionResult<ResponseObject>> ChangePlayerName([FromBody] PlayerTextChangeRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<TextResponse>> ChangePlayerName([FromBody] RenameRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+            return Unauthorized(new TextResponse { Success = false, Message = "Invalid token context" });
         }
 
-        await squadService.ChangePlayerNameAsync(userId, request.Id, request.Value, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Updated" });
+        await squadService.ChangePlayerNameAsync(userId, request.Id, request.Name, cancellationToken);
+        return Ok(new TextResponse { Success = true, Text = request.Name?.Trim() ?? string.Empty });
     }
 
+    [HttpPost("ChangeOrigin")]
     [HttpPost("ChangePlayerOrigin")]
-    public async Task<ActionResult<ResponseObject>> ChangePlayerOrigin([FromBody] PlayerTextChangeRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<TextResponse>> ChangePlayerOrigin([FromBody] OriginRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+            return Unauthorized(new TextResponse { Success = false, Message = "Invalid token context" });
         }
 
-        await squadService.ChangePlayerOriginAsync(userId, request.Id, request.Value, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Updated" });
+        var origin = countryCatalog.GetCountries().FirstOrDefault(x => x.Id == request.CountryId)?.IsoCode ?? "DE";
+        await squadService.ChangePlayerOriginAsync(userId, request.Id, origin, cancellationToken);
+        return Ok(new TextResponse { Success = true, Text = origin });
     }
 
+    [HttpPost("ChangeShirt")]
     [HttpPost("ChangePlayerShirt")]
-    public async Task<ActionResult<ResponseObject>> ChangePlayerShirt([FromBody] PlayerShirtRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ResponseObject>> ChangePlayerShirt([FromBody] NumberRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
@@ -71,7 +102,7 @@ public sealed class SquadController(ISquadService squadService) : ControllerBase
             return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
         }
 
-        await squadService.ChangePlayerShirtAsync(userId, request.Id, request.ShirtNumber, cancellationToken);
+        await squadService.ChangePlayerShirtAsync(userId, request.Id, request.Number, cancellationToken);
         return Ok(new ResponseObject { Success = true, Message = "Updated" });
     }
 
@@ -84,8 +115,30 @@ public sealed class SquadController(ISquadService squadService) : ControllerBase
         ExecuteMutation(request.Id, cancellationToken, squadService.FirePlayerAsync, "Player fired");
 
     [HttpPost("ExtendPlayerContract")]
-    public Task<ActionResult<ResponseObject>> ExtendPlayerContract([FromBody] IdRequest request, CancellationToken cancellationToken) =>
-        ExecuteMutation(request.Id, cancellationToken, squadService.ExtendContractAsync, "Contract extended");
+    public async Task<ActionResult<PlayerContractResponse>> ExtendPlayerContract([FromBody] PlayerContractRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new PlayerContractResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        var playerId = request.PlayerID != Guid.Empty ? request.PlayerID : request.Id;
+        return Ok(await squadService.ExtendContractAsync(userId, playerId, request.Salary, request.PremiumRenewal, cancellationToken));
+    }
+
+    [HttpPost("GetPlayerContractCost")]
+    public async Task<ActionResult<PlayerContractResponse>> GetPlayerContractCost([FromBody] PlayerContractRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new PlayerContractResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        var playerId = request.PlayerID != Guid.Empty ? request.PlayerID : request.Id;
+        return Ok(await squadService.GetPlayerContractCostAsync(userId, playerId, request.Salary, cancellationToken));
+    }
 
     [HttpPost("UpgradePlayer")]
     public Task<ActionResult<ResponseObject>> UpgradePlayer([FromBody] IdRequest request, CancellationToken cancellationToken) =>

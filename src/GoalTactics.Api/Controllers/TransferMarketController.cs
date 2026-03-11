@@ -10,10 +10,12 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Transfermarket")]
 [Authorize]
 public sealed class TransferMarketController(ITransferMarketService transferMarketService) : ControllerBase
 {
     [HttpPost("SearchTransfermarket")]
+    [HttpPost("Search")]
     public async Task<ActionResult<TransferSearchResponse>> SearchTransfermarket([FromBody] TransferSearchRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
@@ -38,6 +40,7 @@ public sealed class TransferMarketController(ITransferMarketService transferMark
     }
 
     [HttpPost("BidPlayer")]
+    [HttpPost("PlaceBid")]
     [EnableRateLimiting("mutation-write")]
     public async Task<ActionResult<ResponseObject>> BidPlayer([FromBody] BidRequest request, CancellationToken cancellationToken)
     {

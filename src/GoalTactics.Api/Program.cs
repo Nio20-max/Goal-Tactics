@@ -138,7 +138,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: key,
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 20,
+                PermitLimit = 200,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 AutoReplenishment = true
@@ -206,6 +206,23 @@ if (app.Environment.IsDevelopment())
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<GoalTacticsDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+    var resetDatabaseOnStartup = app.Configuration.GetValue<bool>("Maintenance:ResetDatabaseOnStartup");
+    var resetDatabaseConfirmation = app.Configuration["Maintenance:ResetDatabaseConfirmation"];
+
+    // Guard destructive resets behind an explicit confirmation string so the wipe is always intentional.
+    if (resetDatabaseOnStartup)
+    {
+        if (!string.Equals(resetDatabaseConfirmation, "RESET_GOALTACTICS_DB", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Maintenance:ResetDatabaseOnStartup requires Maintenance:ResetDatabaseConfirmation=RESET_GOALTACTICS_DB.");
+        }
+
+        logger.LogWarning("Maintenance reset requested. Deleting GoalTactics database before applying migrations.");
+        dbContext.Database.EnsureDeleted();
+    }
+
     dbContext.Database.Migrate();
 }
 

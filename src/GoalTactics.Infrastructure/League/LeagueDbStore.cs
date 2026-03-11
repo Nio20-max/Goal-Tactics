@@ -1,4 +1,5 @@
 using GoalTactics.Application.League;
+using GoalTactics.Application.Common;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -127,7 +128,7 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
         botSlot.IsOnline = true;
         botSlot.Strength = team.Strength;
         botSlot.Country = team.Country;
-        botSlot.Logo = "logo_default";
+        botSlot.Logo = LegacyAppCompatibility.BuildLogoId(team.Id);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -218,7 +219,7 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
                 IsBot = true,
                 Strength = random.Next(40, 85),
                 Country = "DE",
-                Logo = "logo_bot",
+                Logo = LegacyAppCompatibility.BuildLogoId($"bot-{tier}-{groupNumber}-{i}"),
                 IsOnline = false,
                 MatchesHome = 15,
                 MatchesAway = 15,

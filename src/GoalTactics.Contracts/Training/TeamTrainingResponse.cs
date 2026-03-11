@@ -26,15 +26,16 @@ public sealed class TacticBonus
 
 public sealed class TacticBonusTactic
 {
-    public Guid ID { get; init; }
+    public Guid Id { get; init; }
     public string? Name { get; init; }
     public int Value { get; init; }
 }
 
 public sealed class CounterTactic
 {
-    public Guid ID { get; init; }
-    public string? Name { get; init; }
+    public Guid TacticId { get; init; }
+    public decimal Bonus { get; init; }
+    public int MaxBonus { get; init; }
 }
 
 public sealed class TrainingCampData : ResponseObject

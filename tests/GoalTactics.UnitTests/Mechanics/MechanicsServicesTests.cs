@@ -9,7 +9,7 @@ public sealed class MechanicsServicesTests
     {
         var calculator = new TeamStrengthCalculator();
         var value = calculator.Calculate(baseStrength: 50, tacticBonus: 5, fitnessAverage: 80);
-        Assert.True(value > 0);
+        Assert.Equal(55, value);
     }
 
     [Fact]

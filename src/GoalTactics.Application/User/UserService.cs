@@ -1,5 +1,6 @@
 using GoalTactics.Application.Abstractions;
 using GoalTactics.Contracts.User;
+using GoalTactics.Application.Common;
 
 namespace GoalTactics.Application.User;
 
@@ -68,8 +69,8 @@ public sealed class UserService(IUserStore userStore, IPasswordHasher passwordHa
                     Email = profile.Email,
                     Created = profile.CreatedAtUtc.ToString("O"),
                     LastActivity = profile.LastActivityAtUtc?.ToString("O"),
-                    Score = 0,
-                    Rank = "Rookie"
+                    Score = LegacyAppCompatibility.EstimateUserScore(50, 0, 100, 100),
+                    Rank = LegacyAppCompatibility.EstimateRank(LegacyAppCompatibility.EstimateUserScore(50, 0, 100, 100))
                 }
         };
     }

@@ -42,6 +42,26 @@ public sealed class TeamResourcesEntity
 
     public DateTime? LastTrainingTickUtc { get; set; }
 
+    public DateTime? LastSponsorPayoutUtc { get; set; }
+
+    public string? ActiveConstructionId { get; set; }
+
+    public string? ActiveConstructionPlaceId { get; set; }
+
+    public string? ActiveConstructionType { get; set; }
+
+    public int ActiveConstructionCurrentValue { get; set; }
+
+    public int ActiveConstructionNewValue { get; set; }
+
+    public decimal ActiveConstructionUpgradeCost { get; set; }
+
+    public decimal ActiveConstructionUpgradeCostPremium { get; set; }
+
+    public DateTime? ActiveConstructionStartUtc { get; set; }
+
+    public DateTime? ActiveConstructionEndUtc { get; set; }
+
     public int ProgressDayCounter { get; set; }
 
     public TeamEntity? Team { get; set; }

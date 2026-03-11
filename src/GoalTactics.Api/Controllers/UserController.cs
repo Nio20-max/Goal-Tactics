@@ -10,6 +10,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/User")]
 [Authorize]
 public sealed class UserController(IUserService userService) : ControllerBase
 {
