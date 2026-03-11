@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,6 +20,10 @@ class LineupFragment : Fragment() {
 
     private var lineups: List<LineupSummaryData> = emptyList()
     private var currentMatchId: java.util.UUID? = null
+    private var allPlayers: List<MatchLineupPlayerData> = emptyList()
+    private var startingIds = mutableSetOf<java.util.UUID>()
+    private var selectedSystem: String? = null
+    private var selectedTactic: String? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         return inflater.inflate(R.layout.fragment_lineup, container, false)
@@ -26,6 +31,8 @@ class LineupFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        view.findViewById<Button>(R.id.btnSave)?.setOnClickListener { saveLineup() }
         loadLineups()
     }
 
@@ -55,7 +62,7 @@ class LineupFragment : Fragment() {
 
     private fun setupMatchSelector() {
         val spinner = view?.findViewById<Spinner>(R.id.spinnerMatch) ?: return
-        val names = lineups.map { it.opponent ?: "Match" }
+        val names = lineups.map { (it.opponent ?: "Match") + if (it.isLocked) " (locked)" else "" }
         spinner.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, names)
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, v: View?, position: Int, id: Long) {
@@ -67,47 +74,49 @@ class LineupFragment : Fragment() {
     }
 
     private fun loadLineupForMatch(matchId: java.util.UUID) {
-
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = ApiClient.get().getMatchLineup(LineupRequest(matchId))
                 if (response.isSuccessful) {
                     response.body()?.let { data ->
+                        allPlayers = data.players
+                        startingIds = data.players.filter { it.isStarting }.map { it.playerId }.toMutableSet()
+
                         val locked = view?.findViewById<TextView>(R.id.textLocked)
                         locked?.visibility = if (data.isLocked) View.VISIBLE else View.GONE
 
-                        // Setup system spinner
+                        // System spinner
                         val systemSpinner = view?.findViewById<Spinner>(R.id.spinnerSystem)
-                        systemSpinner?.adapter = ArrayAdapter(
-                            requireContext(),
-                            android.R.layout.simple_spinner_dropdown_item,
-                            data.systems
-                        )
-
-                        // Setup tactic spinner
-                        val tacticSpinner = view?.findViewById<Spinner>(R.id.spinnerTactic)
-                        tacticSpinner?.adapter = ArrayAdapter(
-                            requireContext(),
-                            android.R.layout.simple_spinner_dropdown_item,
-                            data.tactics
-                        )
-
-                        // Show players
-                        val recycler = view?.findViewById<RecyclerView>(R.id.recyclerLineupPlayers)
-                        recycler?.layoutManager = LinearLayoutManager(context)
-                        recycler?.adapter = LineupPlayerAdapter(data.players)
-
-                        // Save button
-                        val btnSave = view?.findViewById<Button>(R.id.btnSave)
-                        btnSave?.isEnabled = !data.isLocked
-                        btnSave?.setOnClickListener {
-                            saveLineup(
-                                matchId,
-                                data.players.filter { it.isStarting }.map { it.playerId },
-                                systemSpinner?.selectedItem?.toString(),
-                                tacticSpinner?.selectedItem?.toString()
+                        if (data.systems.isNotEmpty()) {
+                            systemSpinner?.adapter = ArrayAdapter(
+                                requireContext(), android.R.layout.simple_spinner_dropdown_item, data.systems
                             )
+                            systemSpinner?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                                override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                                    selectedSystem = data.systems[pos]
+                                }
+                                override fun onNothingSelected(p: AdapterView<*>?) {}
+                            }
                         }
+
+                        // Tactic spinner
+                        val tacticSpinner = view?.findViewById<Spinner>(R.id.spinnerTactic)
+                        if (data.tactics.isNotEmpty()) {
+                            tacticSpinner?.adapter = ArrayAdapter(
+                                requireContext(), android.R.layout.simple_spinner_dropdown_item, data.tactics
+                            )
+                            tacticSpinner?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                                override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                                    selectedTactic = data.tactics[pos]
+                                }
+                                override fun onNothingSelected(p: AdapterView<*>?) {}
+                            }
+                        }
+
+                        updateStrengthDisplay()
+                        refreshPlayerList(data.isLocked)
+
+                        view?.findViewById<Button>(R.id.btnSave)?.isEnabled = !data.isLocked
                     }
                 }
             } catch (_: Exception) {
@@ -115,16 +124,49 @@ class LineupFragment : Fragment() {
         }
     }
 
-    private fun saveLineup(matchId: java.util.UUID, playerIds: List<java.util.UUID>, system: String?, tactic: String?) {
+    private fun refreshPlayerList(isLocked: Boolean) {
+        val recycler = view?.findViewById<RecyclerView>(R.id.recyclerLineupPlayers) ?: return
+        recycler.layoutManager = LinearLayoutManager(context)
+        recycler.adapter = LineupPlayerAdapter(allPlayers, startingIds, isLocked) { player ->
+            if (player.isStarting || startingIds.contains(player.playerId)) {
+                startingIds.remove(player.playerId)
+            } else {
+                if (startingIds.size < 11) {
+                    startingIds.add(player.playerId)
+                } else {
+                    Toast.makeText(context, "Max 11 starting players", Toast.LENGTH_SHORT).show()
+                    return@LineupPlayerAdapter
+                }
+            }
+            updateStrengthDisplay()
+            refreshPlayerList(isLocked)
+        }
+    }
+
+    private fun updateStrengthDisplay() {
+        val strengthText = view?.findViewById<TextView>(R.id.textStrength) ?: return
+        val startingCount = startingIds.size
+        strengthText.text = "Starting: $startingCount / 11"
+    }
+
+    private fun saveLineup() {
+        val matchId = currentMatchId ?: return
         val main = requireActivity() as MainActivity
+
+        if (startingIds.size != 11) {
+            Toast.makeText(context, "Select exactly 11 starting players", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 main.showLoading(true)
-                val request = SaveLineupRequest(matchId, playerIds, system, tactic)
+                val request = SaveLineupRequest(matchId, startingIds.toList(), selectedSystem, selectedTactic)
                 val response = ApiClient.get().saveLineup(request)
                 if (response.isSuccessful) {
                     Toast.makeText(context, "Lineup saved", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, response.body()?.message ?: "Failed to save", Toast.LENGTH_SHORT).show()
                 }
             } catch (_: Exception) {
             } finally {
@@ -133,8 +175,12 @@ class LineupFragment : Fragment() {
         }
     }
 
-    private class LineupPlayerAdapter(private val players: List<MatchLineupPlayerData>) :
-        RecyclerView.Adapter<LineupPlayerAdapter.ViewHolder>() {
+    private class LineupPlayerAdapter(
+        private val players: List<MatchLineupPlayerData>,
+        private val startingIds: Set<java.util.UUID>,
+        private val isLocked: Boolean,
+        private val onToggle: (MatchLineupPlayerData) -> Unit
+    ) : RecyclerView.Adapter<LineupPlayerAdapter.ViewHolder>() {
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val name: TextView = view.findViewById(R.id.textPlayerName)
@@ -151,10 +197,20 @@ class LineupFragment : Fragment() {
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val player = players[position]
+            val isStarting = startingIds.contains(player.playerId)
             holder.name.text = player.name
             holder.position.text = player.position
-            holder.strength.text = if (player.isStarting) "★" else ""
-            holder.value.text = if (player.isStarting) "Starting" else "Bench"
+            holder.strength.text = if (isStarting) "★" else ""
+            holder.value.text = if (isStarting) "Starting" else "Bench"
+
+            val bg = if (isStarting) R.color.gt_row_selected else {
+                if (position % 2 == 0) R.color.gt_row_even else R.color.gt_row_odd
+            }
+            holder.itemView.setBackgroundResource(bg)
+
+            if (!isLocked) {
+                holder.itemView.setOnClickListener { onToggle(player) }
+            }
         }
 
         override fun getItemCount() = players.size

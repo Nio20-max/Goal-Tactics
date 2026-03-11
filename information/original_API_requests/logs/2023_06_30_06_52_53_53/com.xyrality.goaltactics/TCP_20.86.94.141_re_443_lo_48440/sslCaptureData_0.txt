@@ -1,0 +1,31 @@
+
+
+Request Head:
+
+GET /client/?hub=transfermarkethub&asrs.op=%2Fauc&negotiateVersion=1&asrs_request_id=5PdncPMAAAA%3D&id=ZXIp8Ll9YI440k_9vbKCFgh4Y5pAd02 HTTP/1.1
+Host: gtsignalr.service.signalr.net:443
+Connection: Upgrade
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Key: HJxltNkSakSRN0UAERnmDQ==
+User-Agent: Microsoft SignalR/7.0 (7.0.0+bb01bbf4433e27289b99001b7de6a582879d1835; Linux; .NET; Mono 6.12.0 (2020-02/dffa5ab9224))
+X-Requested-With: XMLHttpRequest
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjIzNjE5NjA5NSJ9.eyJuYmYiOjE2ODgxMDA3NzcsImV4cCI6MTY4ODEwNDM3NywiaWF0IjoxNjg4MTAwNzc3LCJhdWQiOiJodHRwczovL2d0c2lnbmFsci5zZXJ2aWNlLnNpZ25hbHIubmV0L2NsaWVudC8_aHViPXRyYW5zZmVybWFya2V0aHViIn0.ezYf6WZuyJjy2gkZGsVpWQZoA6SSiheYEX_YS5RAPMI
+
+
+Body:
+
+
+
+Response Head:
+
+HTTP/1.1 101 Switching Protocols
+Date: Fri, 30 Jun 2023 04:52:57 GMT
+Connection: upgrade
+upgrade: websocket
+sec-websocket-accept: VzZvWmF7BbhM8Gn63T9gZ4S/zOs=
+Strict-Transport-Security: max-age=15724800; includeSubDomains
+
+
+Body:
+

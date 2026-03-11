@@ -15,13 +15,14 @@ import com.goaltactics.app.data.model.IdRequest
 import com.goaltactics.app.data.model.ScoutInstructionRequest
 import com.goaltactics.app.ui.adapters.ScoutedPlayerAdapter
 import com.goaltactics.app.ui.shell.MainActivity
+import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.launch
 
 class ScoutingFragment : Fragment() {
 
     private val adapter = ScoutedPlayerAdapter { player -> recruitPlayer(player) }
-    private val scoutTypes = listOf("Normal", "Intensive", "World Class")
     private val positions = listOf("Any", "GK", "DEF", "MID", "ATT")
+    private val panels = mutableListOf<View>()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         return inflater.inflate(R.layout.fragment_scouting, container, false)
@@ -30,37 +31,52 @@ class ScoutingFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val spinnerType = view.findViewById<Spinner>(R.id.spinnerScoutType)
-        spinnerType.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, scoutTypes)
+        // Setup tabs
+        val tabLayout = view.findViewById<TabLayout>(R.id.tabLayout)
+        tabLayout.addTab(tabLayout.newTab().setText("Instruct scout"))
+        tabLayout.addTab(tabLayout.newTab().setText("Youth player"))
 
-        val spinnerPosition = view.findViewById<Spinner>(R.id.spinnerPositionFilter)
+        panels.add(view.findViewById(R.id.panelInstructScout))
+        panels.add(view.findViewById(R.id.panelYouthPlayer))
+
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                panels.forEachIndexed { i, p -> p.visibility = if (i == tab.position) View.VISIBLE else View.GONE }
+                if (tab.position == 1) loadScoutedPlayers()
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) {}
+        })
+
+        // Position spinner for special scout
+        val spinnerPosition = view.findViewById<Spinner>(R.id.spinnerPosition)
         spinnerPosition.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, positions)
 
-        val recycler = view.findViewById<RecyclerView>(R.id.recyclerScouted)
+        // Youth player recycler
+        val recycler = view.findViewById<RecyclerView>(R.id.recyclerYouthPlayers)
         recycler.layoutManager = LinearLayoutManager(context)
         recycler.adapter = adapter
 
-        view.findViewById<Button>(R.id.btnInstruct).setOnClickListener {
-            startScouting(
-                scoutTypes[spinnerType.selectedItemPosition],
-                positions[spinnerPosition.selectedItemPosition]
-            )
+        // Scout buttons
+        view.findViewById<Button>(R.id.btnInstructNormal).setOnClickListener {
+            startScouting("Normal", "Any")
         }
-
-        loadScoutedPlayers()
+        view.findViewById<Button>(R.id.btnInstructSpecial).setOnClickListener {
+            startScouting("Intensive", positions[spinnerPosition.selectedItemPosition])
+        }
+        view.findViewById<Button>(R.id.btnSpeedUp)?.setOnClickListener {
+            Toast.makeText(context, "Speed up requires GT Stars", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun loadScoutedPlayers() {
         val main = requireActivity() as MainActivity
         main.showLoading(true)
-
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = ApiClient.get().getScoutedPlayers()
                 if (response.isSuccessful) {
-                    response.body()?.let { data ->
-                        adapter.submitList(data.players)
-                    }
+                    response.body()?.let { data -> adapter.submitList(data.players) }
                 }
             } catch (_: Exception) {
             } finally {
@@ -72,7 +88,6 @@ class ScoutingFragment : Fragment() {
     private fun startScouting(scoutType: String, position: String) {
         val main = requireActivity() as MainActivity
         main.showLoading(true)
-
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val request = ScoutInstructionRequest(

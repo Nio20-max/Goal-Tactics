@@ -1,0 +1,37 @@
+
+
+Request Head:
+
+POST //auc/negotiate?negotiateVersion=1 HTTP/1.1
+User-Agent: Microsoft SignalR/7.0 (7.0.0+bb01bbf4433e27289b99001b7de6a582879d1835; Linux; .NET; Mono 6.12.0 (2020-02/dffa5ab9224))
+X-Requested-With: XMLHttpRequest
+Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d; ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d
+Content-Length: 0
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Length: 481
+Content-Type: application/json
+Date: Fri, 30 Jun 2023 04:52:57 GMT
+Server: Microsoft-IIS/10.0
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+{
+	"negotiateVersion":0,
+	"url":"https://gtsignalr.service.signalr.net/client/?hub=transfermarkethub&asrs.op=%2Fauc&negotiateVersion=1&asrs_request_id=5PdncPMAAAA%3D",
+	"accessToken":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjIzNjE5NjA5NSJ9.eyJuYmYiOjE2ODgxMDA3NzcsImV4cCI6MTY4ODEwNDM3NywiaWF0IjoxNjg4MTAwNzc3LCJhdWQiOiJodHRwczovL2d0c2lnbmFsci5zZXJ2aWNlLnNpZ25hbHIubmV0L2NsaWVudC8_aHViPXRyYW5zZmVybWFya2V0aHViIn0.ezYf6WZuyJjy2gkZGsVpWQZoA6SSiheYEX_YS5RAPMI",
+	"availableTransports":[
+		
+	]
+}

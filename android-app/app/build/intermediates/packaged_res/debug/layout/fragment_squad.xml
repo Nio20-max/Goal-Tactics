@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Squad screen: split table/detail view like legacy squad.xml -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal">
+
+    <!-- Left: Player list table -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="10"
+        android:orientation="vertical">
+
+        <!-- Table header -->
+        <LinearLayout
+            style="@style/GT.Row.Header"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="4"
+                android:text="@string/squad_name"
+                android:textColor="@color/gt_text_primary"
+                android:textSize="@dimen/gt_text_sm"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2"
+                android:text="@string/squad_position"
+                android:gravity="center"
+                android:textColor="@color/gt_text_primary"
+                android:textSize="@dimen/gt_text_sm"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/squad_strength"
+                android:gravity="center"
+                android:textColor="@color/gt_text_primary"
+                android:textSize="@dimen/gt_text_sm"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/squad_fitness"
+                android:gravity="center"
+                android:textColor="@color/gt_text_primary"
+                android:textSize="@dimen/gt_text_sm"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerPlayers"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+
+    <!-- Right: Player detail tabs -->
+    <FrameLayout
+        android:id="@+id/playerDetailContainer"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="25"
+        android:padding="@dimen/gt_spacing_md" />
+</LinearLayout>

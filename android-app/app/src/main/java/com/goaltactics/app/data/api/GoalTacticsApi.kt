@@ -239,6 +239,9 @@ interface GoalTacticsApi {
     @POST("GetTransfermarketFavourites")
     suspend fun getTransfermarketFavourites(@Body request: RequestObject = RequestObject()): Response<TransferSearchResponse>
 
+    @POST("GetMyTransfermarketAuctions")
+    suspend fun getMyTransfermarketAuctions(@Body request: RequestObject = RequestObject()): Response<TransferSearchResponse>
+
     // ── Shop ────────────────────────────────────────────────
 
     @POST("GetProducts")

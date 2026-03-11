@@ -1,0 +1,76 @@
+
+
+Request Head:
+
+POST /api/Team/GetMyTeamInfo HTTP/1.1
+x-goaltactics-version: 1.2.4
+x-goaltactics-capabilities: youthlist,htmligm,friendlist,indtrainings
+Transfer-Encoding: chunked
+Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d; ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d
+Content-Type: application/json; charset=utf-8
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+{
+	"Signature":"b0543cdc4f0fb6c1647717967d3576a8",
+	"Token":"935fcac4-4bed-4711-a517-e60ac98767fb",
+	"Locale":"de-DE",
+	"UtcOffset":"01:00:00",
+	"Culture":"de-DE",
+	"Platform":1
+}
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 30 Jun 2023 04:47:49 GMT
+Server: Microsoft-IIS/10.0
+Transfer-Encoding: chunked
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+{
+	"teamData":{
+		"name":"Hamburger SV",
+		"logo":"wappen104",
+		"country":"de",
+		"countryName":"Deutschland",
+		"leagueName":"5. 2. Liga",
+		"leagueId":"85c36678-c0b1-4b13-a092-9132b6d68ea5",
+		"homeTrikot":"trikot0",
+		"awayTrikot":"trikot0",
+		"marketValue":151450283,
+		"strength":3582,
+		"mood":160,
+		"teamMood":"Paradiesisch",
+		"wins":102,
+		"losses":28,
+		"fans":2422,
+		"members":1757,
+		"matchTrend":"00000",
+		"userData":{
+			"name":"Nikolai",
+			"score":8943,
+			"created":"2023-02-05T06:43:10.0130000",
+			"lastActivity":"2023-06-30T04:47:12.3270000",
+			"facebookId":"116052144733377",
+			"appleId":null,
+			"email":"nikolailinsch@posteo.de",
+			"password":null,
+			"rank":"Master!"
+		},
+		"myLike":false,
+		"likesMe":false,
+		"challengeStatus":0
+	},
+	"errorMessage":null,
+	"status":1,
+	"message":null,
+	"punishment":0
+}

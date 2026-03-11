@@ -198,6 +198,7 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
 
     private static void SpendMoney(BotClubProfile bot, decimal amount)
     {
+        if (bot.Money < amount) return;
         bot.Money -= amount;
         bot.MoneyOutSeason += amount;
     }
@@ -210,6 +211,7 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
 
     private static void SpendStars(BotClubProfile bot, decimal amount)
     {
+        if (bot.Stars < amount) return;
         bot.Stars -= amount;
         bot.StarsOutSeason += amount;
     }

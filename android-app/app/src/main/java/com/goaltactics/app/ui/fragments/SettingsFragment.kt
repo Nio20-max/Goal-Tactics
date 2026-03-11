@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -15,9 +16,12 @@ import com.goaltactics.app.data.model.NotificationSettings
 import com.goaltactics.app.data.model.PreferencesRequest
 import com.goaltactics.app.data.model.RequestObject
 import com.goaltactics.app.ui.shell.MainActivity
+import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.launch
 
 class SettingsFragment : Fragment() {
+
+    private val panels = mutableListOf<View>()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         return inflater.inflate(R.layout.fragment_settings, container, false)
@@ -26,7 +30,24 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        view.findViewById<Button>(R.id.btnSavePrefs).setOnClickListener { saveSettings() }
+        // Setup tabs
+        val tabLayout = view.findViewById<TabLayout>(R.id.tabLayout)
+        tabLayout.addTab(tabLayout.newTab().setText("Settings"))
+        tabLayout.addTab(tabLayout.newTab().setText("Notifications"))
+
+        panels.add(view.findViewById(R.id.panelSettings))
+        panels.add(view.findViewById(R.id.panelNotifications))
+
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                panels.forEachIndexed { i, p -> p.visibility = if (i == tab.position) View.VISIBLE else View.GONE }
+                if (tab.position == 1) loadSettings()
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) {}
+        })
+
+        // Settings tab buttons
         view.findViewById<Button>(R.id.btnDailyReward)?.setOnClickListener { claimDailyReward() }
         view.findViewById<Button>(R.id.btnLogout).setOnClickListener {
             (requireActivity() as MainActivity).logout()
@@ -39,6 +60,18 @@ class SettingsFragment : Fragment() {
                 .setNegativeButton("Cancel", null)
                 .show()
         }
+        view.findViewById<Button>(R.id.btnFacebook)?.setOnClickListener {
+            Toast.makeText(context, "Facebook connect is not available", Toast.LENGTH_SHORT).show()
+        }
+
+        // Version text
+        try {
+            val versionName = requireContext().packageManager.getPackageInfo(requireContext().packageName, 0).versionName
+            view.findViewById<TextView>(R.id.textVersion)?.text = "Version $versionName"
+        } catch (_: Exception) {}
+
+        // Notifications tab
+        view.findViewById<Button>(R.id.btnSavePrefs).setOnClickListener { saveSettings() }
 
         loadSettings()
     }

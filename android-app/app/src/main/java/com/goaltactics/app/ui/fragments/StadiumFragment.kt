@@ -1,5 +1,6 @@
 package com.goaltactics.app.ui.fragments
 
+import android.app.AlertDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -14,8 +15,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.goaltactics.app.data.api.ApiClient
 import com.goaltactics.app.R
+import com.goaltactics.app.data.model.BuildPlaceData
 import com.goaltactics.app.data.model.IdRequest
-import com.goaltactics.app.data.model.RequestObject
 import com.goaltactics.app.data.model.TextRequest
 import com.goaltactics.app.ui.adapters.BuildPlaceAdapter
 import com.goaltactics.app.ui.shell.MainActivity
@@ -23,9 +24,7 @@ import kotlinx.coroutines.launch
 
 class StadiumFragment : Fragment() {
 
-    private val adapter = BuildPlaceAdapter { place ->
-        if (place.canBuild) buildSlot(place.id)
-    }
+    private val adapter = BuildPlaceAdapter { place -> showBuildDialog(place) }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         return inflater.inflate(R.layout.fragment_stadium, container, false)
@@ -82,28 +81,58 @@ class StadiumFragment : Fragment() {
         }
     }
 
-    private fun renewGrass() {
-        val main = requireActivity() as MainActivity
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                main.showLoading(true)
-                val response = ApiClient.get().renewStadiumGrass()
-                if (response.isSuccessful) {
-                    Toast.makeText(context, "Grass renewed!", Toast.LENGTH_SHORT).show()
-                    main.refreshResources()
-                    loadStadium()
+    private fun showBuildDialog(place: BuildPlaceData) {
+        val ctx = context ?: return
+        val title = place.buildingType ?: "Empty Slot"
+        val actions = mutableListOf<String>()
+        if (place.canBuild) actions.add("Build / Upgrade")
+        actions.add("Speedup (GT Stars)")
+
+        AlertDialog.Builder(ctx)
+            .setTitle(title)
+            .setMessage("Level: ${place.level}")
+            .setItems(actions.toTypedArray()) { _, which ->
+                when (actions[which]) {
+                    "Build / Upgrade" -> buildSlot(place.id)
+                    "Speedup (GT Stars)" -> speedupBuilding(place.id)
                 }
-            } catch (_: Exception) {
-            } finally {
-                main.showLoading(false)
             }
-        }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun renewGrass() {
+        val ctx = context ?: return
+        AlertDialog.Builder(ctx)
+            .setTitle("Renew Grass")
+            .setMessage("Renew the stadium grass?")
+            .setPositiveButton("Renew") { _, _ ->
+                val main = requireActivity() as MainActivity
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        main.showLoading(true)
+                        val response = ApiClient.get().renewStadiumGrass()
+                        if (response.isSuccessful) {
+                            Toast.makeText(context, "Grass renewed!", Toast.LENGTH_SHORT).show()
+                            main.refreshResources()
+                            loadStadium()
+                        } else {
+                            Toast.makeText(context, response.body()?.message ?: "Failed", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (_: Exception) {
+                    } finally {
+                        main.showLoading(false)
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showRenameDialog() {
         val ctx = context ?: return
         val editName = EditText(ctx).apply { hint = "New stadium name" }
-        android.app.AlertDialog.Builder(ctx)
+        AlertDialog.Builder(ctx)
             .setTitle("Rename Stadium")
             .setView(editName)
             .setPositiveButton("Rename") { _, _ ->
@@ -123,6 +152,8 @@ class StadiumFragment : Fragment() {
                 if (response.isSuccessful) {
                     Toast.makeText(context, "Stadium renamed!", Toast.LENGTH_SHORT).show()
                     loadStadium()
+                } else {
+                    Toast.makeText(context, response.body()?.message ?: "Failed", Toast.LENGTH_SHORT).show()
                 }
             } catch (_: Exception) {
             } finally {
@@ -141,6 +172,28 @@ class StadiumFragment : Fragment() {
                     Toast.makeText(context, "Building started!", Toast.LENGTH_SHORT).show()
                     main.refreshResources()
                     loadStadium()
+                } else {
+                    Toast.makeText(context, response.body()?.message ?: "Failed", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+            } finally {
+                main.showLoading(false)
+            }
+        }
+    }
+
+    private fun speedupBuilding(slotId: java.util.UUID) {
+        val main = requireActivity() as MainActivity
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                main.showLoading(true)
+                val response = ApiClient.get().speedupBuilding(IdRequest(slotId))
+                if (response.isSuccessful) {
+                    Toast.makeText(context, "Construction speedup!", Toast.LENGTH_SHORT).show()
+                    main.refreshResources()
+                    loadStadium()
+                } else {
+                    Toast.makeText(context, response.body()?.message ?: "Failed", Toast.LENGTH_SHORT).show()
                 }
             } catch (_: Exception) {
             } finally {

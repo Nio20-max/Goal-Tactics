@@ -20,20 +20,20 @@ class LoginViewModel : ViewModel() {
     private val _registerState = MutableLiveData<RegisterState>()
     val registerState: LiveData<RegisterState> = _registerState
 
-    fun login(email: String, password: String, tokenManager: TokenManager) {
-        if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            _loginState.value = LoginState.Error("Please enter a valid email")
+    fun login(managerName: String, password: String, tokenManager: TokenManager) {
+        if (managerName.isBlank() || managerName.length < 2) {
+            _loginState.value = LoginState.Error("Please enter your manager name")
             return
         }
-        if (password.length < 8) {
-            _loginState.value = LoginState.Error("Password must be at least 8 characters")
+        if (password.isBlank()) {
+            _loginState.value = LoginState.Error("Please enter your password")
             return
         }
 
         _loginState.value = LoginState.Loading
         viewModelScope.launch {
             try {
-                val response = api.login(AuthRequest(email, password))
+                val response = api.login(AuthRequest(managerName, password))
                 if (response.isSuccessful) {
                     val body = response.body()
                     if (body?.success == true && !body.token.isNullOrBlank()) {
@@ -52,8 +52,42 @@ class LoginViewModel : ViewModel() {
         }
     }
 
+    fun quickStart(teamName: String, tokenManager: TokenManager, countryId: String? = null) {
+        _loginState.value = LoginState.Loading
+        viewModelScope.launch {
+            try {
+                val response = api.register(RegisterRequest(isGuest = true, teamName = teamName, countryId = countryId))
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body?.success == true && !body.login.isNullOrBlank()) {
+                        // Auto-login with the returned credentials
+                        val loginResponse = api.login(AuthRequest(body.login!!, body.password ?: ""))
+                        if (loginResponse.isSuccessful) {
+                            val loginBody = loginResponse.body()
+                            if (loginBody?.success == true && !loginBody.token.isNullOrBlank()) {
+                                tokenManager.token = loginBody.token
+                                tokenManager.managerName = loginBody.managerName
+                                _loginState.value = LoginState.Success(loginBody.managerName ?: "Manager")
+                            } else {
+                                _loginState.value = LoginState.Error(loginBody?.message ?: "Auto-login failed")
+                            }
+                        } else {
+                            _loginState.value = LoginState.Error("Auto-login failed")
+                        }
+                    } else {
+                        _loginState.value = LoginState.Error(body?.message ?: "Quick start failed")
+                    }
+                } else {
+                    _loginState.value = LoginState.Error("Quick start failed (${response.code()})")
+                }
+            } catch (e: Exception) {
+                _loginState.value = LoginState.Error(e.message ?: "Network error")
+            }
+        }
+    }
+
     fun register(email: String, managerName: String, password: String, passwordConfirm: String) {
-        if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+        if (email.isBlank()) {
             _registerState.value = RegisterState.Error("Please enter a valid email")
             return
         }
@@ -61,8 +95,8 @@ class LoginViewModel : ViewModel() {
             _registerState.value = RegisterState.Error("Manager name must be 2–64 characters")
             return
         }
-        if (password.length < 8) {
-            _registerState.value = RegisterState.Error("Password must be at least 8 characters")
+        if (password.length < 4) {
+            _registerState.value = RegisterState.Error("Password must be at least 4 characters")
             return
         }
         if (password != passwordConfirm) {
@@ -73,7 +107,11 @@ class LoginViewModel : ViewModel() {
         _registerState.value = RegisterState.Loading
         viewModelScope.launch {
             try {
-                val response = api.register(RegisterRequest(email, password, managerName))
+                val response = api.register(RegisterRequest(
+                    email = email,
+                    password = password,
+                    managerName = managerName
+                ))
                 if (response.isSuccessful) {
                     val body = response.body()
                     if (body?.success == true) {

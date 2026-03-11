@@ -1,0 +1,125 @@
+
+
+Request Head:
+
+POST /api/Team/GetAccomplishments HTTP/1.1
+x-goaltactics-version: 1.2.4
+x-goaltactics-capabilities: youthlist,htmligm,friendlist,indtrainings
+Transfer-Encoding: chunked
+Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d; ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d
+Content-Type: application/json; charset=utf-8
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+{
+	"Signature":"b0543cdc4f0fb6c1647717967d3576a8",
+	"Token":"935fcac4-4bed-4711-a517-e60ac98767fb",
+	"Locale":"de-DE",
+	"UtcOffset":"01:00:00",
+	"Culture":"de-DE",
+	"Platform":1
+}
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 30 Jun 2023 04:47:13 GMT
+Server: Microsoft-IIS/10.0
+Transfer-Encoding: chunked
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+{
+	"accomplishments":[
+		{
+			"name":"Torschützenkönig{
+				0
+			}Robert Lewandowski{
+				0
+			}Saison #116",
+			"image":"02.png"
+		},
+		{
+			"name":"Meisterschaft{
+				0
+			}19. 3. Liga{
+				0
+			}Saison #116",
+			"image":"04.png"
+		},
+		{
+			"name":"Lehrling",
+			"image":"15.png"
+		},
+		{
+			"name":"Rookie",
+			"image":"14.png"
+		},
+		{
+			"name":"Master!",
+			"image":"23.png"
+		},
+		{
+			"name":"Erfahren",
+			"image":"18.png"
+		},
+		{
+			"name":"Motivator",
+			"image":"17.png"
+		},
+		{
+			"name":"Profi",
+			"image":"20.png"
+		},
+		{
+			"name":"Fortgeschritten",
+			"image":"19.png"
+		},
+		{
+			"name":"Meisterschaft{
+				0
+			}16. 3. Liga{
+				0
+			}Saison #114",
+			"image":"04.png"
+		},
+		{
+			"name":"Torschützenkönig{
+				0
+			}Carlos Miera{
+				0
+			}Saison #113",
+			"image":"02.png"
+		},
+		{
+			"name":"Elite",
+			"image":"22.png"
+		},
+		{
+			"name":"Torschützenkönig{
+				0
+			}Carlos Miera{
+				0
+			}Saison #114",
+			"image":"02.png"
+		},
+		{
+			"name":"Champion",
+			"image":"21.png"
+		},
+		{
+			"name":"Amateur",
+			"image":"16.png"
+		}
+	],
+	"errorMessage":null,
+	"status":1,
+	"message":null,
+	"punishment":0
+}

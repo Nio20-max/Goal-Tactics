@@ -3,13 +3,13 @@ package com.goaltactics.app.ui.login
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
-import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import com.goaltactics.app.BuildConfig
 import com.goaltactics.app.GoalTacticsApp
 import com.goaltactics.app.R
 import com.goaltactics.app.databinding.ActivityLoginBinding
@@ -19,6 +19,25 @@ class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private val viewModel: LoginViewModel by viewModels()
+
+    // Which page is currently visible (0=create team, 1=login, 2=register)
+    private var currentPage = 0
+
+    // Available countries: code → display name, matching flag_XX drawables
+    private val countries = listOf(
+        "ar" to "Argentina", "at" to "Austria", "be" to "Belgium", "bg" to "Bulgaria",
+        "br" to "Brazil", "by" to "Belarus", "ch" to "Switzerland", "cl" to "Chile",
+        "co" to "Colombia", "cr" to "Costa Rica", "cy" to "Cyprus", "cz" to "Czech Republic",
+        "de" to "Germany", "dk" to "Denmark", "ec" to "Ecuador", "ee" to "Estonia",
+        "el" to "Greece", "es" to "Spain", "fi" to "Finland", "fr" to "France",
+        "gb" to "Great Britain", "hn" to "Honduras", "hu" to "Hungary", "ie" to "Ireland",
+        "it" to "Italy", "lt" to "Lithuania", "lu" to "Luxembourg", "lv" to "Latvia",
+        "mt" to "Malta", "mx" to "Mexico", "nl" to "Netherlands", "pl" to "Poland",
+        "pt" to "Portugal", "ro" to "Romania", "ru" to "Russia", "sa" to "Saudi Arabia",
+        "se" to "Sweden", "si" to "Slovenia", "sk" to "Slovakia", "tr" to "Turkey",
+        "ua" to "Ukraine", "uy" to "Uruguay"
+    )
+    private var selectedCountry = "de"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,27 +51,73 @@ class LoginActivity : AppCompatActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.textVersion.text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
         setupListeners()
         observeState()
+        showPage(0)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        when (currentPage) {
+            1 -> showPage(0)  // Login → Create Team
+            2 -> showPage(1)  // Register → Login
+            else -> super.onBackPressed()
+        }
+    }
+
+    private fun showPage(page: Int) {
+        currentPage = page
+        binding.pageCreateTeam.visibility = if (page == 0) View.VISIBLE else View.GONE
+        binding.pageLogin.visibility = if (page == 1) View.VISIBLE else View.GONE
+        binding.pageRegister.visibility = if (page == 2) View.VISIBLE else View.GONE
     }
 
     private fun setupListeners() {
+        // ── Page 0: Create Team ──
+        binding.imgCountrySelect.setOnClickListener { showCountryPicker() }
+        binding.btnStart.setOnClickListener {
+            val teamName = binding.editTeamName.text.toString().trim()
+            if (teamName.length < 2) return@setOnClickListener
+            val app = application as GoalTacticsApp
+            viewModel.quickStart(teamName, app.tokenManager, selectedCountry)
+        }
+        binding.btnGoToLogin.setOnClickListener { showPage(1) }
+
+        // ── Page 1: Login ──
         binding.btnLogin.setOnClickListener {
-            val email = binding.editEmail.text.toString().trim()
+            val managerName = binding.editEmail.text.toString().trim()
             val password = binding.editPassword.text.toString()
             val app = application as GoalTacticsApp
-            viewModel.login(email, password, app.tokenManager)
+            viewModel.login(managerName, password, app.tokenManager)
         }
+        binding.btnFacebook.setOnClickListener {
+            AlertDialog.Builder(this, R.style.GT_Dialog)
+                .setTitle("Facebook Login")
+                .setMessage("Facebook login is not available in this version.")
+                .setPositiveButton(R.string.ok, null)
+                .show()
+        }
+        binding.btnSupport.setOnClickListener {
+            AlertDialog.Builder(this, R.style.GT_Dialog)
+                .setTitle("Support")
+                .setMessage("Need help? Visit our website or contact support.")
+                .setPositiveButton(R.string.ok, null)
+                .show()
+        }
+        binding.btnQuickStart.setOnClickListener { showPage(0) }
+        binding.btnRegister.setOnClickListener { showPage(2) }
 
-        binding.btnRegister.setOnClickListener {
-            showRegisterDialog()
+        // ── Page 2: Register ──
+        binding.btnDoRegister.setOnClickListener {
+            viewModel.register(
+                binding.editRegEmail.text.toString().trim(),
+                binding.editRegManagerName.text.toString().trim(),
+                binding.editRegPassword.text.toString(),
+                binding.editRegPasswordConfirm.text.toString()
+            )
         }
-
-        binding.btnQuickStart.setOnClickListener {
-            // Quick-start creates a temporary account and logs in
-            val app = application as GoalTacticsApp
-            viewModel.login("quickstart@goaltactics.com", "quickstart_temp", app.tokenManager)
-        }
+        binding.btnRegCancel.setOnClickListener { showPage(1) }
     }
 
     private fun observeState() {
@@ -73,51 +138,38 @@ class LoginActivity : AppCompatActivity() {
                 }
             }
         }
-    }
-
-    private fun showRegisterDialog() {
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_register, null)
-        val dialog = AlertDialog.Builder(this, R.style.GT_Dialog)
-            .setView(dialogView)
-            .create()
-
-        val editEmail = dialogView.findViewById<EditText>(R.id.editRegEmail)
-        val editName = dialogView.findViewById<EditText>(R.id.editRegManagerName)
-        val editPassword = dialogView.findViewById<EditText>(R.id.editRegPassword)
-        val editPasswordConfirm = dialogView.findViewById<EditText>(R.id.editRegPasswordConfirm)
-        val textError = dialogView.findViewById<TextView>(R.id.textRegError)
-        val btnRegister = dialogView.findViewById<Button>(R.id.btnDoRegister)
-        val btnCancel = dialogView.findViewById<Button>(R.id.btnRegCancel)
-
-        btnRegister.setOnClickListener {
-            viewModel.register(
-                editEmail.text.toString().trim(),
-                editName.text.toString().trim(),
-                editPassword.text.toString(),
-                editPasswordConfirm.text.toString()
-            )
-        }
-
-        btnCancel.setOnClickListener { dialog.dismiss() }
 
         viewModel.registerState.observe(this) { state ->
             when (state) {
                 is LoginViewModel.RegisterState.Loading -> {
-                    textError.visibility = View.GONE
+                    binding.loadingOverlay.visibility = View.VISIBLE
+                    binding.textRegError.visibility = View.GONE
                 }
                 is LoginViewModel.RegisterState.Success -> {
-                    dialog.dismiss()
-                    // Auto-fill login fields after successful registration
-                    binding.editEmail.setText(editEmail.text.toString().trim())
+                    binding.loadingOverlay.visibility = View.GONE
+                    // Go back to login, pre-fill the manager name
+                    binding.editEmail.setText(binding.editRegManagerName.text.toString().trim())
+                    showPage(1)
                 }
                 is LoginViewModel.RegisterState.Error -> {
-                    textError.text = state.message
-                    textError.visibility = View.VISIBLE
+                    binding.loadingOverlay.visibility = View.GONE
+                    binding.textRegError.text = state.message
+                    binding.textRegError.visibility = View.VISIBLE
                 }
             }
         }
+    }
 
-        dialog.show()
+    private fun showCountryPicker() {
+        val names = countries.map { it.second }.toTypedArray()
+        AlertDialog.Builder(this, R.style.GT_Dialog)
+            .setTitle("Select a country")
+            .setItems(names) { _, which ->
+                selectedCountry = countries[which].first
+                val resId = resources.getIdentifier("flag_$selectedCountry", "drawable", packageName)
+                if (resId != 0) binding.imgCountrySelect.setImageResource(resId)
+            }
+            .show()
     }
 
     private fun navigateToMain() {

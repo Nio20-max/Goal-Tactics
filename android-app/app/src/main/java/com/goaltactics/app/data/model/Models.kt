@@ -18,25 +18,35 @@ class TextRequest(val text: String)
 // ── Auth ────────────────────────────────────────────────────
 
 data class AuthRequest(
-    val email: String,
-    val password: String
+    val login: String,
+    val password: String,
+    val authId: String? = null,
+    val authMethod: String? = null
 )
 
 data class AuthResponse(
     val success: Boolean,
     val token: String?,
     val managerName: String?,
-    val message: String?
+    val message: String?,
+    val userId: String? = null,
+    val level: Int? = null,
+    val isAdmin: Boolean? = null
 )
 
 data class RegisterRequest(
-    val email: String,
-    val password: String,
-    val managerName: String
+    val email: String? = null,
+    val password: String? = null,
+    val managerName: String? = null,
+    val teamName: String? = null,
+    val isGuest: Boolean = false,
+    val countryId: String? = null
 )
 
 data class RegisterResponse(
     val success: Boolean,
+    val login: String?,
+    val password: String?,
     val userId: String?,
     val message: String?
 )
@@ -90,6 +100,27 @@ data class TeamDataResponse(
     val message: String?
 )
 
+data class MatchData(
+    val id: java.util.UUID? = null,
+    val date: String? = null,
+    val homeLogo: String? = null,
+    val awayLogo: String? = null,
+    val homeName: String? = null,
+    val awayName: String? = null,
+    val myTeam: Int = 0,
+    val homeCountry: String? = null,
+    val awayCountry: String? = null,
+    val homeScore: Int = 0,
+    val awayScore: Int = 0,
+    val opponentTeamId: java.util.UUID? = null,
+    val homeStrength: Int = 0,
+    val awayStrength: Int = 0,
+    val hasLineup: Boolean = false,
+    val homeTrikot: String? = null,
+    val awayTrikot: String? = null,
+    val isFriendly: Boolean = false
+)
+
 data class ExtendedTeamDataResponse(
     val success: Boolean,
     val teamData: ExtendedTeamData?,
@@ -97,7 +128,9 @@ data class ExtendedTeamDataResponse(
     val season: String?,
     val seasonStartDate: String?,
     val matchday: Int,
-    val renameTeamCost: Int
+    val renameTeamCost: Int,
+    val lastMatch: MatchData? = null,
+    val nextMatch: MatchData? = null
 )
 
 data class ClubNews(
@@ -153,11 +186,59 @@ data class SquadResponse(
 
 data class SquadPlayerData(
     val id: UUID,
-    val name: String?,
-    val position: String?,
-    val strength: Int,
-    val fitness: Int
-)
+    val name: String? = null,
+    val country: String? = null,
+    val head: String? = null,
+    val strength: Double = 0.0,
+    val talent: Int = 0,
+    val age: Int = 0,
+    val position: Int = 0,
+    val endDate: String? = null,
+    val experience: Int = 0,
+    val fitness: Double = 0.0,
+    val body: String? = null,
+    val gloves: String? = null,
+    val shoes: String? = null,
+    val salary: Long = 0,
+    val marketValue: Long = 0,
+    val origin: String? = null,
+    val skills: List<Double>? = null,
+    val mainSkill: Int = 0,
+    val bonusSkills: List<Int>? = null,
+    val yellowCards: Int = 0,
+    val hasRedCard: Boolean = false,
+    val injured: Boolean = false,
+    val isForSale: Boolean = false,
+    val sellPrice: Long = 0,
+    val transfermarketFee: Long = 0,
+    val transfermarketMaxOffer: Long = 0,
+    val transfermarketMinOffer: Long = 0,
+    val transfermarketMaxHours: Int = 0,
+    val isUpgraded: Boolean = false,
+    val maxUpgradeStrength: Double = 0.0,
+    val shirt: Int = 0,
+    val canExtendContract: Boolean = false,
+    val hasIndividualTraining: Boolean = false
+) {
+    val positionName: String get() = when (position) {
+        0 -> "Keeper"
+        1 -> "Defender"
+        2 -> "Midfielder"
+        3 -> "Striker"
+        else -> "Unknown"
+    }
+    val keeping: Double get() = skills?.getOrNull(0) ?: 0.0
+    val defending: Double get() = skills?.getOrNull(1) ?: 0.0
+    val playmaking: Double get() = skills?.getOrNull(2) ?: 0.0
+    val passing: Double get() = skills?.getOrNull(3) ?: 0.0
+    val scoring: Double get() = skills?.getOrNull(4) ?: 0.0
+    val speed: Double get() = skills?.getOrNull(5) ?: 0.0
+    val stamina: Double get() = skills?.getOrNull(6) ?: 0.0
+    val nationality: String? get() = country
+    val mood: Int? get() = null
+    val goals: Int? get() = null
+    val assists: Int? get() = null
+}
 
 data class PlayerStatisticsResponse(
     val success: Boolean,

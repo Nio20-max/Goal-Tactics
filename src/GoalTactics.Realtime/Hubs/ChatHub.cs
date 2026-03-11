@@ -1,10 +1,11 @@
+using GoalTactics.Application.Chat;
 using GoalTactics.Contracts.Realtime;
 using GoalTactics.Realtime.HubState;
 using Microsoft.AspNetCore.SignalR;
 
 namespace GoalTactics.Realtime.Hubs;
 
-public sealed class ChatHub(UserConnectionRegistry registry) : Hub
+public sealed class ChatHub(UserConnectionRegistry registry, IChatStore chatStore) : Hub
 {
     public override async Task OnConnectedAsync()
     {
@@ -36,6 +37,12 @@ public sealed class ChatHub(UserConnectionRegistry registry) : Hub
 
     public async Task Post(Guid teamId, ChatMessage message)
     {
+        var userId = Context.UserIdentifier ?? Context.User?.Identity?.Name;
+        if (!string.IsNullOrWhiteSpace(userId) && !string.IsNullOrWhiteSpace(message.Text))
+        {
+            await chatStore.AddMessageAsync(userId, message.Text);
+        }
+
         await Clients.Group("public").SendAsync("Post", teamId, message);
     }
 }

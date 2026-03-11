@@ -32,22 +32,33 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnChat: ImageButton
 
     private val navItems = listOf(
-        NavItem("Club", R.id.nav_club, "menu_team"),
-        NavItem("Squad", R.id.nav_squad, "menu_player"),
-        NavItem("Lineup", R.id.nav_lineup, "menu_formation"),
-        NavItem("Training", R.id.nav_training, "menu_training"),
-        NavItem("Scouting", R.id.nav_scouting, "menu_youth"),
-        NavItem("Transfer Market", R.id.nav_transfer, "menu_transfermarket"),
-        NavItem("Stadium", R.id.nav_stadium, "menu_stadium"),
-        NavItem("Finances", R.id.nav_finances, "menu_finance"),
-        NavItem("League", R.id.nav_league, "menu_league"),
-        NavItem("Ladder", R.id.nav_ladder, "menu_ladder"),
-        NavItem("Friends", R.id.nav_friends, "menu_friends"),
-        NavItem("Live", R.id.nav_live, "menu_live"),
-        NavItem("Chat", R.id.nav_chat, "menu_support"),
-        NavItem("Shop", R.id.nav_shop, "menu_shop_logo"),
-        NavItem("Settings", R.id.nav_settings, "menu_settings"),
-        NavItem("Mail", R.id.nav_mail, "menu_emblem_jersey")
+        // Shop section
+        NavItem("Shop", 0, "", isSection = true),
+        NavItem("SHOP", R.id.nav_shop, "menu_shop_logo"),
+        NavItem("VIDEO", R.id.nav_video, "menu_videos"),
+        // Club management section
+        NavItem("Club management", 0, "", isSection = true),
+        NavItem("CLUB", R.id.nav_club, "menu_team"),
+        NavItem("FINANCES", R.id.nav_finances, "menu_finance"),
+        NavItem("STADIUM", R.id.nav_stadium, "menu_stadium"),
+        NavItem("EQUIPMENT", R.id.nav_equipment, "menu_emblem_jersey"),
+        // Team management section
+        NavItem("Team Management", 0, "", isSection = true),
+        NavItem("SQUAD", R.id.nav_squad, "menu_player"),
+        NavItem("LINEUP", R.id.nav_lineup, "menu_formation"),
+        NavItem("TRAINING", R.id.nav_training, "menu_training"),
+        NavItem("SCOUTING", R.id.nav_scouting, "menu_youth"),
+        NavItem("TRANSFER MARKET", R.id.nav_transfer, "menu_transfermarket"),
+        // Matches section
+        NavItem("Matches", 0, "", isSection = true),
+        NavItem("LEAGUE", R.id.nav_league, "menu_league"),
+        NavItem("GT LADDER", R.id.nav_ladder, "menu_ladder"),
+        NavItem("FRIENDS", R.id.nav_friends, "menu_friends"),
+        NavItem("LIVE", R.id.nav_live, "menu_live"),
+        // Other section
+        NavItem("Other", 0, "", isSection = true),
+        NavItem("SUPPORT", R.id.nav_support, "menu_support"),
+        NavItem("SETTINGS", R.id.nav_settings, "menu_settings")
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -103,6 +114,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onNavItemSelected(item: NavItem) {
+        if (item.isSection) return
         val fragment: Fragment = when (item.id) {
             R.id.nav_club -> ClubFragment()
             R.id.nav_squad -> SquadFragment()
@@ -112,12 +124,15 @@ class MainActivity : AppCompatActivity() {
             R.id.nav_transfer -> TransferFragment()
             R.id.nav_stadium -> StadiumFragment()
             R.id.nav_finances -> FinancesFragment()
+            R.id.nav_equipment -> ShopFragment() // Equipment reuses shop for now
             R.id.nav_league -> LeagueFragment()
             R.id.nav_ladder -> LadderFragment()
             R.id.nav_friends -> FriendsFragment()
             R.id.nav_live -> LiveFragment()
             R.id.nav_chat -> ChatFragment()
             R.id.nav_shop -> ShopFragment()
+            R.id.nav_video -> ShopFragment() // Video reuses shop for now
+            R.id.nav_support -> ChatFragment() // Support opens chat/mail
             R.id.nav_settings -> SettingsFragment()
             R.id.nav_mail -> MailFragment()
             else -> ClubFragment()
@@ -177,5 +192,5 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    data class NavItem(val title: String, val id: Int, val iconName: String)
+    data class NavItem(val title: String, val id: Int, val iconName: String, val isSection: Boolean = false)
 }

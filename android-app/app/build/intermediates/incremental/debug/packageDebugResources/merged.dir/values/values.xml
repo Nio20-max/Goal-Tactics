@@ -1,0 +1,552 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="colorAccentBlue">#004497</color>
+    <color name="colorAccentGreen">#afd50c</color>
+    <color name="colorBackground">#1d2b03</color>
+    <color name="colorBackgroundTransparent">#e02e5a10</color>
+    <color name="colorBlackGradientEnd">#00000000</color>
+    <color name="colorBlackGradientStart">#cc000000</color>
+    <color name="colorBlackTransparent">#99000000</color>
+    <color name="colorBlackTransparentDark">#e6000000</color>
+    <color name="colorCompareBackground">#161f13</color>
+    <color name="colorCompareGreen">#2e5a10</color>
+    <color name="colorDarkGray">#555555</color>
+    <color name="colorEuro">#dcffb2</color>
+    <color name="colorEvenRow">#641d2b03</color>
+    <color name="colorGradientEnd">#003d6a1b</color>
+    <color name="colorGradientStart">#3d6a1b</color>
+    <color name="colorGray">#999999</color>
+    <color name="colorGreen">#3d6a1b</color>
+    <color name="colorHighlight">#ffffff00</color>
+    <color name="colorInactiveEvenRow">#64555555</color>
+    <color name="colorInactiveUnevenRow">#64999999</color>
+    <color name="colorLadderGreen">#6a8d0c</color>
+    <color name="colorLadderStamina">#323bb4</color>
+    <color name="colorNewEvenRow">#64002248</color>
+    <color name="colorNewUnevenRow">#64004497</color>
+    <color name="colorPopup">#1d2b03</color>
+    <color name="colorScoreGradientEnd">#151515</color>
+    <color name="colorScoreGradientStart">#2a2a2a</color>
+    <color name="colorSection">#a0afd50c</color>
+    <color name="colorSectionNew">#a00088ff</color>
+    <color name="colorShadow">#000000</color>
+    <color name="colorSkillCardBackground">#66376e78</color>
+    <color name="colorSkillCardBlue">#6ed4e7</color>
+    <color name="colorSkillCardLegend">#a425f3</color>
+    <color name="colorSkillCardMaster">#126cef</color>
+    <color name="colorStars">#fee697</color>
+    <color name="colorText">#ffffff</color>
+    <color name="colorUnevenRow">#6492cc46</color>
+    <color name="colorWarningEvenRow">#64b22222</color>
+    <color name="colorWarningUnevenRow">#648b0000</color>
+    <color name="gt_background_dark">#FF1D2B03</color>
+    <color name="gt_background_overlay">#CC000000</color>
+    <color name="gt_background_panel">#FF2A3D08</color>
+    <color name="gt_blue_accent">#FF004497</color>
+    <color name="gt_blue_link">#FF4488CC</color>
+    <color name="gt_border">#FF3A5A18</color>
+    <color name="gt_button_danger">#FF992222</color>
+    <color name="gt_button_disabled">#FF333333</color>
+    <color name="gt_button_primary">#FF3D6A1B</color>
+    <color name="gt_button_primary_pressed">#FF2A4D12</color>
+    <color name="gt_button_secondary">#FF555555</color>
+    <color name="gt_gradient_end">#FF000000</color>
+    <color name="gt_gradient_start">#00000000</color>
+    <color name="gt_green_accent">#FFAFD50C</color>
+    <color name="gt_green_field">#FF4C8C2B</color>
+    <color name="gt_green_light">#FF8CBF26</color>
+    <color name="gt_green_lime">#FF6A8D0C</color>
+    <color name="gt_green_primary">#FF3D6A1B</color>
+    <color name="gt_medipacks_blue">#FF6CBEED</color>
+    <color name="gt_money_green">#FFDCFFB2</color>
+    <color name="gt_progress_bg">#FF333333</color>
+    <color name="gt_progress_fill">#FFAFD50C</color>
+    <color name="gt_row_active">#FF4C6B1F</color>
+    <color name="gt_row_even">#FF2A3D08</color>
+    <color name="gt_row_new">#FF3D5A1B</color>
+    <color name="gt_row_odd">#FF1D2B03</color>
+    <color name="gt_row_selected">#FF5A7F2A</color>
+    <color name="gt_row_warning">#FF6B4A1F</color>
+    <color name="gt_separator">#FF4A4A4A</color>
+    <color name="gt_skill_blue">#FF004497</color>
+    <color name="gt_skill_legend">#FFCC8800</color>
+    <color name="gt_skill_master">#FF7B2D8E</color>
+    <color name="gt_skill_normal">#FF3D6A1B</color>
+    <color name="gt_stars_yellow">#FFFEE697</color>
+    <color name="gt_status_offline">#FF666666</color>
+    <color name="gt_status_online">#FF88CC00</color>
+    <color name="gt_text_disabled">#FF888888</color>
+    <color name="gt_text_error">#FFFF4444</color>
+    <color name="gt_text_primary">#FFFFFFFF</color>
+    <color name="gt_text_secondary">#FFCCCCCC</color>
+    <color name="gt_text_success">#FF88CC00</color>
+    <color name="gt_text_warning">#FFFFCC00</color>
+    <color name="transparent">#00000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <dimen name="avatar_border">2dp</dimen>
+    <dimen name="avatar_size">50dp</dimen>
+    <dimen name="button_height">30dp</dimen>
+    <dimen name="button_width">150dp</dimen>
+    <dimen name="card_corner_radius">8dp</dimen>
+    <dimen name="card_shadow_corner_radius">10dp</dimen>
+    <dimen name="card_shadow_padding">2dp</dimen>
+    <dimen name="corner_radius">10dp</dimen>
+    <dimen name="entry_height">35dp</dimen>
+    <dimen name="entry_width">200dp</dimen>
+    <dimen name="flag_size">80dp</dimen>
+    <dimen name="gt_avatar_radius">25dp</dimen>
+    <dimen name="gt_avatar_size">50dp</dimen>
+    <dimen name="gt_badge_size">18dp</dimen>
+    <dimen name="gt_badge_text_size">10sp</dimen>
+    <dimen name="gt_bench_height">375dp</dimen>
+    <dimen name="gt_bench_width">60dp</dimen>
+    <dimen name="gt_bottom_bar_height">50dp</dimen>
+    <dimen name="gt_button_height">40dp</dimen>
+    <dimen name="gt_button_height_sm">30dp</dimen>
+    <dimen name="gt_button_height_small">30dp</dimen>
+    <dimen name="gt_button_width">150dp</dimen>
+    <dimen name="gt_button_width_wide">180dp</dimen>
+    <dimen name="gt_coach_height">250dp</dimen>
+    <dimen name="gt_context_menu_width">200dp</dimen>
+    <dimen name="gt_corner_radius">10dp</dimen>
+    <dimen name="gt_flag_height">40dp</dimen>
+    <dimen name="gt_flag_width">60dp</dimen>
+    <dimen name="gt_formation_height">140dp</dimen>
+    <dimen name="gt_formation_width">180dp</dimen>
+    <dimen name="gt_input_height">35dp</dimen>
+    <dimen name="gt_match_info_height">88dp</dimen>
+    <dimen name="gt_menu_width">250dp</dimen>
+    <dimen name="gt_player_avatar_height">120dp</dimen>
+    <dimen name="gt_player_avatar_width">320dp</dimen>
+    <dimen name="gt_popup_padding">16dp</dimen>
+    <dimen name="gt_popup_width">400dp</dimen>
+    <dimen name="gt_row_height">36dp</dimen>
+    <dimen name="gt_row_padding_h">8dp</dimen>
+    <dimen name="gt_row_padding_v">4dp</dimen>
+    <dimen name="gt_spacing_lg">12dp</dimen>
+    <dimen name="gt_spacing_md">8dp</dimen>
+    <dimen name="gt_spacing_sm">4dp</dimen>
+    <dimen name="gt_spacing_xl">16dp</dimen>
+    <dimen name="gt_spacing_xs">2dp</dimen>
+    <dimen name="gt_spacing_xxl">24dp</dimen>
+    <dimen name="gt_text_body">14sp</dimen>
+    <dimen name="gt_text_lg">18sp</dimen>
+    <dimen name="gt_text_md">16sp</dimen>
+    <dimen name="gt_text_sm">12sp</dimen>
+    <dimen name="gt_text_title">24sp</dimen>
+    <dimen name="gt_text_xl">22sp</dimen>
+    <dimen name="gt_text_xs">10sp</dimen>
+    <dimen name="gt_top_bar_height">30dp</dimen>
+    <dimen name="icon_size">35dp</dimen>
+    <dimen name="large_button_height">40dp</dimen>
+    <dimen name="large_button_width">180dp</dimen>
+    <dimen name="large_text_size">16dp</dimen>
+    <dimen name="lineupformation_combobox_height">140dp</dimen>
+    <dimen name="lineupformation_combobox_width">180dp</dimen>
+    <dimen name="lineupformation_margin_start">15dp</dimen>
+    <dimen name="lineupformation_margin_top">8dp</dimen>
+    <dimen name="live_top_shadow">50dp</dimen>
+    <dimen name="mainlayout_balance_height">30dp</dimen>
+    <dimen name="mainlayout_balance_layout_margin_start">8dp</dimen>
+    <dimen name="mainlayout_balance_margin_start">4dp</dimen>
+    <dimen name="mainlayout_balance_plus_size">12dp</dimen>
+    <dimen name="mainlayout_balanceimage_size">20dp</dimen>
+    <dimen name="mainlayout_bottombar_height">50dp</dimen>
+    <dimen name="mainlayout_chat_notification_size">10dp</dimen>
+    <dimen name="mainlayout_context_menu_width">200dp</dimen>
+    <dimen name="mainlayout_euro_min_width">100dp</dimen>
+    <dimen name="mainlayout_main_menu_width">250dp</dimen>
+    <dimen name="mainlayout_medipacks_min_width">30dp</dimen>
+    <dimen name="mainlayout_menubutton_width">105dp</dimen>
+    <dimen name="mainlayout_stars_min_width">70dp</dimen>
+    <dimen name="mainlayout_topbar_height">30dp</dimen>
+    <dimen name="matchinfo_height">88dp</dimen>
+    <dimen name="menu_cell_height">50dp</dimen>
+    <dimen name="menu_image_size">40dp</dimen>
+    <dimen name="menu_section_height">20dp</dimen>
+    <dimen name="menu_title_inset">60dp</dimen>
+    <dimen name="popup_border_width">1dp</dimen>
+    <dimen name="popup_corner_radius">10dp</dimen>
+    <dimen name="round_button_size">30dp</dimen>
+    <dimen name="scouting_margin_start">10dp</dimen>
+    <dimen name="skill_border_width">2dp</dimen>
+    <dimen name="spacing_extralarge">30dp</dimen>
+    <dimen name="spacing_large">20dp</dimen>
+    <dimen name="spacing_medium">10dp</dimen>
+    <dimen name="spacing_minimal">2dp</dimen>
+    <dimen name="spacing_small">5dp</dimen>
+    <dimen name="spacing_subzero">1dp</dimen>
+    <dimen name="tabbar_height">30dp</dimen>
+    <dimen name="teamview_blackbutton_height">30dp</dimen>
+    <dimen name="teamview_blackbutton_margin_end">3dp</dimen>
+    <dimen name="teamview_blackbutton_margin_top">3dp</dimen>
+    <dimen name="teamview_bluebg_margin">3dp</dimen>
+    <dimen name="teamview_club_name_height">25dp</dimen>
+    <dimen name="teamview_clubinfo_divider">1dp</dimen>
+    <dimen name="teamview_greenbutton_height">30dp</dimen>
+    <dimen name="teamview_greenbutton_margin_end">3dp</dimen>
+    <dimen name="teamview_greenbutton_margin_top">3dp</dimen>
+    <dimen name="teamview_logo_size">60dp</dimen>
+    <dimen name="teamview_margin_top">5dp</dimen>
+    <dimen name="teamview_matchcontainer_height">130dp</dimen>
+    <dimen name="teamview_matchdate_margin">5dp</dimen>
+    <dimen name="teamview_matchlogo_size">50dp</dimen>
+    <dimen name="teamview_matchscore_margin">5dp</dimen>
+    <dimen name="teamview_matchshirt_margin">5dp</dimen>
+    <dimen name="teamview_matchshirt_size">60dp</dimen>
+    <dimen name="training_dialog_width">200dp</dimen>
+    <dimen name="training_start">210dp</dimen>
+    <string name="accept">Accept</string>
+    <string name="app_name">Goal Tactics</string>
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="chat_message_hint">Type a message…</string>
+    <string name="chat_send">Send</string>
+    <string name="close">Close</string>
+    <string name="club_accomplishments">Accomplishments</string>
+    <string name="club_country">Country</string>
+    <string name="club_fans">Fans</string>
+    <string name="club_last_match">Last Match</string>
+    <string name="club_league">League</string>
+    <string name="club_losses">Losses</string>
+    <string name="club_market_value">Market Value</string>
+    <string name="club_mood">Team Mood</string>
+    <string name="club_news">Club News</string>
+    <string name="club_next_match">Next Match</string>
+    <string name="club_strength">Strength</string>
+    <string name="club_team_name">Team</string>
+    <string name="club_wins">Wins</string>
+    <string name="confirm">Confirm</string>
+    <string name="currency_medipacks">Medipacks</string>
+    <string name="currency_money">Money</string>
+    <string name="currency_stars">Stars</string>
+    <string name="decline">Decline</string>
+    <string name="delete">Delete</string>
+    <string name="error_generic">Something went wrong</string>
+    <string name="error_network">No network connection</string>
+    <string name="finances_balance">Balance</string>
+    <string name="finances_history">Finance History</string>
+    <string name="finances_income">Income</string>
+    <string name="finances_outcome">Expenses</string>
+    <string name="finances_today">Today</string>
+    <string name="finances_yesterday">Yesterday</string>
+    <string name="friends_add">Add Friend</string>
+    <string name="friends_challenge">Challenge</string>
+    <string name="friends_like">Like</string>
+    <string name="friends_search_hint">Search by name…</string>
+    <string name="friends_unlike">Unlike</string>
+    <string name="ladder_challenge">Challenge</string>
+    <string name="ladder_points">Points</string>
+    <string name="ladder_rank">Rank</string>
+    <string name="ladder_stamina">Stamina</string>
+    <string name="league_draws">D</string>
+    <string name="league_goals_received">GA</string>
+    <string name="league_goals_scored">GF</string>
+    <string name="league_losses">L</string>
+    <string name="league_matches">M</string>
+    <string name="league_points">Pts</string>
+    <string name="league_position">Pos</string>
+    <string name="league_table">League Table</string>
+    <string name="league_wins">W</string>
+    <string name="lineup_bench">Bench</string>
+    <string name="lineup_locked">Lineup is locked</string>
+    <string name="lineup_save">Save Lineup</string>
+    <string name="lineup_starting">Starting</string>
+    <string name="lineup_system">System</string>
+    <string name="lineup_tactic">Tactic</string>
+    <string name="live_match">Live Match</string>
+    <string name="live_report">Match Report</string>
+    <string name="loading">Loading…</string>
+    <string name="login_button">Login</string>
+    <string name="login_confirm_password_hint">Confirm Password</string>
+    <string name="login_email_hint">Email</string>
+    <string name="login_error_email">Please enter a valid email</string>
+    <string name="login_error_generic">Login failed. Please try again.</string>
+    <string name="login_error_name">Manager name must be 2–64 characters</string>
+    <string name="login_error_password">Password must be at least 8 characters</string>
+    <string name="login_error_password_match">Passwords don\'t match</string>
+    <string name="login_manager_name_hint">Your Manager Name</string>
+    <string name="login_new_player">New Player</string>
+    <string name="login_password_hint">Password</string>
+    <string name="login_quickstart">Quick Start</string>
+    <string name="login_register">Register</string>
+    <string name="login_support">Support</string>
+    <string name="mail_delete_read">Delete Read</string>
+    <string name="mail_inbox">Mail</string>
+    <string name="mail_mark_all_read">Mark All as Read</string>
+    <string name="mail_mark_read">Mark as Read</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_club">Club</string>
+    <string name="nav_finances">Finances</string>
+    <string name="nav_friends">Friends</string>
+    <string name="nav_ladder">GT Ladder</string>
+    <string name="nav_league">League</string>
+    <string name="nav_lineup">Lineup</string>
+    <string name="nav_live">Live</string>
+    <string name="nav_scouting">Scouting</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_shop">Shop</string>
+    <string name="nav_squad">Squad</string>
+    <string name="nav_stadium">Stadium</string>
+    <string name="nav_training">Training</string>
+    <string name="nav_transfer">Transfer</string>
+    <string name="no">No</string>
+    <string name="ok">OK</string>
+    <string name="retry">Retry</string>
+    <string name="save">Save</string>
+    <string name="scouting_instruct">Instruct Scout</string>
+    <string name="scouting_recruit">Recruit</string>
+    <string name="scouting_speedup">Speed Up</string>
+    <string name="scouting_talent">Talent</string>
+    <string name="search">Search</string>
+    <string name="settings_daily_reward">Claim Daily Reward</string>
+    <string name="settings_delete_account">Delete Account</string>
+    <string name="settings_logout">Logout</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_preferences">Preferences</string>
+    <string name="shop_buy">Buy</string>
+    <string name="shop_equipment">Equipment</string>
+    <string name="shop_products">Products</string>
+    <string name="shop_use">Use</string>
+    <string name="skill_agility">Agility</string>
+    <string name="skill_ball_control">Ball Control</string>
+    <string name="skill_cornerkick">Corner Kick</string>
+    <string name="skill_defence">Defence</string>
+    <string name="skill_duel">Duel</string>
+    <string name="skill_experience">Experience</string>
+    <string name="skill_flanks">Flanks</string>
+    <string name="skill_freekicks">Free Kicks</string>
+    <string name="skill_header">Header</string>
+    <string name="skill_keeping">Keeping</string>
+    <string name="skill_one_on_one">One on One</string>
+    <string name="skill_passing">Passing</string>
+    <string name="skill_penalty">Penalty</string>
+    <string name="skill_playmaking">Playmaking</string>
+    <string name="skill_shots">Shots</string>
+    <string name="skill_speed">Speed</string>
+    <string name="sponsors_accept">Accept</string>
+    <string name="sponsors_negotiate">Negotiate</string>
+    <string name="sponsors_offers">Sponsor Offers</string>
+    <string name="squad_extend">Extend Contract</string>
+    <string name="squad_fire">Fire</string>
+    <string name="squad_fitness">Fit</string>
+    <string name="squad_goals">Goals</string>
+    <string name="squad_heal">Heal</string>
+    <string name="squad_matches">Matches</string>
+    <string name="squad_name">Name</string>
+    <string name="squad_position">Position</string>
+    <string name="squad_red_cards">Red Cards</string>
+    <string name="squad_sell">Sell</string>
+    <string name="squad_statistics">Statistics</string>
+    <string name="squad_strength">Str</string>
+    <string name="squad_upgrade">Upgrade</string>
+    <string name="squad_yellow_cards">Yellow Cards</string>
+    <string name="stadium_build">Build</string>
+    <string name="stadium_capacity">Capacity</string>
+    <string name="stadium_earnings">Avg. Earnings</string>
+    <string name="stadium_grass_quality">Grass Quality</string>
+    <string name="stadium_name">Stadium</string>
+    <string name="stadium_rename">Rename Stadium</string>
+    <string name="stadium_renew_grass">Renew Grass</string>
+    <string name="training_camp">Training Camp</string>
+    <string name="training_efficiency">Efficiency</string>
+    <string name="training_individual">Individual Training</string>
+    <string name="training_main_skill">Main Skill</string>
+    <string name="training_save">Save Training</string>
+    <string name="training_sub_skill">Sub Skill</string>
+    <string name="training_tactic">Tactic Training</string>
+    <string name="transfer_bid">Place Bid</string>
+    <string name="transfer_end_date">Ends</string>
+    <string name="transfer_favourites">Favourites</string>
+    <string name="transfer_min_bid">Min. Bid</string>
+    <string name="transfer_min_strength">Min. Strength</string>
+    <string name="transfer_only_keeper">Keepers Only</string>
+    <string name="transfer_search">Search Transfer Market</string>
+    <string name="yes">Yes</string>
+    <style name="ButtonStyle" parent="TextStyle">
+        <item name="android:background">@drawable/button_green_selector</item>
+        <item name="android:gravity">center</item>
+    </style>
+    <style name="ClickableResourcesStyle">
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+    <style name="EntryStyle" parent="TextStyle">
+        <item name="android:background">@drawable/bg_input_field</item>
+        <item name="android:textStyle">normal</item>
+    </style>
+    <style name="GT" parent="">
+    </style>
+    <style name="GT.Button" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_height">@dimen/gt_button_height</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:minWidth">@dimen/gt_button_width</item>
+        <item name="android:textColor">@color/gt_text_primary</item>
+        <item name="android:textSize">@dimen/gt_text_body</item>
+        <item name="backgroundTint">@color/gt_button_primary</item>
+        <item name="cornerRadius">@dimen/gt_corner_radius</item>
+    </style>
+    <style name="GT.Button.Danger">
+        <item name="backgroundTint">@color/gt_button_danger</item>
+    </style>
+    <style name="GT.Button.Secondary">
+        <item name="backgroundTint">@color/gt_button_secondary</item>
+    </style>
+    <style name="GT.Button.Small">
+        <item name="android:layout_height">@dimen/gt_button_height_small</item>
+        <item name="android:textSize">@dimen/gt_text_sm</item>
+        <item name="android:minWidth">80dp</item>
+    </style>
+    <style name="GT.Card" parent="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">@color/gt_background_panel</item>
+        <item name="cardCornerRadius">@dimen/gt_corner_radius</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/gt_border</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+    <style name="GT.Dialog" parent="Theme.MaterialComponents.Dialog">
+        <item name="android:windowBackground">@color/gt_background_panel</item>
+        <item name="android:textColorPrimary">@color/gt_text_primary</item>
+    </style>
+    <style name="GT.EditText" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="android:textColor">@color/gt_text_primary</item>
+        <item name="android:textColorHint">@color/gt_text_disabled</item>
+        <item name="android:textSize">@dimen/gt_text_body</item>
+        <item name="android:background">@color/gt_background_panel</item>
+    </style>
+    <style name="GT.Row">
+        <item name="android:layout_height">@dimen/gt_row_height</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:paddingStart">@dimen/gt_row_padding_h</item>
+        <item name="android:paddingEnd">@dimen/gt_row_padding_h</item>
+        <item name="android:gravity">center_vertical</item>
+    </style>
+    <style name="GT.Row.Header">
+        <item name="android:background">@color/gt_green_primary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="GT.TabLayout" parent="Widget.MaterialComponents.TabLayout">
+        <item name="tabBackground">@drawable/tab_selector</item>
+        <item name="tabTextColor">@color/gt_text_secondary</item>
+        <item name="tabSelectedTextColor">@color/gt_text_primary</item>
+        <item name="tabIndicatorHeight">0dp</item>
+        <item name="tabIndicatorColor">@android:color/transparent</item>
+        <item name="tabRippleColor">@android:color/transparent</item>
+        <item name="tabTextAppearance">@style/GT.TabText</item>
+        <item name="tabGravity">fill</item>
+        <item name="tabMode">fixed</item>
+        <item name="tabMinWidth">0dp</item>
+        <item name="tabPaddingStart">2dp</item>
+        <item name="tabPaddingEnd">2dp</item>
+    </style>
+    <style name="GT.TabText" parent="TextAppearance.AppCompat.Button">
+        <item name="android:textSize">@dimen/gt_text_sm</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:shadowColor">@color/colorShadow</item>
+        <item name="android:shadowDx">1</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">2</item>
+    </style>
+    <style name="GT.Text">
+        <item name="android:textColor">@color/gt_text_primary</item>
+        <item name="android:textSize">@dimen/gt_text_body</item>
+    </style>
+    <style name="GT.Text.Body">
+        <item name="android:textColor">@color/gt_text_primary</item>
+        <item name="android:textSize">@dimen/gt_text_body</item>
+    </style>
+    <style name="GT.Text.Currency">
+        <item name="android:textSize">@dimen/gt_text_sm</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="GT.Text.Currency.Medipacks">
+        <item name="android:textColor">@color/gt_medipacks_blue</item>
+    </style>
+    <style name="GT.Text.Currency.Money">
+        <item name="android:textColor">@color/gt_money_green</item>
+    </style>
+    <style name="GT.Text.Currency.Stars">
+        <item name="android:textColor">@color/gt_stars_yellow</item>
+    </style>
+    <style name="GT.Text.Secondary">
+        <item name="android:textColor">@color/gt_text_secondary</item>
+        <item name="android:textSize">@dimen/gt_text_sm</item>
+    </style>
+    <style name="GT.Text.Small">
+        <item name="android:textColor">@color/gt_text_secondary</item>
+        <item name="android:textSize">@dimen/gt_text_xs</item>
+    </style>
+    <style name="GT.Text.Title">
+        <item name="android:textColor">@color/gt_text_primary</item>
+        <item name="android:textSize">@dimen/gt_text_title</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="HeaderRowStyle" parent="TextStyle">
+        <item name="android:textSize">10dp</item>
+        <item name="android:padding">4dp</item>
+    </style>
+    <style name="InactiveButtonStyle" parent="ButtonStyle">
+        <item name="android:background">@drawable/button_gray_selector</item>
+    </style>
+    <style name="LargeTextStyle" parent="TextStyle">
+        <item name="android:textSize">16dp</item>
+        <item name="android:shadowRadius">10</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">0</item>
+    </style>
+    <style name="MegaTextStyle" parent="LargeTextStyle">
+        <item name="android:textSize">20dp</item>
+    </style>
+    <style name="MenuSectionStyle" parent="TextStyle">
+        <item name="android:textStyle">normal</item>
+        <item name="android:textSize">10dp</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+    <style name="PremiumButtonStyle" parent="TextStyle">
+        <item name="android:background">@drawable/button_premium_selector</item>
+        <item name="android:gravity">center</item>
+    </style>
+    <style name="RegularTextStyle" parent="TextStyle">
+        <item name="android:textStyle">normal</item>
+    </style>
+    <style name="ResourcesStyle">
+        <item name="android:clickable">false</item>
+    </style>
+    <style name="SmallTextStyle" parent="TextStyle">
+        <item name="android:textSize">10dp</item>
+    </style>
+    <style name="SubtabStyle" parent="TextStyle">
+        <item name="android:background">@drawable/subtab_selector</item>
+        <item name="android:gravity">center</item>
+    </style>
+    <style name="TextStyle">
+        <item name="android:textColor">@color/colorText</item>
+        <item name="android:textSize">12dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:shadowColor">@color/colorShadow</item>
+        <item name="android:shadowDx">1</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">2</item>
+    </style>
+    <style name="Theme.GoalTactics" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">@color/colorText</item>
+        <item name="colorPrimaryDark">@color/colorGray</item>
+        <item name="colorAccent">@color/colorAccentGreen</item>
+        <item name="colorSecondary">@color/colorAccentGreen</item>
+        <item name="android:windowBackground">@drawable/splash_screen</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:textColorHint">@color/colorGray</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColorPrimary">@color/gt_text_primary</item>
+        <item name="android:textColorSecondary">@color/gt_text_secondary</item>
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:navigationBarColor">@color/black</item>
+    </style>
+    <style name="Theme.GoalTactics.Login">
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>

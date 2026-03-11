@@ -15,14 +15,31 @@ class NavMenuAdapter(
     private val items: List<MainActivity.NavItem>
 ) : BaseAdapter() {
 
+    companion object {
+        private const val TYPE_ITEM = 0
+        private const val TYPE_SECTION = 1
+    }
+
     override fun getCount(): Int = items.size
     override fun getItem(position: Int): MainActivity.NavItem = items[position]
     override fun getItemId(position: Int): Long = position.toLong()
+    override fun getViewTypeCount(): Int = 2
+    override fun getItemViewType(position: Int): Int =
+        if (items[position].isSection) TYPE_SECTION else TYPE_ITEM
+
+    override fun isEnabled(position: Int): Boolean = !items[position].isSection
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+        val item = items[position]
+        if (item.isSection) {
+            val view = convertView ?: LayoutInflater.from(context)
+                .inflate(R.layout.item_nav_section, parent, false)
+            view.findViewById<TextView>(R.id.textSectionTitle).text = item.title
+            return view
+        }
+
         val view = convertView ?: LayoutInflater.from(context)
             .inflate(R.layout.item_nav_menu, parent, false)
-        val item = items[position]
         
         view.findViewById<TextView>(R.id.textNavItem).text = item.title
         

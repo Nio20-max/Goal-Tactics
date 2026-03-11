@@ -1,0 +1,65 @@
+
+
+Request Head:
+
+POST /api/User/GetPreferences HTTP/1.1
+x-goaltactics-version: 1.2.4
+x-goaltactics-capabilities: youthlist,htmligm,friendlist,indtrainings
+Transfer-Encoding: chunked
+Content-Type: application/json; charset=utf-8
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+{
+	"Signature":"b0543cdc4f0fb6c1647717967d3576a8",
+	"Token":"935fcac4-4bed-4711-a517-e60ac98767fb",
+	"Locale":"de-DE",
+	"UtcOffset":"01:00:00",
+	"Culture":"de-DE",
+	"Platform":1
+}
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 30 Jun 2023 04:53:29 GMT
+Server: Microsoft-IIS/10.0
+Set-Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d;Path=/;HttpOnly;Secure;Domain=gtwebapp2.azurewebsites.net
+Set-Cookie: ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d;Path=/;HttpOnly;SameSite=None;Secure;Domain=gtwebapp2.azurewebsites.net
+Transfer-Encoding: chunked
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+{
+	"notificationSettings":{
+		"auctionOverbid":true,
+		"matchResults":true,
+		"lineupIncomplete":true,
+		"friendInvite":true,
+		"ineffectiveTraining":true,
+		"friendlyMatch":true,
+		"system":true,
+		"auctionEnd":true
+	},
+	"userData":{
+		"name":"Nikolai",
+		"score":8953,
+		"created":"2023-02-05T06:43:10.0130000",
+		"lastActivity":"2023-06-30T04:52:13.9530000",
+		"facebookId":"116052144733377",
+		"appleId":null,
+		"email":"nikolailinsch@posteo.de",
+		"password":null,
+		"rank":"Master!"
+	},
+	"errorMessage":null,
+	"status":1,
+	"message":null,
+	"punishment":0
+}

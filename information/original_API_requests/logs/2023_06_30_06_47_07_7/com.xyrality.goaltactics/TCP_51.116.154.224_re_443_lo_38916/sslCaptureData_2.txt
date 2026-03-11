@@ -1,0 +1,183 @@
+
+
+Request Head:
+
+POST /api/Team/GetMyTeamExtendedInfo HTTP/1.1
+x-goaltactics-version: 1.2.4
+x-goaltactics-capabilities: youthlist,htmligm,friendlist,indtrainings
+Transfer-Encoding: chunked
+Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d; ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d
+Content-Type: application/json; charset=utf-8
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+{
+	"Signature":"b0543cdc4f0fb6c1647717967d3576a8",
+	"Token":"935fcac4-4bed-4711-a517-e60ac98767fb",
+	"Locale":"de-DE",
+	"UtcOffset":"01:00:00",
+	"Culture":"de-DE",
+	"Platform":1
+}
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 30 Jun 2023 04:51:35 GMT
+Server: Microsoft-IIS/10.0
+Transfer-Encoding: chunked
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+{
+	"teamData":{
+		"leaguePosition":1,
+		"playersCount":39,
+		"bestVictory":"5:0",
+		"worstDefeat":"5:1",
+		"stadiumSize":112500,
+		"name":"Hamburger SV",
+		"logo":"wappen104",
+		"country":"de",
+		"countryName":"Deutschland",
+		"leagueName":"5. 2. Liga",
+		"leagueId":"85c36678-c0b1-4b13-a092-9132b6d68ea5",
+		"homeTrikot":"trikot0",
+		"awayTrikot":"trikot0",
+		"marketValue":151450283,
+		"strength":3582,
+		"mood":160,
+		"teamMood":"Paradiesisch",
+		"wins":102,
+		"losses":28,
+		"fans":2422,
+		"members":1757,
+		"matchTrend":"00000",
+		"userData":{
+			"name":"Nikolai",
+			"score":8943,
+			"created":"2023-02-05T06:43:10.0130000",
+			"lastActivity":"2023-06-30T04:47:12.3270000",
+			"facebookId":"116052144733377",
+			"appleId":null,
+			"email":"nikolailinsch@posteo.de",
+			"password":null,
+			"rank":"Master!"
+		},
+		"myLike":false,
+		"likesMe":false,
+		"challengeStatus":0
+	},
+	"news":[
+		{
+			"date":"2023-06-30T04:31:29.4100000",
+			"title":"Gebäude ausbauen",
+			"text":"Jugendzentrum (Stufe 14) werden ausgebaut und sind voraussichtlich fertig 01.07.2023 am 04:51."
+		},
+		{
+			"date":"2023-06-30T03:04:04.3070000",
+			"title":"Mitglieder & Fanclub",
+			"text":"Die Mitglieder erhöhen sich um 13. Deine Fans erhöhen sich um 25."
+		},
+		{
+			"date":"2023-06-30T01:55:20.0530000",
+			"title":"Ausbau fertiggestellt",
+			"text":"Stufe 13 Jugendzentrum wurde soeben fertiggestellt."
+		},
+		{
+			"date":"2023-06-29T18:15:20.4230000",
+			"title":"Heimspiel gegen Holzheimer SG",
+			"text":"Zum heutigen Spiel kamen 85500 Zuschauer. Die Einnahmen betragen 10,
+			915,
+			500 €."
+		},
+		{
+			"date":"2023-06-29T11:01:13.5400000",
+			"title":"Freundschaftsspiel gegen Psvendovena",
+			"text":"Zum heutigen Freundschaftsspiel kamen 85500 Zuschauer. Die Einnahmen betragen 5,
+			457,
+			750 €."
+		},
+		{
+			"date":"2023-06-29T04:11:39.6670000",
+			"title":"Gebäude ausbauen",
+			"text":"Jugendzentrum (Stufe 13) werden ausgebaut und sind voraussichtlich fertig 30.06.2023 am 02:51."
+		},
+		{
+			"date":"2023-06-29T03:04:06.0000000",
+			"title":"Mitglieder & Fanclub",
+			"text":"Die Mitglieder erhöhen sich um 16. Deine Fans erhöhen sich um 20."
+		},
+		{
+			"date":"2023-06-29T00:50:20.0470000",
+			"title":"Ausbau fertiggestellt",
+			"text":"Stufe 12 Jugendzentrum wurde soeben fertiggestellt."
+		},
+		{
+			"date":"2023-06-28T11:01:01.8770000",
+			"title":"Freundschaftsspiel gegen TNO",
+			"text":"Zum heutigen Freundschaftsspiel kamen 85500 Zuschauer. Die Einnahmen betragen 5,
+			457,
+			750 €."
+		},
+		{
+			"date":"2023-06-28T04:48:29.9270000",
+			"title":"Gebäude ausbauen",
+			"text":"Jugendzentrum (Stufe 12) werden ausgebaut und sind voraussichtlich fertig 29.06.2023 am 01:48."
+		}
+	],
+	"season":"#118",
+	"seasonStartDate":"2023-06-16T18:00:00.0000000",
+	"matchday":15,
+	"lastMatch":{
+		"homeCountry":"",
+		"awayCountry":"",
+		"homeScore":3,
+		"awayScore":1,
+		"opponentTeamId":"d6b4c2e9-cafd-4255-9f89-ab307d8d5d62",
+		"homeStrength":6116,
+		"awayStrength":2832,
+		"hasLineup":false,
+		"isFriendly":false,
+		"homeTrikot":null,
+		"awayTrikot":null,
+		"id":"c8c5e553-24c2-4b1f-a088-24daa16b5fbc",
+		"date":"2023-06-29T18:00:00.0000000",
+		"homeLogo":"wappen104",
+		"awayLogo":"wappen05",
+		"homeName":"Hamburger SV",
+		"awayName":"Holzheimer SG",
+		"myTeam":1
+	},
+	"nextMatch":{
+		"homeCountry":"",
+		"awayCountry":"",
+		"homeScore":-1,
+		"awayScore":-1,
+		"opponentTeamId":"44febca6-318e-4464-b22f-55f5bed2857a",
+		"homeStrength":-1,
+		"awayStrength":-1,
+		"hasLineup":false,
+		"isFriendly":false,
+		"homeTrikot":null,
+		"awayTrikot":null,
+		"id":"635d37bc-ce44-42c0-8a37-117728da74e7",
+		"date":"2023-06-30T18:00:00.0000000",
+		"homeLogo":"wappen19",
+		"awayLogo":"wappen104",
+		"homeName":"Eintracht Frankfurt",
+		"awayName":"Hamburger SV",
+		"myTeam":2
+	},
+	"renameTeamCost":500,
+	"errorMessage":null,
+	"status":1,
+	"message":null,
+	"punishment":0
+}

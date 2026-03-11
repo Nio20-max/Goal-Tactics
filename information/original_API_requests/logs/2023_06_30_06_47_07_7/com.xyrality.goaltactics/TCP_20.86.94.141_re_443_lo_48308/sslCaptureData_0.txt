@@ -1,0 +1,54 @@
+
+
+Request Head:
+
+POST /client/negotiate?hub=transfermarkethub&asrs.op=%2Fauc&negotiateVersion=1&asrs_request_id=9DjKwPIAAAA%3D HTTP/1.1
+User-Agent: Microsoft SignalR/7.0 (7.0.0+bb01bbf4433e27289b99001b7de6a582879d1835; Linux; .NET; Mono 6.12.0 (2020-02/dffa5ab9224))
+X-Requested-With: XMLHttpRequest
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjIzNjE5NjA5NSJ9.eyJuYmYiOjE2ODgxMDA0ODIsImV4cCI6MTY4ODEwNDA4MiwiaWF0IjoxNjg4MTAwNDgyLCJhdWQiOiJodHRwczovL2d0c2lnbmFsci5zZXJ2aWNlLnNpZ25hbHIubmV0L2NsaWVudC8_aHViPXRyYW5zZmVybWFya2V0aHViIn0.i4JZQQeGJw_ZfWYcsaK1YA60Klj9L91rAcCf2GkKWOw
+Content-Length: 0
+Host: gtsignalr.service.signalr.net
+
+
+Body:
+
+
+
+Response Head:
+
+HTTP/1.1 200 OK
+Date: Fri, 30 Jun 2023 04:48:02 GMT
+Content-Type: application/json
+Content-Length: 282
+Connection: keep-alive
+Strict-Transport-Security: max-age=15724800; includeSubDomains
+
+
+Body:
+
+{
+	"negotiateVersion":0,
+	"connectionId":"rVetruw6G2yNoFHpN5dvJAdzgPjQd02",
+	"availableTransports":[
+		{
+			"transport":"WebSockets",
+			"transferFormats":[
+				"Text",
+				"Binary"
+			]
+		},
+		{
+			"transport":"ServerSentEvents",
+			"transferFormats":[
+				"Text"
+			]
+		},
+		{
+			"transport":"LongPolling",
+			"transferFormats":[
+				"Text",
+				"Binary"
+			]
+		}
+	]
+}

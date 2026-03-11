@@ -1,0 +1,77 @@
+
+
+Request Head:
+
+POST /api/Team/GetTeamInfo HTTP/1.1
+x-goaltactics-version: 1.2.4
+x-goaltactics-capabilities: youthlist,htmligm,friendlist,indtrainings
+Transfer-Encoding: chunked
+Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d; ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d
+Content-Type: application/json; charset=utf-8
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+{
+	"Id":"9a3add93-5f04-4ee6-9f53-5e5af57f2733",
+	"Signature":"c49a9be0f3594fd3926d8d8eae2c589b",
+	"Token":"935fcac4-4bed-4711-a517-e60ac98767fb",
+	"Locale":"de-DE",
+	"UtcOffset":"01:00:00",
+	"Culture":"de-DE",
+	"Platform":1
+}
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 30 Jun 2023 04:47:49 GMT
+Server: Microsoft-IIS/10.0
+Transfer-Encoding: chunked
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+{
+	"teamData":{
+		"name":"GunnStars",
+		"logo":"wappen61",
+		"country":"gb",
+		"countryName":"Großbritannien",
+		"leagueName":"3. 2nd Division",
+		"leagueId":"2cd90dd5-06b4-4539-bc20-f1211d2ff9ea",
+		"homeTrikot":"trikot45",
+		"awayTrikot":"trikot4",
+		"marketValue":171436414,
+		"strength":4054,
+		"mood":150,
+		"teamMood":"Paradiesisch",
+		"wins":199,
+		"losses":53,
+		"fans":4100,
+		"members":3086,
+		"matchTrend":"00000",
+		"userData":{
+			"name":"George Gunn",
+			"score":45800,
+			"created":"2022-09-27T12:45:53.3270000",
+			"lastActivity":"2023-06-30T00:41:00.8430000",
+			"facebookId":"166154069402406",
+			"appleId":null,
+			"email":"gunngeorgew@gmail.com",
+			"password":null,
+			"rank":"Master!"
+		},
+		"myLike":true,
+		"likesMe":true,
+		"challengeStatus":1
+	},
+	"errorMessage":null,
+	"status":1,
+	"message":null,
+	"punishment":0
+}

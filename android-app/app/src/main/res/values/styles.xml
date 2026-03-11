@@ -126,9 +126,109 @@
         <item name="strokeWidth">1dp</item>
     </style>
 
+    <!-- TabLayout matching original game-themed tabs -->
+    <style name="GT.TabLayout" parent="Widget.MaterialComponents.TabLayout">
+        <item name="tabBackground">@drawable/tab_selector</item>
+        <item name="tabTextColor">@color/gt_text_secondary</item>
+        <item name="tabSelectedTextColor">@color/gt_text_primary</item>
+        <item name="tabIndicatorHeight">0dp</item>
+        <item name="tabIndicatorColor">@android:color/transparent</item>
+        <item name="tabRippleColor">@android:color/transparent</item>
+        <item name="tabTextAppearance">@style/GT.TabText</item>
+        <item name="tabGravity">fill</item>
+        <item name="tabMode">fixed</item>
+        <item name="tabMinWidth">0dp</item>
+        <item name="tabPaddingStart">2dp</item>
+        <item name="tabPaddingEnd">2dp</item>
+    </style>
+
+    <style name="GT.TabText" parent="TextAppearance.AppCompat.Button">
+        <item name="android:textSize">@dimen/gt_text_sm</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:shadowColor">@color/colorShadow</item>
+        <item name="android:shadowDx">1</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">2</item>
+    </style>
+
     <!-- Popup / dialog -->
     <style name="GT.Dialog" parent="Theme.MaterialComponents.Dialog">
         <item name="android:windowBackground">@color/gt_background_panel</item>
         <item name="android:textColorPrimary">@color/gt_text_primary</item>
+    </style>
+
+    <!-- Original Xamarin styles (referenced by layouts) -->
+    <style name="TextStyle">
+        <item name="android:textColor">@color/colorText</item>
+        <item name="android:textSize">12dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:shadowColor">@color/colorShadow</item>
+        <item name="android:shadowDx">1</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">2</item>
+    </style>
+
+    <style name="SmallTextStyle" parent="TextStyle">
+        <item name="android:textSize">10dp</item>
+    </style>
+
+    <style name="RegularTextStyle" parent="TextStyle">
+        <item name="android:textStyle">normal</item>
+    </style>
+
+    <style name="LargeTextStyle" parent="TextStyle">
+        <item name="android:textSize">16dp</item>
+        <item name="android:shadowRadius">10</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">0</item>
+    </style>
+
+    <style name="MegaTextStyle" parent="LargeTextStyle">
+        <item name="android:textSize">20dp</item>
+    </style>
+
+    <style name="ButtonStyle" parent="TextStyle">
+        <item name="android:background">@drawable/button_green_selector</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="InactiveButtonStyle" parent="ButtonStyle">
+        <item name="android:background">@drawable/button_gray_selector</item>
+    </style>
+
+    <style name="PremiumButtonStyle" parent="TextStyle">
+        <item name="android:background">@drawable/button_premium_selector</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="EntryStyle" parent="TextStyle">
+        <item name="android:background">@drawable/bg_input_field</item>
+        <item name="android:textStyle">normal</item>
+    </style>
+
+    <style name="MenuSectionStyle" parent="TextStyle">
+        <item name="android:textStyle">normal</item>
+        <item name="android:textSize">10dp</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <style name="SubtabStyle" parent="TextStyle">
+        <item name="android:background">@drawable/subtab_selector</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="HeaderRowStyle" parent="TextStyle">
+        <item name="android:textSize">10dp</item>
+        <item name="android:padding">4dp</item>
+    </style>
+
+    <style name="ClickableResourcesStyle">
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="ResourcesStyle">
+        <item name="android:clickable">false</item>
     </style>
 </resources>

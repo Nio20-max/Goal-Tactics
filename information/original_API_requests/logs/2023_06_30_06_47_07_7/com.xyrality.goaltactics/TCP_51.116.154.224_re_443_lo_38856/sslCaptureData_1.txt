@@ -1,0 +1,186 @@
+
+
+Request Head:
+
+POST /api/Friends/GetFriends HTTP/1.1
+x-goaltactics-version: 1.2.4
+x-goaltactics-capabilities: youthlist,htmligm,friendlist,indtrainings
+Transfer-Encoding: chunked
+Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d; ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d
+Content-Type: application/json; charset=utf-8
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+{
+	"Signature":"b0543cdc4f0fb6c1647717967d3576a8",
+	"Token":"935fcac4-4bed-4711-a517-e60ac98767fb",
+	"Locale":"de-DE",
+	"UtcOffset":"01:00:00",
+	"Culture":"de-DE",
+	"Platform":1
+}
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 30 Jun 2023 04:47:33 GMT
+Server: Microsoft-IIS/10.0
+Transfer-Encoding: chunked
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+{
+	"friends":[
+		{
+			"teamId":"efea6eba-b174-4df6-abc0-243b56ceb513",
+			"userName":"Yuna1603",
+			"teamName":"Inazuma Eleven",
+			"country":"de",
+			"teamLogo":"wappen97",
+			"strength":1780,
+			"lastActivity":"2023-06-29T20:42:29.1470000",
+			"language":"de",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		},
+		{
+			"teamId":"e8e3ab87-d550-4ea5-a1a7-aa01d5cc727f",
+			"userName":"Imprezat",
+			"teamName":"EagleIRL",
+			"country":"ie",
+			"teamLogo":"wappen01",
+			"strength":2743,
+			"lastActivity":"2023-06-30T02:41:57.2130000",
+			"language":"en",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		},
+		{
+			"teamId":"1e1d8c3b-9666-46ec-8bb4-966445e65fb8",
+			"userName":"ROONI",
+			"teamName":"FC Leipzig",
+			"country":"de",
+			"teamLogo":"wappen01",
+			"strength":3508,
+			"lastActivity":"2023-06-30T04:43:00.3130000",
+			"language":"de",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		},
+		{
+			"teamId":"7372bd3a-97d9-417e-87ed-3a65767c746f",
+			"userName":"Manager8595190",
+			"teamName":"Kick off",
+			"country":"de",
+			"teamLogo":"wappen135",
+			"strength":1548,
+			"lastActivity":"2023-06-29T07:11:56.2900000",
+			"language":"de",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		},
+		{
+			"teamId":"3cbed6b6-b24f-4815-ae3c-b5b4240ab466",
+			"userName":"Gooner Paul",
+			"teamName":"Gooners",
+			"country":"gb",
+			"teamLogo":"wappen12",
+			"strength":2402,
+			"lastActivity":"2023-06-29T19:44:28.1130000",
+			"language":"en",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		},
+		{
+			"teamId":"b35fcf52-ad6b-44bb-8605-9dfd696eb0f8",
+			"userName":"Sc3",
+			"teamName":"Siu",
+			"country":"ch",
+			"teamLogo":"wappen01",
+			"strength":587,
+			"lastActivity":"2023-06-30T04:40:55.8200000",
+			"language":"de",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		},
+		{
+			"teamId":"a4be7d6b-41fe-47af-9749-de0af92ec307",
+			"userName":"Manager9965717",
+			"teamName":"Forza coraggio",
+			"country":"it",
+			"teamLogo":"wappen01",
+			"strength":280,
+			"lastActivity":"2023-06-27T15:13:47.3000000",
+			"language":"it",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		},
+		{
+			"teamId":"fe6cee37-1236-4892-804a-92d3f756816c",
+			"userName":"ManagerC701C7A5",
+			"teamName":"Real Madrink",
+			"country":"it",
+			"teamLogo":"wappen24",
+			"strength":2569,
+			"lastActivity":"2023-06-29T20:57:57.6730000",
+			"language":"it",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		},
+		{
+			"teamId":"ff751992-48fa-4e47-b541-d83fe3aff2a3",
+			"userName":"Manager8256932",
+			"teamName":"Juve",
+			"country":"de",
+			"teamLogo":"wappen24",
+			"strength":2271,
+			"lastActivity":"2023-06-28T19:42:52.9130000",
+			"language":"de",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		},
+		{
+			"teamId":"6fa8d1a7-8c93-49f0-9899-369e6c732c1a",
+			"userName":"ManagerED558A70",
+			"teamName":"Kirchheimer SC",
+			"country":"de",
+			"teamLogo":"wappen03",
+			"strength":209,
+			"lastActivity":"2023-06-30T03:56:50.2200000",
+			"language":"de",
+			"myLike":false,
+			"likesMe":false,
+			"challengeStatus":0,
+			"challengeId":"00000000-0000-0000-0000-000000000000"
+		}
+	],
+	"friendName":null,
+	"errorMessage":null,
+	"status":1,
+	"message":null,
+	"punishment":0
+}

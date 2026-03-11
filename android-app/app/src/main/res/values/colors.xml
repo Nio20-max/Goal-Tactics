@@ -86,7 +86,7 @@
     <color name="colorGray">#999999</color>
     <color name="colorDarkGray">#555555</color>
     <color name="colorGreen">#3d6a1b</color>
-    <color name="colorHighlight">#ff0000</color>
+    <color name="colorHighlight">#ffffff00</color>
     <color name="colorInactiveEvenRow">#64555555</color>
     <color name="colorInactiveUnevenRow">#64999999</color>
     <color name="colorLadderGreen">#6a8d0c</color>

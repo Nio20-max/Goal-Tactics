@@ -1,0 +1,27 @@
+
+
+Request Head:
+
+GET /api/Common/GetVersion HTTP/1.1
+Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d; ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Type: text/plain; charset=utf-8
+Date: Fri, 30 Jun 2023 04:53:29 GMT
+Server: Microsoft-IIS/10.0
+Transfer-Encoding: chunked
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+28

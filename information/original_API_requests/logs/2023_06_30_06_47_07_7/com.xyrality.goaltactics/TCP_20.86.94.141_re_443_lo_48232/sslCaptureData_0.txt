@@ -1,0 +1,31 @@
+
+
+Request Head:
+
+GET /client/?hub=chathub&asrs.op=%2Fchat&negotiateVersion=1&asrs_request_id=0pcIpPIAAAA%3D&id=vI2JlV8mlG9G1FWfYNRYFgdzgPjQd02 HTTP/1.1
+Host: gtsignalr.service.signalr.net:443
+Connection: Upgrade
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Key: smZqFZOC6kGfiG3byt1E/g==
+User-Agent: Microsoft SignalR/7.0 (7.0.0+bb01bbf4433e27289b99001b7de6a582879d1835; Linux; .NET; Mono 6.12.0 (2020-02/dffa5ab9224))
+X-Requested-With: XMLHttpRequest
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjIzNjE5NjA5NSJ9.eyJuYmYiOjE2ODgxMDA0MzQsImV4cCI6MTY4ODEwNDAzNCwiaWF0IjoxNjg4MTAwNDM0LCJhdWQiOiJodHRwczovL2d0c2lnbmFsci5zZXJ2aWNlLnNpZ25hbHIubmV0L2NsaWVudC8_aHViPWNoYXRodWIifQ.n1EXjnYUF-uGrJAfhG7Cu9oCkdQZWsGBEq50s2kAgww
+
+
+Body:
+
+
+
+Response Head:
+
+HTTP/1.1 101 Switching Protocols
+Date: Fri, 30 Jun 2023 04:47:15 GMT
+Connection: upgrade
+upgrade: websocket
+sec-websocket-accept: fjyHxa1Y2PoaGDbm/fFtcg0bkvk=
+Strict-Transport-Security: max-age=15724800; includeSubDomains
+
+
+Body:
+

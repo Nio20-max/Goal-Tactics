@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quick start dialog: enter team name and country, then start -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_gravity="center"
+    android:orientation="vertical"
+    android:background="@drawable/bg_panel"
+    android:padding="@dimen/gt_spacing_xxl"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:layout_marginBottom="@dimen/gt_spacing_lg"
+        android:text="Quick Start"
+        android:textColor="@color/gt_green_accent"
+        android:textSize="@dimen/gt_text_md"
+        android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/editTeamName"
+        android:gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/gt_input_height"
+        android:layout_marginBottom="@dimen/gt_spacing_lg"
+        android:hint="Your Team Name"
+        android:inputType="textPersonName"
+        android:maxLength="64"
+        android:imeOptions="flagNoExtractUi"
+        android:background="@drawable/bg_input_field"
+        android:textColor="@color/gt_text_primary"
+        android:textColorHint="@color/gt_text_disabled"
+        android:textSize="@dimen/gt_text_body"
+        android:minWidth="@dimen/gt_button_width_wide" />
+
+    <LinearLayout
+        android:layout_gravity="center_horizontal"
+        android:orientation="horizontal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <Button
+            android:id="@+id/btnCancel"
+            style="@style/GT.Button.Secondary"
+            android:layout_width="@dimen/gt_button_width"
+            android:layout_height="@dimen/gt_button_height_sm"
+            android:layout_marginEnd="@dimen/gt_spacing_sm"
+            android:text="@string/cancel" />
+
+        <Button
+            android:id="@+id/btnStart"
+            style="@style/GT.Button"
+            android:layout_width="@dimen/gt_button_width"
+            android:layout_height="@dimen/gt_button_height_sm"
+            android:layout_marginStart="@dimen/gt_spacing_sm"
+            android:text="Let\&#39;s start!" />
+    </LinearLayout>
+</LinearLayout>

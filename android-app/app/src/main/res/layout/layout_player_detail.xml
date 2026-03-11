@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Player detail panel with tabs: Info | Details | Sell | Skill Cards | Upgrade -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/background_dark_nocorners">
+
+    <!-- Tab bar for detail views -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/playerDetailTabs"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/tabbar_height"
+        android:background="@drawable/navigationbar" />
+
+    <!-- Info tab -->
+    <ScrollView
+        android:id="@+id/panelInfo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/gt_spacing_sm">
+
+            <TextView
+                android:id="@+id/textPlayerName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                style="@style/GT.Text.Title"
+                android:layout_marginBottom="@dimen/gt_spacing_sm" />
+
+            <include layout="@layout/item_stat_row" android:id="@+id/rowPosition" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowStrength" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowFitness" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowAge" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowNationality" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowMarketValue" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowMood" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowSalary" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowGoals" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowAssists" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Details/Skills tab -->
+    <ScrollView
+        android:id="@+id/panelDetails"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/gt_spacing_sm">
+
+            <include layout="@layout/item_stat_row" android:id="@+id/rowKeeping" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowDefending" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowPlaymaking" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowPassing" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowScoring" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowSpeed" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowStamina" />
+            <include layout="@layout/item_stat_row" android:id="@+id/rowTalent" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Sell tab -->
+    <LinearLayout
+        android:id="@+id/panelSell"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="@dimen/gt_spacing_md"
+        android:visibility="gone"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/textSellPrice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/GT.Text.Title"
+            android:layout_marginBottom="@dimen/gt_spacing_lg" />
+
+        <Button
+            android:id="@+id/btnSellPlayer"
+            style="@style/GT.Button"
+            android:layout_width="wrap_content"
+            android:text="Sell on Transfer Market" />
+    </LinearLayout>
+
+    <!-- Skill Cards tab -->
+    <LinearLayout
+        android:id="@+id/panelSkillCards"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="@dimen/gt_spacing_md"
+        android:visibility="gone">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerSkillCards"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+
+    <!-- Upgrade tab -->
+    <LinearLayout
+        android:id="@+id/panelUpgrade"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="@dimen/gt_spacing_md"
+        android:visibility="gone"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/textUpgradeInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/GT.Text.Body"
+            android:layout_marginBottom="@dimen/gt_spacing_lg" />
+
+        <Button
+            android:id="@+id/btnUpgradePlayer"
+            style="@style/GT.Button"
+            android:layout_width="wrap_content"
+            android:text="Upgrade Player" />
+    </LinearLayout>
+</LinearLayout>

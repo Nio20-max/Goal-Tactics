@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\GoalTactics.Application\GoalTactics.Application.csproj" />
     <ProjectReference Include="..\GoalTactics.Contracts\GoalTactics.Contracts.csproj" />
   </ItemGroup>
 

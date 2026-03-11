@@ -462,7 +462,7 @@ public sealed class BotSimulationRunner(
             var random = new Random(HashCode.Combine(home.Seed, away.Seed, clock.CurrentUtc.DayOfYear));
 
             var homeScore = Math.Max(0, random.Next(0, 3) + (home.Strength - away.Strength) / 25);
-            var awayScore = Math.Max(0, random.Next(0, 3) + (away.Strength - home.Strength) / 30);
+            var awayScore = Math.Max(0, random.Next(0, 3) + (away.Strength - home.Strength) / 25);
 
             report.MatchesPlayed++;
             report.TotalGoals += homeScore + awayScore;
@@ -516,9 +516,9 @@ public sealed class BotSimulationRunner(
     {
         var baseline = tier switch
         {
-            1 => 58_000,
-            2 => 46_000,
-            3 => 36_000,
+            1 => 60_000,
+            2 => 48_000,
+            3 => 38_000,
             _ => 30_000
         };
 

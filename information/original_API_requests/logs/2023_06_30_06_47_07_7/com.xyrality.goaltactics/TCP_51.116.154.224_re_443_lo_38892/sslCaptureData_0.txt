@@ -1,0 +1,240 @@
+
+
+Request Head:
+
+POST /api/Common/GetCountries HTTP/1.1
+x-goaltactics-version: 1.2.4
+x-goaltactics-capabilities: youthlist,htmligm,friendlist,indtrainings
+Transfer-Encoding: chunked
+Content-Type: application/json; charset=utf-8
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+{
+	"Signature":"0fba08e9a13954fa9c89d6f9bf91d2df",
+	"Locale":"de-DE",
+	"UtcOffset":"01:00:00",
+	"Culture":"de-DE",
+	"Platform":1
+}
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 30 Jun 2023 04:49:57 GMT
+Server: Microsoft-IIS/10.0
+Set-Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d;Path=/;HttpOnly;Secure;Domain=gtwebapp2.azurewebsites.net
+Set-Cookie: ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d;Path=/;HttpOnly;SameSite=None;Secure;Domain=gtwebapp2.azurewebsites.net
+Transfer-Encoding: chunked
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+{
+	"countries":[
+		{
+			"id":"5d66dea5-76bd-4c1d-acb4-0a1ec537006c",
+			"name":"Frankreich",
+			"short":"fr"
+		},
+		{
+			"id":"a45dd2cc-b2fa-4c03-ad86-0c5f53315599",
+			"name":"Schweden",
+			"short":"se"
+		},
+		{
+			"id":"ac746fda-6311-476c-b644-1888d8619557",
+			"name":"Portugal",
+			"short":"pt"
+		},
+		{
+			"id":"f0e8aa62-4103-48ae-a70c-1abb8c76685c",
+			"name":"Türkei",
+			"short":"tr"
+		},
+		{
+			"id":"0385ffb8-3b08-4315-8b50-23acceb8b3d9",
+			"name":"Belgien",
+			"short":"be"
+		},
+		{
+			"id":"0a37fff4-8b60-4f9d-a707-2bbfe549fbfe",
+			"name":"Uruguay",
+			"short":"uy"
+		},
+		{
+			"id":"84f1d5db-d6ea-419b-9b75-491147551419",
+			"name":"Saudi Arabien",
+			"short":"sa"
+		},
+		{
+			"id":"975bb690-cb91-46ac-bf82-4f906e35eae9",
+			"name":"Mexiko",
+			"short":"mx"
+		},
+		{
+			"id":"cc54c944-0735-48db-8a31-54056217efea",
+			"name":"Deutschland",
+			"short":"de"
+		},
+		{
+			"id":"88975ff0-5a1a-4913-bf40-588575959e02",
+			"name":"Ecuador",
+			"short":"ec"
+		},
+		{
+			"id":"f1f7dccd-e549-4fbc-ba8d-6001bc53941a",
+			"name":"Großbritannien",
+			"short":"gb"
+		},
+		{
+			"id":"2d7fe3b4-25fe-4bef-b9e8-61685ca465dd",
+			"name":"Argentinien",
+			"short":"ar"
+		},
+		{
+			"id":"3f55532b-8173-4cbd-9ee5-62ecd7bf1877",
+			"name":"Schweiz",
+			"short":"ch"
+		},
+		{
+			"id":"42bd10d5-4b25-4997-a899-6a6574c0942a",
+			"name":"Spanien",
+			"short":"es"
+		},
+		{
+			"id":"65c3ddf4-9f62-4227-afb3-70d9e2ec22c7",
+			"name":"Ungarn",
+			"short":"hu"
+		},
+		{
+			"id":"0da573a5-8f4e-4e02-a8af-726a75dac7f6",
+			"name":"Österreich",
+			"short":"at"
+		},
+		{
+			"id":"963647fb-0e8e-4903-87f9-78d5def1998f",
+			"name":"Brasilien",
+			"short":"br"
+		},
+		{
+			"id":"cc106924-45fb-4f91-a56d-7cf170e0478d",
+			"name":"Lettland",
+			"short":"lv"
+		},
+		{
+			"id":"0c1e6e66-b3ab-4d7f-9889-842568e2e46e",
+			"name":"Finnland",
+			"short":"fi"
+		},
+		{
+			"id":"409f9d43-c5d8-4d3d-b1cc-8e81f2ca226c",
+			"name":"Irland",
+			"short":"ie"
+		},
+		{
+			"id":"5090a07b-4800-440c-be09-92f8fb0eea5f",
+			"name":"Tschechiche Republik",
+			"short":"cz"
+		},
+		{
+			"id":"bd632a58-be41-49ce-9ba5-93f36dfcf1b7",
+			"name":"Luxemburg",
+			"short":"lu"
+		},
+		{
+			"id":"f9998915-81ba-4766-96e6-96016c627151",
+			"name":"Zypern",
+			"short":"cy"
+		},
+		{
+			"id":"7844a96e-31c3-45a5-9db8-9ecc75e40480",
+			"name":"Dänemark",
+			"short":"dk"
+		},
+		{
+			"id":"7986c123-d9f5-4f99-b161-a9b70a25be66",
+			"name":"Columbia",
+			"short":"co"
+		},
+		{
+			"id":"1019b12b-cd18-4a7d-a93f-aafed899c118",
+			"name":"Estland",
+			"short":"ee"
+		},
+		{
+			"id":"9605f6cb-2e68-4eb9-9d8b-ad30eca3dbba",
+			"name":"Bulgarien",
+			"short":"bg"
+		},
+		{
+			"id":"9f126af7-d098-4e5e-bf59-b0e724603d74",
+			"name":"Honduras",
+			"short":"hn"
+		},
+		{
+			"id":"2a2a357e-4f49-41f7-b8d5-c288fa223df1",
+			"name":"Costa Rica",
+			"short":"cr"
+		},
+		{
+			"id":"95e2eb68-7f33-425c-b54a-c85d9f80d40c",
+			"name":"Slovenien",
+			"short":"si"
+		},
+		{
+			"id":"ab4c034d-465e-4fa8-9b84-ccdedc2a99f1",
+			"name":"Slowakei",
+			"short":"sk"
+		},
+		{
+			"id":"fa07833f-aebe-41c8-930e-dc84cfaf6da7",
+			"name":"Malta",
+			"short":"mt"
+		},
+		{
+			"id":"dd1f3e74-198c-4bf8-9603-e828cf2a3df2",
+			"name":"Polen",
+			"short":"pl"
+		},
+		{
+			"id":"f8782e49-5347-46de-ab77-ecce56852c02",
+			"name":"Litauen",
+			"short":"lt"
+		},
+		{
+			"id":"36f0b73f-60e9-4dec-a949-f2739c8a86dd",
+			"name":"Niederlande",
+			"short":"nl"
+		},
+		{
+			"id":"76595534-154c-4b11-8167-f44b4faf2ac0",
+			"name":"Griechenland",
+			"short":"el"
+		},
+		{
+			"id":"3f524bec-2394-4b6e-a266-f452a5201f10",
+			"name":"Italien",
+			"short":"it"
+		},
+		{
+			"id":"bf941914-8e18-4e79-b8fb-f6c105aec95b",
+			"name":"Rumänien",
+			"short":"ro"
+		},
+		{
+			"id":"5be01811-39db-4bb9-902a-fe991778867d",
+			"name":"Chile",
+			"short":"cl"
+		}
+	],
+	"errorMessage":null,
+	"status":1,
+	"message":null,
+	"punishment":0
+}

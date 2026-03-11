@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chat screen -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- Messages list -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerMessages"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="@dimen/gt_spacing_md" />
+
+    <!-- Input bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/gt_background_panel"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="@dimen/gt_spacing_md">
+
+        <EditText
+            android:id="@+id/editMessage"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/gt_button_height"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input_field"
+            android:hint="@string/chat_message_hint"
+            android:inputType="text"
+            android:maxLength="512"
+            android:padding="@dimen/gt_spacing_md"
+            android:textColor="@color/gt_text_primary"
+            android:textColorHint="@color/gt_text_disabled"
+            android:textSize="@dimen/gt_text_body" />
+
+        <Button
+            android:id="@+id/btnSend"
+            style="@style/GT.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/gt_spacing_md"
+            android:text="@string/chat_send" />
+    </LinearLayout>
+</LinearLayout>

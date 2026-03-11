@@ -1,0 +1,111 @@
+
+
+Request Head:
+
+POST /api/Team/GetFinanceHistory HTTP/1.1
+x-goaltactics-version: 1.2.4
+x-goaltactics-capabilities: youthlist,htmligm,friendlist,indtrainings
+Transfer-Encoding: chunked
+Cookie: ARRAffinity=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d; ARRAffinitySameSite=91e9fb92eb963b4a96b87b058366e5aaf2509f2958010098f03d851bbdfb562d
+Content-Type: application/json; charset=utf-8
+Host: gtwebapp2.azurewebsites.net
+
+
+Body:
+
+{
+	"Signature":"b0543cdc4f0fb6c1647717967d3576a8",
+	"Token":"935fcac4-4bed-4711-a517-e60ac98767fb",
+	"Locale":"de-DE",
+	"UtcOffset":"01:00:00",
+	"Culture":"de-DE",
+	"Platform":1
+}
+
+Response Head:
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 30 Jun 2023 04:50:48 GMT
+Server: Microsoft-IIS/10.0
+Transfer-Encoding: chunked
+Request-Context: appId=cid-v1:4d82e522-e03c-4fe1-8a7a-d7d7b4fe8f73
+X-Powered-By: ASP.NET
+
+
+Body:
+
+{
+	"financeHistory":[
+		{
+			"date":"2023-04-06T00:00:00",
+			"income":10338587.0000000000,
+			"outcome":5813646.8108500401,
+			"balance":34454396.0306156623
+		},
+		{
+			"date":"2023-04-16T00:00:00",
+			"income":3926.0900000000,
+			"outcome":22666.9000000000,
+			"balance":12114967.5322803078
+		},
+		{
+			"date":"2023-04-24T00:00:00",
+			"income":2718815.0000000000,
+			"outcome":1632837.7994323951,
+			"balance":8942291.1397267548
+		},
+		{
+			"date":"2023-05-02T00:00:00",
+			"income":2826266.8100000000,
+			"outcome":1933149.0733300580,
+			"balance":27853553.8751311075
+		},
+		{
+			"date":"2023-05-10T00:00:00",
+			"income":9586884.0000000000,
+			"outcome":2120625.5832054699,
+			"balance":-1186149.4713057456
+		},
+		{
+			"date":"2023-05-18T00:00:00",
+			"income":3434367.0000000000,
+			"outcome":2402750.5232571266,
+			"balance":18226629.8630504952
+		},
+		{
+			"date":"2023-05-26T00:00:00",
+			"income":1075481.0000000000,
+			"outcome":2829482.0236190617,
+			"balance":33274235.9131052770
+		},
+		{
+			"date":"2023-06-03T00:00:00",
+			"income":10127328.0000000000,
+			"outcome":8137430.4090322298,
+			"balance":26116838.0738077908
+		},
+		{
+			"date":"2023-06-11T00:00:00",
+			"income":1226161.0000000000,
+			"outcome":3197895.5227313970,
+			"balance":81579501.4869847636
+		},
+		{
+			"date":"2023-06-20T00:00:00",
+			"income":7386584.8600000000,
+			"outcome":25927186.1321323011,
+			"balance":44675943.8905193675
+		},
+		{
+			"date":"2023-06-29T00:00:00",
+			"income":16564453.0000000000,
+			"outcome":5525031.1768597399,
+			"balance":32433462.2646630343
+		}
+	],
+	"errorMessage":null,
+	"status":1,
+	"message":null,
+	"punishment":0
+}

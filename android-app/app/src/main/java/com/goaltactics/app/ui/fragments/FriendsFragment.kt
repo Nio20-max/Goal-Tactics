@@ -1,5 +1,6 @@
 package com.goaltactics.app.ui.fragments
 
+import android.app.AlertDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -12,15 +13,20 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.goaltactics.app.data.api.ApiClient
 import com.goaltactics.app.R
+import com.goaltactics.app.data.model.FriendData
 import com.goaltactics.app.data.model.IdRequest
 import com.goaltactics.app.data.model.SearchRequest
 import com.goaltactics.app.ui.adapters.FriendAdapter
 import com.goaltactics.app.ui.shell.MainActivity
+import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.launch
 
 class FriendsFragment : Fragment() {
 
-    private val adapter = FriendAdapter { friend -> showFriendAction(friend) }
+    private val friendsAdapter = FriendAdapter { friend -> showFriendAction(friend) }
+    private val challengesAdapter = FriendAdapter { friend -> sendChallenge(friend) }
+    private val searchAdapter = FriendAdapter { friend -> showFriendAction(friend) }
+    private val panels = mutableListOf<View>()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         return inflater.inflate(R.layout.fragment_friends, container, false)
@@ -29,9 +35,39 @@ class FriendsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val recycler = view.findViewById<RecyclerView>(R.id.recyclerFriends)
-        recycler.layoutManager = LinearLayoutManager(context)
-        recycler.adapter = adapter
+        // Setup tabs
+        val tabLayout = view.findViewById<TabLayout>(R.id.tabLayout)
+        tabLayout.addTab(tabLayout.newTab().setText("Friends list"))
+        tabLayout.addTab(tabLayout.newTab().setText("Challenges"))
+        tabLayout.addTab(tabLayout.newTab().setText("Search friends"))
+
+        panels.add(view.findViewById(R.id.panelFriendsList))
+        panels.add(view.findViewById(R.id.panelChallenges))
+        panels.add(view.findViewById(R.id.panelSearchFriends))
+
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                panels.forEachIndexed { i, p -> p.visibility = if (i == tab.position) View.VISIBLE else View.GONE }
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) {}
+        })
+
+        // Friends list
+        view.findViewById<RecyclerView>(R.id.recyclerFriends).apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = friendsAdapter
+        }
+        // Challenges
+        view.findViewById<RecyclerView>(R.id.recyclerChallenges).apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = challengesAdapter
+        }
+        // Search
+        view.findViewById<RecyclerView>(R.id.recyclerSearchResults).apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = searchAdapter
+        }
 
         view.findViewById<View>(R.id.btnSearchFriends)?.setOnClickListener {
             val query = view.findViewById<EditText>(R.id.editSearch)?.text?.toString()?.trim()
@@ -52,7 +88,9 @@ class FriendsFragment : Fragment() {
                 val response = ApiClient.get().getFriends(SearchRequest(text = null, value = 0, language = null))
                 if (response.isSuccessful) {
                     response.body()?.let { data ->
-                        adapter.submitList(data.friends)
+                        friendsAdapter.submitList(data.friends)
+                        val noFriends = view?.findViewById<View>(R.id.noFriendsContainer)
+                        noFriends?.visibility = if (data.friends.isNullOrEmpty()) View.VISIBLE else View.GONE
                     }
                 }
             } catch (_: Exception) {
@@ -72,7 +110,7 @@ class FriendsFragment : Fragment() {
                 val response = ApiClient.get().getFriends(request)
                 if (response.isSuccessful) {
                     response.body()?.let { data ->
-                        adapter.submitList(data.friends)
+                        searchAdapter.submitList(data.friends)
                     }
                 }
             } catch (_: Exception) {
@@ -82,33 +120,58 @@ class FriendsFragment : Fragment() {
         }
     }
 
-    private fun showFriendAction(friend: com.goaltactics.app.data.model.FriendData) {
+    private fun showFriendAction(friend: FriendData) {
         val ctx = context ?: return
-        val actions = if (friend.isFriend) {
-            arrayOf("Like", "Unlike")
+        val actions = mutableListOf<String>()
+
+        if (friend.isFriend) {
+            actions.add("Challenge")
+            actions.add(if (friend.isLiked) "Unlike" else "Like")
+        } else if (friend.isRequestIncoming) {
+            actions.add("Accept")
+            actions.add("Decline")
+        } else if (friend.isRequestOutgoing) {
+            actions.add("Request Pending...")
         } else {
-            arrayOf("Accept", "Decline")
+            actions.add("Add Friend")
         }
-        android.app.AlertDialog.Builder(ctx)
+
+        AlertDialog.Builder(ctx)
             .setTitle(friend.name ?: "Friend")
-            .setItems(actions) { _, which ->
+            .setItems(actions.toTypedArray()) { _, which ->
                 when (actions[which]) {
-                    "Accept" -> friendAction { ApiClient.get().acceptFriend(IdRequest(friend.id)) }
-                    "Decline" -> friendAction { ApiClient.get().declineFriend(IdRequest(friend.id)) }
-                    "Like" -> friendAction { ApiClient.get().like(IdRequest(friend.id)) }
-                    "Unlike" -> friendAction { ApiClient.get().unlike(IdRequest(friend.id)) }
+                    "Accept" -> friendAction("Accepted!") { ApiClient.get().acceptFriend(IdRequest(friend.id)) }
+                    "Decline" -> friendAction("Declined") { ApiClient.get().declineFriend(IdRequest(friend.id)) }
+                    "Like" -> friendAction("Liked!") { ApiClient.get().like(IdRequest(friend.id)) }
+                    "Unlike" -> friendAction("Unliked") { ApiClient.get().unlike(IdRequest(friend.id)) }
+                    "Challenge" -> sendChallenge(friend)
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    private fun friendAction(action: suspend () -> retrofit2.Response<*>) {
+    private fun sendChallenge(friend: FriendData) {
+        val ctx = context ?: return
+        AlertDialog.Builder(ctx)
+            .setTitle("Challenge ${friend.name}?")
+            .setMessage("Send a friendly match challenge?")
+            .setPositiveButton("Challenge") { _, _ ->
+                friendAction("Challenge sent!") { ApiClient.get().sendChallenge(IdRequest(friend.foreignTeamId)) }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun friendAction(successMsg: String, action: suspend () -> retrofit2.Response<*>) {
         val main = requireActivity() as MainActivity
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 main.showLoading(true)
-                action()
+                val result = action()
+                if (result.isSuccessful) {
+                    Toast.makeText(context, successMsg, Toast.LENGTH_SHORT).show()
+                }
                 loadFriends()
             } catch (_: Exception) {
             } finally {

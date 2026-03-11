@@ -37,9 +37,9 @@ class PlayerAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val player = getItem(position)
         holder.name.text = player.name
-        holder.position.text = player.position
-        holder.strength.text = player.strength.toString()
-        holder.value.text = "FIT: ${player.fitness}"
+        holder.position.text = player.positionName
+        holder.strength.text = String.format("%.1f", player.strength)
+        holder.value.text = String.format("FIT: %.0f%%", player.fitness)
         holder.itemView.setOnClickListener { onClick(player) }
         // Alternate row colors
         val bg = if (position % 2 == 0) R.color.gt_row_even else R.color.gt_row_odd
@@ -90,8 +90,14 @@ class LeagueTableAdapter : ListAdapter<LeagueTableData, LeagueTableAdapter.ViewH
         holder.losses.text = "$l"
         holder.goals.text = "$gf:$ga"
         holder.points.text = "$pts"
-        val bg = if (position % 2 == 0) R.color.gt_row_even else R.color.gt_row_odd
+        val bg = if (entry.isMine) R.color.gt_row_selected
+        else if (position % 2 == 0) R.color.gt_row_even else R.color.gt_row_odd
         holder.itemView.setBackgroundResource(bg)
+        if (entry.isMine) {
+            holder.name.setTypeface(null, android.graphics.Typeface.BOLD)
+        } else {
+            holder.name.setTypeface(null, android.graphics.Typeface.NORMAL)
+        }
     }
 }
 
@@ -123,8 +129,14 @@ class LadderAdapter : ListAdapter<LadderTeamData, LadderAdapter.ViewHolder>(Ladd
         holder.name.text = team.teamName
         holder.strength.text = "${team.strength}"
         holder.points.text = "${team.points}"
-        val bg = if (position % 2 == 0) R.color.gt_row_even else R.color.gt_row_odd
+        val bg = if (team.isMine) R.color.gt_row_selected
+        else if (position % 2 == 0) R.color.gt_row_even else R.color.gt_row_odd
         holder.itemView.setBackgroundResource(bg)
+        if (team.isMine) {
+            holder.name.setTypeface(null, android.graphics.Typeface.BOLD)
+        } else {
+            holder.name.setTypeface(null, android.graphics.Typeface.NORMAL)
+        }
     }
 }
 
@@ -366,20 +378,23 @@ class MailAdapter(
     }
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val label: TextView = view.findViewById(R.id.textLabel)
-        val value: TextView = view.findViewById(R.id.textValue)
+        val date: TextView = view.findViewById(R.id.textDate)
+        val sender: TextView = view.findViewById(R.id.textSender)
+        val subject: TextView = view.findViewById(R.id.textSubject)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_stat_row, parent, false)
+            .inflate(R.layout.item_mail_row, parent, false)
         return ViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val mail = getItem(position)
-        holder.label.text = mail.subject
-        holder.value.text = mail.date
+        holder.date.text = mail.date
+        holder.sender.text = mail.sender ?: "System"
+        holder.subject.text = mail.subject
+        if (mail.isNew) holder.subject.setTypeface(null, android.graphics.Typeface.BOLD)
         holder.itemView.setOnClickListener { onClick(mail) }
         val bg = if (position % 2 == 0) R.color.gt_row_even else R.color.gt_row_odd
         holder.itemView.setBackgroundResource(bg)
