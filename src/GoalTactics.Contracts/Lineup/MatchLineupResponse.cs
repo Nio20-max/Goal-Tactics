@@ -5,15 +5,9 @@ namespace GoalTactics.Contracts.Lineup;
 public sealed class MatchLineupResponse : ResponseObject
 {
     public IReadOnlyList<MatchLineupPlayerData> Players { get; init; } = [];
-    public IReadOnlyList<MatchSystemData> Systems { get; init; } = [];
-    public TacticData[] Tactics { get; init; } = [];
-    public MatchFormationData? FormationData { get; init; }
+    public IReadOnlyList<string> Systems { get; init; } = [];
+    public string[] Tactics { get; init; } = [];
     public bool IsLocked { get; init; }
-    public string? HomeShirt { get; init; }
-    public decimal CaptainBonus { get; init; }
-    public decimal PenaltyBonus { get; init; }
-    public decimal CornerBonus { get; init; }
-    public decimal FreekickBonus { get; init; }
 }
 
 public sealed class MatchFormationData

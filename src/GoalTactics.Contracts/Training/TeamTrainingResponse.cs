@@ -72,6 +72,6 @@ public sealed class TrainingPlayerData : SquadPlayerData
     public int SkillIndex { get; init; }
     public decimal SkillChange { get; init; }
     public decimal TotalChange { get; init; }
-    public new decimal[]? Skills { get; init; }
+    public new double[]? Skills { get; init; }
     public bool HasContract { get; init; }
 }

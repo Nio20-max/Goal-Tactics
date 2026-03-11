@@ -46,7 +46,7 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
                 NoTraining = false,
                 HasAlert = false
             },
-            TacticTraining = BuildTacticTraining(),
+            TacticTraining = BuildTacticTraining(state),
             TrainingCamp = BuildTrainingCamp(state),
             IndividualTraining = new IndividualTrainingData
             {
@@ -64,10 +64,12 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         return teamStore.SaveTeamTrainingAsync(userId, request.MainSkillIndex, request.SubSkillIndex, cancellationToken);
     }
 
-    public Task SaveTacticTrainingAsync(string userId, TacticTrainingSaveRequest request, CancellationToken cancellationToken = default)
+    public async Task SaveTacticTrainingAsync(string userId, TacticTrainingSaveRequest request, CancellationToken cancellationToken = default)
     {
-        // Tactic training is not persisted separately yet.
-        return Task.CompletedTask;
+        if (!string.IsNullOrWhiteSpace(request.TacticId))
+        {
+            await teamStore.SaveTacticTrainingAsync(userId, request.TacticId.Trim(), cancellationToken);
+        }
     }
 
     public async Task BookCampAsync(string userId, TrainingCampRequest request, CancellationToken cancellationToken = default)
@@ -94,7 +96,19 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
 
     public async Task SaveIndividualTrainingAsync(string userId, IndividualTrainingRequest request, CancellationToken cancellationToken = default)
     {
-        var success = await teamStore.SaveIndividualTrainingAsync(userId, request.Id, request.SkillType, cancellationToken);
+        var skill = request.ResolvedSkillType;
+        if (string.IsNullOrWhiteSpace(skill))
+        {
+            throw new InvalidOperationException("No skill specified.");
+        }
+
+        // Deduct stars for starting individual training
+        if (!await teamStore.TrySpendStarsAsync(userId, 1_000m, cancellationToken))
+        {
+            throw new InvalidOperationException("Insufficient stars.");
+        }
+
+        var success = await teamStore.SaveIndividualTrainingAsync(userId, request.ResolvedPlayerId, skill, cancellationToken);
         if (!success)
         {
             throw new InvalidOperationException("Player not found.");
@@ -128,24 +142,33 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         }
     }
 
-    private static TacticTrainingData BuildTacticTraining()
+    private static TacticTrainingData BuildTacticTraining(TeamTrainingStateRecord state)
     {
-        var tactics = new[]
+        var tacticDefs = new[]
         {
-            new { Id = Guid.Parse("91a5e724-7b88-4777-8c73-008ad20a5dea"), Name = "Normal", Value = 83, Counters = new[] { (Guid.Parse("99baeb1f-c7cf-4f75-9d5b-12d508a174a9"), 8.30m, 10), (Guid.Parse("fc645db1-90bd-4924-b642-6efeabad1fdb"), 4.15m, 5), (Guid.Parse("9cf6d48e-8268-432d-80b2-7ad2f986f8c7"), 1.66m, 2) } },
-            new { Id = Guid.Parse("99baeb1f-c7cf-4f75-9d5b-12d508a174a9"), Name = "Pressing", Value = 20, Counters = new[] { (Guid.Parse("fc645db1-90bd-4924-b642-6efeabad1fdb"), 2.00m, 10), (Guid.Parse("9cf6d48e-8268-432d-80b2-7ad2f986f8c7"), 1.00m, 5), (Guid.Parse("b83f08e9-500f-4fab-bb16-885e4d5532d2"), 0.40m, 2) } },
-            new { Id = Guid.Parse("fc645db1-90bd-4924-b642-6efeabad1fdb"), Name = "One-Touch", Value = 12, Counters = new[] { (Guid.Parse("9cf6d48e-8268-432d-80b2-7ad2f986f8c7"), 1.20m, 10), (Guid.Parse("b83f08e9-500f-4fab-bb16-885e4d5532d2"), 0.60m, 5), (Guid.Parse("2f47a8d8-ca9a-4a89-a908-da69d3c6e41b"), 0.24m, 2) } },
-            new { Id = Guid.Parse("9cf6d48e-8268-432d-80b2-7ad2f986f8c7"), Name = "Durch die Mitte", Value = 40, Counters = new[] { (Guid.Parse("b83f08e9-500f-4fab-bb16-885e4d5532d2"), 4.00m, 10), (Guid.Parse("2f47a8d8-ca9a-4a89-a908-da69d3c6e41b"), 2.00m, 5), (Guid.Parse("02f01198-2101-4ba0-88d4-f02442240e1c"), 0.80m, 2) } },
-            new { Id = Guid.Parse("b83f08e9-500f-4fab-bb16-885e4d5532d2"), Name = "Konter", Value = 10, Counters = new[] { (Guid.Parse("2f47a8d8-ca9a-4a89-a908-da69d3c6e41b"), 1.00m, 10), (Guid.Parse("02f01198-2101-4ba0-88d4-f02442240e1c"), 0.50m, 5), (Guid.Parse("91a5e724-7b88-4777-8c73-008ad20a5dea"), 0.20m, 2) } },
-            new { Id = Guid.Parse("2f47a8d8-ca9a-4a89-a908-da69d3c6e41b"), Name = "Über die Flügel", Value = 30, Counters = new[] { (Guid.Parse("02f01198-2101-4ba0-88d4-f02442240e1c"), 3.00m, 10), (Guid.Parse("91a5e724-7b88-4777-8c73-008ad20a5dea"), 1.50m, 5), (Guid.Parse("99baeb1f-c7cf-4f75-9d5b-12d508a174a9"), 0.60m, 2) } },
-            new { Id = Guid.Parse("02f01198-2101-4ba0-88d4-f02442240e1c"), Name = "Kick and Rush", Value = 100, Counters = new[] { (Guid.Parse("91a5e724-7b88-4777-8c73-008ad20a5dea"), 10.00m, 10), (Guid.Parse("99baeb1f-c7cf-4f75-9d5b-12d508a174a9"), 5.00m, 5), (Guid.Parse("fc645db1-90bd-4924-b642-6efeabad1fdb"), 2.00m, 2) } }
+            (Id: Guid.Parse("91a5e724-7b88-4777-8c73-008ad20a5dea"), Name: "Normal"),
+            (Id: Guid.Parse("99baeb1f-c7cf-4f75-9d5b-12d508a174a9"), Name: "Pressing"),
+            (Id: Guid.Parse("fc645db1-90bd-4924-b642-6efeabad1fdb"), Name: "One-Touch"),
+            (Id: Guid.Parse("9cf6d48e-8268-432d-80b2-7ad2f986f8c7"), Name: "Durch die Mitte"),
+            (Id: Guid.Parse("b83f08e9-500f-4fab-bb16-885e4d5532d2"), Name: "Konter"),
+            (Id: Guid.Parse("2f47a8d8-ca9a-4a89-a908-da69d3c6e41b"), Name: "Über die Flügel"),
+            (Id: Guid.Parse("02f01198-2101-4ba0-88d4-f02442240e1c"), Name: "Kick and Rush")
         };
+
+        // Compute tactic values: all start at 0%, selected tactic goes up 2%/day
+        var selectedId = Guid.TryParse(state.SelectedTacticId, out var parsed) ? parsed : Guid.Empty;
+        var daysTrained = state.SelectedTacticStartUtc.HasValue
+            ? (int)(DateTime.UtcNow - state.SelectedTacticStartUtc.Value).TotalDays
+            : 0;
+        var selectedValue = Math.Min(100, Math.Max(0, daysTrained * 2));
+
+        var tactics = tacticDefs.Select(t => (t.Id, t.Name, Value: t.Id == selectedId ? selectedValue : 0)).ToArray();
 
         return new TacticTrainingData
         {
             Success = true,
-            SelectedTacticId = tactics[0].Id,
-            TacticBonusList = tactics.Select(tactic => new TacticBonus
+            SelectedTacticId = selectedId == Guid.Empty ? tacticDefs[0].Id : selectedId,
+            TacticBonusList = tactics.Select((tactic, idx) => new TacticBonus
             {
                 Tactic = new TacticBonusTactic
                 {
@@ -153,12 +176,12 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
                     Name = tactic.Name,
                     Value = tactic.Value
                 },
-                CounterTactics = tactic.Counters.Select(counter => new CounterTactic
+                CounterTactics = new[]
                 {
-                    TacticId = counter.Item1,
-                    Bonus = counter.Item2,
-                    MaxBonus = counter.Item3
-                }).ToArray()
+                    new CounterTactic { TacticId = tacticDefs[(idx + 1) % tacticDefs.Length].Id, Bonus = tactic.Value * 0.1m, MaxBonus = 10 },
+                    new CounterTactic { TacticId = tacticDefs[(idx + 2) % tacticDefs.Length].Id, Bonus = tactic.Value * 0.05m, MaxBonus = 5 },
+                    new CounterTactic { TacticId = tacticDefs[(idx + 3) % tacticDefs.Length].Id, Bonus = tactic.Value * 0.02m, MaxBonus = 2 }
+                }
             }).ToArray()
         };
     }
@@ -168,17 +191,49 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         var activeIdentifier = string.IsNullOrWhiteSpace(state.CampType) ? null : state.CampType;
         var activeBookDate = state.CampActiveUntilUtc?.ToString("O") ?? string.Empty;
 
+        // Camp cost depends on league tier
+        var campCostEuro = state.LeagueTier switch
+        {
+            1 => 10_000_000,
+            2 => 5_000_000,
+            3 => 2_000_000,
+            _ => 500_000
+        };
+
+        // Random camp attributes based on current date seed (changes daily)
+        var daySeed = (int)(DateTime.UtcNow.Date.Ticks / TimeSpan.TicksPerDay);
+        var rng = new Random(daySeed);
+        var allCamps = new[]
+        {
+            (Effect: 2, Variant: 0, Name: "Höhentrainingslager", Image: "Camp_2_0_high"),
+            (Effect: 1, Variant: 4, Name: "Aerobicunterricht", Image: "Camp_1_4_high"),
+            (Effect: 0, Variant: 3, Name: "Taktikanalyse", Image: "Camp_0_3_high"),
+            (Effect: 2, Variant: 1, Name: "Krafttraining", Image: "Camp_2_1_low"),
+            (Effect: 1, Variant: 2, Name: "Lauftraining", Image: "Camp_1_2_low"),
+            (Effect: 0, Variant: 0, Name: "Mannschaftsausflug", Image: "Camp_0_0_low")
+        };
+
+        // Pick 3 random camps
+        var shuffled = allCamps.OrderBy(_ => rng.Next()).Take(3).ToArray();
+
         return new TrainingCampData
         {
             Success = true,
             UpdateCampsCost = 1000,
             IsUpdateEnabled = !state.CampActiveUntilUtc.HasValue || state.CampActiveUntilUtc.Value.Date < DateTime.UtcNow.Date,
-            CampItems =
-            [
-                new TrainingCampItem { Identifier = "Camp_2_0_high", Image = "Camp_2_0_high", Name = "Hohentrainingslager", Effect = 2, Variant = 0, Power = 1.5m, Percent = false, PriceEuro = 9_640_000, PriceStars = 1000, BookDate = activeIdentifier == "Camp_2_0_high" ? activeBookDate : string.Empty },
-                new TrainingCampItem { Identifier = "Camp_1_4_high", Image = "Camp_1_4_high", Name = "Aerobicunterricht", Effect = 1, Variant = 4, Power = 1.5m, Percent = false, PriceEuro = 9_640_000, PriceStars = 1000, BookDate = activeIdentifier == "Camp_1_4_high" ? activeBookDate : string.Empty },
-                new TrainingCampItem { Identifier = "Camp_0_3_high", Image = "Camp_0_3_high", Name = "Taktikanalyse", Effect = 0, Variant = 3, Power = 1.5m, Percent = false, PriceEuro = 9_640_000, PriceStars = 1000, BookDate = activeIdentifier == "Camp_0_3_high" ? activeBookDate : string.Empty }
-            ]
+            CampItems = shuffled.Select(c => new TrainingCampItem
+            {
+                Identifier = c.Image,
+                Image = c.Image,
+                Name = c.Name,
+                Effect = c.Effect,
+                Variant = c.Variant,
+                Power = 1.5m,
+                Percent = false,
+                PriceEuro = campCostEuro,
+                PriceStars = 1000,
+                BookDate = activeIdentifier == c.Image ? activeBookDate : string.Empty
+            }).ToArray()
         };
     }
 
@@ -194,7 +249,7 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         };
 
         var skills = Enumerable.Range(0, 14)
-            .Select(index => index == 0 ? Math.Round(player.Strength * 0.9m, 6) : Math.Round(Math.Max(10m, player.Strength / (index + 2m)), 6))
+            .Select(index => index == 0 ? Math.Round((double)player.Strength * 0.9, 6) : Math.Round(Math.Max(10.0, (double)player.Strength / (index + 2.0)), 6))
             .ToArray();
 
         var hasIndividualTraining = !string.IsNullOrWhiteSpace(player.IndividualTrainingSkill) && player.IndividualTrainingUntilUtc.HasValue;
@@ -205,7 +260,7 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
             Id = player.Id,
             Name = player.Name,
             Country = player.Origin.ToLowerInvariant(),
-            Strength = player.Strength,
+            Strength = (double)player.Strength,
             Talent = player.Talent,
             Age = player.Age,
             Position = position,
@@ -215,22 +270,22 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
             SkillChange = skillChange,
             TotalChange = Math.Round(skillChange * 7m, 6),
             Skills = skills,
-            Fitness = player.Fitness,
+            Fitness = (double)player.Fitness,
             Shirt = player.ShirtNumber,
             YellowCards = player.YellowCards,
             HasRedCard = player.RedCards > 0,
             TransfermarketMaxHours = 48,
-            TransfermarketMinOffer = Math.Max(1000, player.Strength * 25),
-            TransfermarketFee = Math.Max(1000, player.Strength * 25),
-            TransfermarketMaxOffer = Math.Max(10_000, player.Strength * 250),
+            TransfermarketMinOffer = (long)Math.Max(1000m, player.Strength * 25m),
+            TransfermarketFee = (long)Math.Max(1000m, player.Strength * 25m),
+            TransfermarketMaxOffer = (long)Math.Max(10_000m, player.Strength * 250m),
             HasIndividualTraining = hasIndividualTraining,
             MainSkill = 0,
             BonusSkills = [1, 2],
-            MarketValue = Math.Max(25_000, player.Strength * 300),
-            Salary = Math.Max(1_000, player.Strength * 12),
+            MarketValue = (long)Math.Max(25_000m, player.Strength * 300m),
+            Salary = (long)Math.Max(1_000m, player.Strength * 12m),
             Origin = player.Origin,
             CanExtendContract = true,
-            MaxUpgradeStrength = Math.Round(player.Strength + 25m, 3)
+            MaxUpgradeStrength = Math.Round((double)player.Strength + 25.0, 3)
         };
     }
 }

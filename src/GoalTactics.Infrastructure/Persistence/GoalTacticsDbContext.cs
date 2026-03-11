@@ -23,13 +23,23 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
 
     public DbSet<TeamNewsEntity> TeamNews => Set<TeamNewsEntity>();
 
+    public DbSet<TeamAccomplishmentEntity> TeamAccomplishments => Set<TeamAccomplishmentEntity>();
+
     public DbSet<TeamMailEntity> TeamMail => Set<TeamMailEntity>();
 
     public DbSet<TeamFinanceHistoryEntity> TeamFinanceHistory => Set<TeamFinanceHistoryEntity>();
 
+    public DbSet<TeamFinanceLedgerEntity> TeamFinanceLedger => Set<TeamFinanceLedgerEntity>();
+
+    public DbSet<TeamEquipmentEntity> TeamEquipment => Set<TeamEquipmentEntity>();
+
     public DbSet<LeagueEntity> Leagues => Set<LeagueEntity>();
 
+    public DbSet<SeasonStateEntity> SeasonStates => Set<SeasonStateEntity>();
+
     public DbSet<LeagueTeamEntity> LeagueTeams => Set<LeagueTeamEntity>();
+
+    public DbSet<LeagueMatchEntity> LeagueMatches => Set<LeagueMatchEntity>();
 
     public DbSet<FriendRelationEntity> FriendRelations => Set<FriendRelationEntity>();
 
@@ -138,6 +148,8 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.StadiumName).HasColumnName("stadium_name").HasMaxLength(96).IsRequired();
             entity.Property(x => x.GrassQuality).HasColumnName("grass_quality").IsRequired();
             entity.Property(x => x.LeagueTier).HasColumnName("league_tier").IsRequired();
+            entity.Property(x => x.SelectedShirt).HasColumnName("selected_shirt").HasMaxLength(32);
+            entity.Property(x => x.SelectedEmblem).HasColumnName("selected_emblem").HasMaxLength(32);
             entity.HasIndex(x => x.UserId).IsUnique();
             entity.HasOne(x => x.User)
                 .WithMany()
@@ -206,6 +218,7 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.RedCards).HasColumnName("red_cards").IsRequired();
             entity.Property(x => x.IndividualTrainingSkill).HasColumnName("individual_training_skill").HasMaxLength(32);
             entity.Property(x => x.IndividualTrainingUntilUtc).HasColumnName("individual_training_until_utc");
+            entity.Property(x => x.ContractEndUtc).HasColumnName("contract_end_utc");
             entity.HasIndex(x => x.TeamId);
             entity.HasOne(x => x.Team)
                 .WithMany()
@@ -222,6 +235,9 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.SubSkillIndex).HasColumnName("sub_skill_index").IsRequired();
             entity.Property(x => x.CampType).HasColumnName("camp_type").HasMaxLength(32).IsRequired();
             entity.Property(x => x.CampActiveUntilUtc).HasColumnName("camp_active_until_utc");
+            entity.Property(x => x.TrainingChangedAtUtc).HasColumnName("training_changed_at_utc");
+            entity.Property(x => x.SelectedTacticId).HasColumnName("selected_tactic_id").HasMaxLength(64);
+            entity.Property(x => x.SelectedTacticStartUtc).HasColumnName("selected_tactic_start_utc");
             entity.HasOne(x => x.Team)
                 .WithOne()
                 .HasForeignKey<TeamTrainingStateEntity>(x => x.TeamId)
@@ -237,6 +253,18 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.DateText).HasColumnName("date_text").HasMaxLength(64).IsRequired();
             entity.Property(x => x.Title).HasColumnName("title").HasMaxLength(128).IsRequired();
             entity.Property(x => x.Text).HasColumnName("text").HasMaxLength(2048).IsRequired();
+            entity.HasIndex(x => x.TeamId);
+        });
+
+        modelBuilder.Entity<TeamAccomplishmentEntity>(entity =>
+        {
+            entity.ToTable("team_accomplishments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.TeamId).HasColumnName("team_id").IsRequired();
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(256).IsRequired();
+            entity.Property(x => x.Image).HasColumnName("image").HasMaxLength(128).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at").IsRequired();
             entity.HasIndex(x => x.TeamId);
         });
 
@@ -267,6 +295,41 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.Outcome).HasColumnName("outcome").IsRequired();
             entity.Property(x => x.Balance).HasColumnName("balance").IsRequired();
             entity.HasIndex(x => x.UserId);
+        });
+
+        modelBuilder.Entity<TeamFinanceLedgerEntity>(entity =>
+        {
+            entity.ToTable("team_finance_ledger");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(x => x.Matchday).HasColumnName("matchday").IsRequired();
+            entity.Property(x => x.Date).HasColumnName("date").IsRequired();
+            entity.Property(x => x.BookingType).HasColumnName("booking_type").HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Value).HasColumnName("value").IsRequired();
+            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(256).IsRequired();
+            entity.Property(x => x.IsEarning).HasColumnName("is_earning").IsRequired();
+            entity.HasIndex(x => new { x.UserId, x.Matchday });
+        });
+
+        modelBuilder.Entity<TeamEquipmentEntity>(entity =>
+        {
+            entity.ToTable("team_equipment");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(x => x.Image).HasColumnName("image").HasMaxLength(32).IsRequired();
+            entity.Property(x => x.EquipmentType).HasColumnName("equipment_type").HasMaxLength(16).IsRequired();
+            entity.Property(x => x.IsActive).HasColumnName("is_active").IsRequired();
+            entity.HasIndex(x => x.UserId);
+        });
+
+        modelBuilder.Entity<SeasonStateEntity>(entity =>
+        {
+            entity.ToTable("season_state");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id").HasMaxLength(32);
+            entity.Property(x => x.LastSeasonProcessed).HasColumnName("last_season_processed").IsRequired();
         });
 
         modelBuilder.Entity<LeagueEntity>(entity =>
@@ -313,6 +376,36 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.HasIndex(x => x.TeamId).IsUnique(false);
             entity.HasOne(x => x.League)
                 .WithMany(x => x.Teams)
+                .HasForeignKey(x => x.LeagueId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<LeagueMatchEntity>(entity =>
+        {
+            entity.ToTable("league_matches");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.LeagueId).HasColumnName("league_id").IsRequired();
+            entity.Property(x => x.Matchday).HasColumnName("matchday").IsRequired();
+            entity.Property(x => x.HomeLeagueTeamId).HasColumnName("home_league_team_id").IsRequired();
+            entity.Property(x => x.AwayLeagueTeamId).HasColumnName("away_league_team_id").IsRequired();
+            entity.Property(x => x.HomeTeamName).HasColumnName("home_team_name").HasMaxLength(128);
+            entity.Property(x => x.AwayTeamName).HasColumnName("away_team_name").HasMaxLength(128);
+            entity.Property(x => x.HomeLogo).HasColumnName("home_logo").HasMaxLength(64);
+            entity.Property(x => x.AwayLogo).HasColumnName("away_logo").HasMaxLength(64);
+            entity.Property(x => x.HomeCountry).HasColumnName("home_country").HasMaxLength(8);
+            entity.Property(x => x.AwayCountry).HasColumnName("away_country").HasMaxLength(8);
+            entity.Property(x => x.HomeStrength).HasColumnName("home_strength").IsRequired();
+            entity.Property(x => x.AwayStrength).HasColumnName("away_strength").IsRequired();
+            entity.Property(x => x.HomeScore).HasColumnName("home_score");
+            entity.Property(x => x.AwayScore).HasColumnName("away_score");
+            entity.Property(x => x.IsPlayed).HasColumnName("is_played").IsRequired();
+            entity.Property(x => x.ScheduledDateUtc).HasColumnName("scheduled_date_utc").IsRequired();
+            entity.Property(x => x.PlayedAtUtc).HasColumnName("played_at_utc");
+            entity.HasIndex(x => x.LeagueId);
+            entity.HasIndex(x => new { x.LeagueId, x.Matchday });
+            entity.HasOne(x => x.League)
+                .WithMany()
                 .HasForeignKey(x => x.LeagueId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

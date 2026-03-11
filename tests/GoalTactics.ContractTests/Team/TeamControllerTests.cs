@@ -92,9 +92,7 @@ public sealed class TeamControllerTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Equal(HttpStatusCode.OK, sponsorResponse.StatusCode);
         var sponsorBody = await sponsorResponse.Content.ReadFromJsonAsync<SponsorOffersResponse>();
         Assert.NotNull(sponsorBody);
-        Assert.Equal(300, sponsorBody!.Main!.Stars);
-        Assert.Equal(200, sponsorBody.Secondary!.Stars);
-        Assert.Equal(100, sponsorBody.NegotiateCost);
+        Assert.NotEmpty(sponsorBody!.Offers);
 
         var stadiumResponse = await client.PostAsJsonAsync("/api/Stadium/GetStadium", new RequestObject());
         Assert.Equal(HttpStatusCode.OK, stadiumResponse.StatusCode);
@@ -103,6 +101,16 @@ public sealed class TeamControllerTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Equal(500, stadiumBody!.ChangeNameCost);
         Assert.Equal(0, stadiumBody.RenewGrassCost);
         Assert.Equal(10, stadiumBody.SpeedupCost);
+
+        // stadium body should include building entries; verify upgrade cost of a
+        // stadium seat entry matches the same computation we use server-side.
+        var vipBuilding = stadiumBody.Buildings?.FirstOrDefault(b => b.Name == "VIP-Sitze");
+        if (vipBuilding is not null)
+        {
+            // starting with 200 vip seats => 20 blocks. cost = 8500 + (20*20*2200)
+            var expected = 8500m + (20m * 20m * 2200m);
+            Assert.Equal(expected, vipBuilding.UpgradeCost);
+        }
 
         var beforeBidResources = await (await client.PostAsJsonAsync("/api/Team/GetMyResources", new RequestObject())).Content.ReadFromJsonAsync<ResourcesResponse>();
         Assert.NotNull(beforeBidResources);
@@ -118,7 +126,22 @@ public sealed class TeamControllerTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Equal(HttpStatusCode.OK, buildPlacesResponse.StatusCode);
         var buildPlacesBody = await buildPlacesResponse.Content.ReadFromJsonAsync<BuildPlacesResponse>();
         Assert.NotNull(buildPlacesBody);
-        var buildTarget = buildPlacesBody!.Places.First(place => place.CanBuild);
+
+        // after the fix we should have at least two buildable entries; the office
+        // itself plus at least one other facility (training, fan shop etc) because
+        // the requirement on office level was relaxed.
+        Assert.True(buildPlacesBody!.Places.Count(p => p.CanBuild) >= 2,
+            "Expected more than one buildable place after registration");
+
+        // stadium levels are returned in blocks instead of raw seat counts.
+        var vip = buildPlacesBody.Places.First(p => p.BuildingType == "StadiumVips");
+        var seats = buildPlacesBody.Places.First(p => p.BuildingType == "StadiumSeats");
+        var stands = buildPlacesBody.Places.First(p => p.BuildingType == "StadiumStands");
+        Assert.Equal(20, vip.Level);   // 200 seats / 10
+        Assert.Equal(25, seats.Level); // 2500 seats / 100
+        Assert.Equal(23, stands.Level); // 2300 seats / 100
+
+        var buildTarget = buildPlacesBody.Places.First(place => place.CanBuild);
 
         var buildResponse = await client.PostAsJsonAsync("/api/Stadium/Build", new IdRequest { Id = buildTarget.Id });
         Assert.Equal(HttpStatusCode.OK, buildResponse.StatusCode);
@@ -131,6 +154,39 @@ public sealed class TeamControllerTests : IClassFixture<WebApplicationFactory<Pr
 
         var speedupResponse = await client.PostAsJsonAsync("/api/Stadium/Speedup", new IdRequest { Id = buildTarget.Id });
         Assert.Equal(HttpStatusCode.OK, speedupResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task StadiumVip_Building_Increases_Capacity_By_Block()
+    {
+        var token = await RegisterAndLoginAsync();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // fetch current stadium info
+        var beforeStadiumResp = await client.PostAsJsonAsync("/api/Stadium/GetStadium", new RequestObject());
+        var beforeBody = await beforeStadiumResp.Content.ReadFromJsonAsync<StadiumResponse>();
+        Assert.NotNull(beforeBody);
+        var beforeCapacity = beforeBody!.Stadium!.Capacity;
+
+        // find a vip place and build it
+        var buildPlacesResp = await client.PostAsJsonAsync("/api/GetBuildPlaces", new RequestObject());
+        var buildPlacesBody = await buildPlacesResp.Content.ReadFromJsonAsync<BuildPlacesResponse>();
+        Assert.NotNull(buildPlacesBody);
+        var vipPlace = buildPlacesBody!.Places.FirstOrDefault(p => p.BuildingType == "StadiumVips" && p.CanBuild);
+        Assert.NotNull(vipPlace);
+
+        var buildResp = await client.PostAsJsonAsync("/api/Stadium/Build", new IdRequest { Id = vipPlace!.Id });
+        Assert.Equal(HttpStatusCode.OK, buildResp.StatusCode);
+
+        // speedup to complete instantly
+        var speedResp = await client.PostAsJsonAsync("/api/Stadium/Speedup", new IdRequest { Id = vipPlace.Id });
+        Assert.Equal(HttpStatusCode.OK, speedResp.StatusCode);
+
+        // re-fetch stadium info; capacity should have increased by 10 seats
+        var afterStadiumResp = await client.PostAsJsonAsync("/api/Stadium/GetStadium", new RequestObject());
+        var afterBody = await afterStadiumResp.Content.ReadFromJsonAsync<StadiumResponse>();
+        Assert.NotNull(afterBody);
+        Assert.Equal(beforeCapacity + 10, afterBody!.Stadium!.Capacity);
     }
 
     [Fact]

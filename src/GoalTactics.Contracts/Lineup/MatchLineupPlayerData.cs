@@ -1,15 +1,10 @@
-using GoalTactics.Contracts.Squad;
-
 namespace GoalTactics.Contracts.Lineup;
 
-/// <summary>LineupPlayerData : SquadPlayerData in decompiled app.</summary>
-public sealed class MatchLineupPlayerData : SquadPlayerData
+/// <summary>LineupPlayerData in Android app — flat model.</summary>
+public sealed class MatchLineupPlayerData
 {
-    public List<PositionStrength>? Positions { get; init; }
-}
-
-public sealed class PositionStrength
-{
-    public Guid PositionId { get; init; }
-    public decimal Strength { get; init; }
+    public Guid PlayerId { get; init; }
+    public string? Name { get; init; }
+    public string? Position { get; init; }
+    public bool IsStarting { get; init; }
 }

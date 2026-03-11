@@ -92,12 +92,14 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
     {
         return new FriendData
         {
-            TeamId = ParseGuid(x.ForeignTeamId),
-            UserName = x.Name,
-            TeamName = x.Name,
-            Strength = 0,
-            MyLike = x.IsLiked,
-            LikesMe = x.IsRequestIncoming
+            Id = ParseGuid(x.ForeignTeamId),
+            ForeignUserId = ParseGuid(x.ForeignUserId),
+            ForeignTeamId = ParseGuid(x.ForeignTeamId),
+            Name = x.Name,
+            IsFriend = x.IsFriend,
+            IsRequestIncoming = x.IsRequestIncoming,
+            IsRequestOutgoing = x.IsRequestOutgoing,
+            IsLiked = x.IsLiked
         };
     }
 
@@ -109,10 +111,10 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
             Challenges = data.Challenges.Select(x => new ChallengeData
             {
                 Id = ParseGuid(x.Id),
-                IsAccepted = x.Accepted,
-                IsDeclined = false,
-                MatchDate = x.MatchDateUtc.ToString("O"),
-                AwayName = x.OpponentName
+                ForeignTeamId = ParseGuid(x.ForeignTeamId),
+                OpponentName = x.OpponentName,
+                Accepted = x.Accepted,
+                MatchDate = x.MatchDateUtc.ToString("O")
             }).ToArray(),
             Friends = data.Friends.Select(MapFriend).ToArray(),
             MatchDate = data.MatchDateUtc.ToString("O"),

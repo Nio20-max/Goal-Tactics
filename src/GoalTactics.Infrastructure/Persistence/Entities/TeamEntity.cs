@@ -38,5 +38,9 @@ public sealed class TeamEntity
 
     public int LeagueTier { get; set; } = 4;
 
+    public string? SelectedShirt { get; set; }
+
+    public string? SelectedEmblem { get; set; }
+
     public UserEntity? User { get; set; }
 }

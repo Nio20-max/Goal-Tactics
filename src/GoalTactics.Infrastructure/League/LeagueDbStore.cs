@@ -195,22 +195,10 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
 
         var seed = HashCode.Combine(tier, groupNumber);
         var random = new Random(seed);
+        var leagueTeams = new List<LeagueTeamEntity>();
         for (var i = 1; i <= ClubsPerLeague; i++)
         {
-            var winsHome = random.Next(0, 8);
-            var winsAway = random.Next(0, 8);
-            var drawsHome = random.Next(0, 6);
-            var drawsAway = random.Next(0, 6);
-            var lossesHome = Math.Max(0, 15 - winsHome - drawsHome);
-            var lossesAway = Math.Max(0, 15 - winsAway - drawsAway);
-            var goalsScoredHome = random.Next(10, 35);
-            var goalsScoredAway = random.Next(8, 30);
-            var goalsReceivedHome = random.Next(10, 35);
-            var goalsReceivedAway = random.Next(8, 30);
-            var pointsHome = winsHome * 3 + drawsHome;
-            var pointsAway = winsAway * 3 + drawsAway;
-
-            dbContext.LeagueTeams.Add(new LeagueTeamEntity
+            var lt = new LeagueTeamEntity
             {
                 Id = Guid.NewGuid().ToString("N"),
                 LeagueId = league.Id,
@@ -221,24 +209,253 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
                 Country = "DE",
                 Logo = LegacyAppCompatibility.BuildLogoId($"bot-{tier}-{groupNumber}-{i}"),
                 IsOnline = false,
-                MatchesHome = 15,
-                MatchesAway = 15,
-                WinsHome = winsHome,
-                WinsAway = winsAway,
-                LossesHome = lossesHome,
-                LossesAway = lossesAway,
-                DrawsHome = drawsHome,
-                DrawsAway = drawsAway,
-                GoalsScoredHome = goalsScoredHome,
-                GoalsScoredAway = goalsScoredAway,
-                GoalsReceivedHome = goalsReceivedHome,
-                GoalsReceivedAway = goalsReceivedAway,
-                PointsHome = pointsHome,
-                PointsAway = pointsAway
-            });
+                MatchesHome = 0,
+                MatchesAway = 0,
+                WinsHome = 0,
+                WinsAway = 0,
+                LossesHome = 0,
+                LossesAway = 0,
+                DrawsHome = 0,
+                DrawsAway = 0,
+                GoalsScoredHome = 0,
+                GoalsScoredAway = 0,
+                GoalsReceivedHome = 0,
+                GoalsReceivedAway = 0,
+                PointsHome = 0,
+                PointsAway = 0
+            };
+            leagueTeams.Add(lt);
+            dbContext.LeagueTeams.Add(lt);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        GenerateRoundRobinSchedule(league.Id, leagueTeams);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
         return league;
+    }
+
+    /// <summary>
+    /// Generates a full round-robin schedule (home and away) for 16 teams.
+    /// 30 matchdays, 8 matches per matchday.
+    /// </summary>
+    private void GenerateRoundRobinSchedule(string leagueId, List<LeagueTeamEntity> teams)
+    {
+        var n = teams.Count; // 16
+        var seasonStart = DateTime.UtcNow.Date;
+
+        // Standard round-robin: fix team[0], rotate the rest
+        // First half: matchdays 1..15
+        var teamIds = teams.Select(t => t).ToArray();
+        var schedule = new List<(int matchday, LeagueTeamEntity home, LeagueTeamEntity away)>();
+
+        // Round-robin algorithm: fix first team, rotate rest
+        var rotating = new LeagueTeamEntity[n - 1];
+        for (var i = 0; i < n - 1; i++)
+            rotating[i] = teamIds[i + 1];
+
+        for (var round = 0; round < n - 1; round++)
+        {
+            var matchday = round + 1;
+            // First match: team[0] vs rotating[0]
+            schedule.Add((matchday, teamIds[0], rotating[0]));
+
+            // Pair remaining: rotating[1] vs rotating[n-2], rotating[2] vs rotating[n-3], etc.
+            for (var j = 1; j < n / 2; j++)
+            {
+                var home = rotating[j];
+                var away = rotating[n - 2 - j];
+                schedule.Add((matchday, home, away));
+            }
+
+            // Rotate: move last element to position 0
+            var last = rotating[n - 2];
+            for (var j = n - 2; j > 0; j--)
+                rotating[j] = rotating[j - 1];
+            rotating[0] = last;
+        }
+
+        // Second half: reverse home/away, matchdays 16..30
+        var firstHalf = schedule.ToList();
+        foreach (var (matchday, home, away) in firstHalf)
+        {
+            schedule.Add((matchday + n - 1, away, home));
+        }
+
+        // Create match entities
+        foreach (var (matchday, home, away) in schedule)
+        {
+            dbContext.LeagueMatches.Add(new LeagueMatchEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                LeagueId = leagueId,
+                Matchday = matchday,
+                HomeLeagueTeamId = home.Id,
+                AwayLeagueTeamId = away.Id,
+                HomeTeamName = home.TeamName,
+                AwayTeamName = away.TeamName,
+                HomeLogo = home.Logo,
+                AwayLogo = away.Logo,
+                HomeCountry = home.Country,
+                AwayCountry = away.Country,
+                HomeStrength = (int)home.Strength,
+                AwayStrength = (int)away.Strength,
+                IsPlayed = false,
+                ScheduledDateUtc = seasonStart.AddDays(matchday - 1).AddHours(18)
+            });
+        }
+    }
+
+    public async Task<IReadOnlyList<LeagueMatchRecord>> GetMatchesForUserAsync(string userId, Guid requestedLeagueId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateTeamAsync(userId, cancellationToken);
+        await EnsureLeagueMembershipAsync(team, cancellationToken);
+
+        string leagueId;
+        if (requestedLeagueId != Guid.Empty)
+        {
+            leagueId = requestedLeagueId.ToString("N");
+        }
+        else
+        {
+            var membership = await dbContext.LeagueTeams.AsNoTracking().FirstAsync(x => x.TeamId == team.Id, cancellationToken);
+            leagueId = membership.LeagueId;
+        }
+
+        // Ensure schedule exists
+        var hasMatches = await dbContext.LeagueMatches.AnyAsync(x => x.LeagueId == leagueId, cancellationToken);
+        if (!hasMatches)
+        {
+            var leagueTeams = await dbContext.LeagueTeams.Where(x => x.LeagueId == leagueId).ToListAsync(cancellationToken);
+            if (leagueTeams.Count >= 2)
+            {
+                GenerateRoundRobinSchedule(leagueId, leagueTeams);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        var matches = await dbContext.LeagueMatches
+            .AsNoTracking()
+            .Where(x => x.LeagueId == leagueId)
+            .OrderBy(x => x.Matchday)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        // Build a lookup from league_team_id to real team_id
+        var leagueTeamIds = matches.SelectMany(m => new[] { m.HomeLeagueTeamId, m.AwayLeagueTeamId }).Distinct().ToList();
+        var leagueTeamLookup = await dbContext.LeagueTeams
+            .AsNoTracking()
+            .Where(x => leagueTeamIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        return matches.Select(m =>
+        {
+            var homeTeamId = leagueTeamLookup.TryGetValue(m.HomeLeagueTeamId, out var ht) ? ht.TeamId ?? m.HomeLeagueTeamId : m.HomeLeagueTeamId;
+            var awayTeamId = leagueTeamLookup.TryGetValue(m.AwayLeagueTeamId, out var at) ? at.TeamId ?? m.AwayLeagueTeamId : m.AwayLeagueTeamId;
+            return new LeagueMatchRecord(
+                Id: Guid.TryParse(m.Id, out var mid) ? mid : Guid.Empty,
+                Matchday: m.Matchday,
+                HomeName: ht?.TeamName ?? m.HomeTeamName ?? "Unknown",
+                AwayName: at?.TeamName ?? m.AwayTeamName ?? "Unknown",
+                HomeLogo: ht?.Logo ?? m.HomeLogo ?? "logo_default",
+                AwayLogo: at?.Logo ?? m.AwayLogo ?? "logo_default",
+                HomeCountry: ht?.Country ?? m.HomeCountry ?? "DE",
+                AwayCountry: at?.Country ?? m.AwayCountry ?? "DE",
+                HomeStrength: (int)(ht?.Strength ?? m.HomeStrength),
+                AwayStrength: (int)(at?.Strength ?? m.AwayStrength),
+                HomeScore: m.HomeScore,
+                AwayScore: m.AwayScore,
+                IsPlayed: m.IsPlayed,
+                ScheduledDateUtc: m.ScheduledDateUtc,
+                HomeTeamId: homeTeamId,
+                AwayTeamId: awayTeamId,
+                UserTeamId: team.Id);
+        }).ToArray();
+    }
+
+    public async Task<LeagueMatchRecord?> GetMatchAsync(Guid matchId, CancellationToken cancellationToken = default)
+    {
+        var m = await dbContext.LeagueMatches.AsNoTracking().FirstOrDefaultAsync(x => x.Id == matchId.ToString("N"), cancellationToken);
+        if (m is null) return null;
+
+        var homeTeam = await dbContext.LeagueTeams.AsNoTracking().FirstOrDefaultAsync(x => x.Id == m.HomeLeagueTeamId, cancellationToken);
+        var awayTeam = await dbContext.LeagueTeams.AsNoTracking().FirstOrDefaultAsync(x => x.Id == m.AwayLeagueTeamId, cancellationToken);
+
+        return new LeagueMatchRecord(
+            Id: Guid.TryParse(m.Id, out var mid) ? mid : Guid.Empty,
+            Matchday: m.Matchday,
+            HomeName: homeTeam?.TeamName ?? m.HomeTeamName ?? "Unknown",
+            AwayName: awayTeam?.TeamName ?? m.AwayTeamName ?? "Unknown",
+            HomeLogo: homeTeam?.Logo ?? m.HomeLogo ?? "logo_default",
+            AwayLogo: awayTeam?.Logo ?? m.AwayLogo ?? "logo_default",
+            HomeCountry: homeTeam?.Country ?? m.HomeCountry ?? "DE",
+            AwayCountry: awayTeam?.Country ?? m.AwayCountry ?? "DE",
+            HomeStrength: (int)(homeTeam?.Strength ?? m.HomeStrength),
+            AwayStrength: (int)(awayTeam?.Strength ?? m.AwayStrength),
+            HomeScore: m.HomeScore,
+            AwayScore: m.AwayScore,
+            IsPlayed: m.IsPlayed,
+            ScheduledDateUtc: m.ScheduledDateUtc,
+            HomeTeamId: homeTeam?.TeamId ?? m.HomeLeagueTeamId,
+            AwayTeamId: awayTeam?.TeamId ?? m.AwayLeagueTeamId,
+            UserTeamId: null);
+    }
+
+    public async Task<IReadOnlyList<LeagueMatchRecord>> GetUpcomingMatchesForTeamAsync(string teamId, CancellationToken cancellationToken = default)
+    {
+        // Find the league team entry for this team
+        var leagueTeam = await dbContext.LeagueTeams.AsNoTracking().FirstOrDefaultAsync(x => x.TeamId == teamId, cancellationToken);
+        if (leagueTeam is null) return [];
+
+        // Ensure schedule exists
+        var hasMatches = await dbContext.LeagueMatches.AnyAsync(x => x.LeagueId == leagueTeam.LeagueId, cancellationToken);
+        if (!hasMatches)
+        {
+            var leagueTeams = await dbContext.LeagueTeams.Where(x => x.LeagueId == leagueTeam.LeagueId).ToListAsync(cancellationToken);
+            if (leagueTeams.Count >= 2)
+            {
+                GenerateRoundRobinSchedule(leagueTeam.LeagueId, leagueTeams);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        var matches = await dbContext.LeagueMatches
+            .AsNoTracking()
+            .Where(x => x.LeagueId == leagueTeam.LeagueId && !x.IsPlayed
+                && (x.HomeLeagueTeamId == leagueTeam.Id || x.AwayLeagueTeamId == leagueTeam.Id))
+            .OrderBy(x => x.ScheduledDateUtc)
+            .Take(5)
+            .ToListAsync(cancellationToken);
+
+        var leagueTeamIds = matches.SelectMany(m => new[] { m.HomeLeagueTeamId, m.AwayLeagueTeamId }).Distinct().ToList();
+        var lookup = await dbContext.LeagueTeams
+            .AsNoTracking()
+            .Where(x => leagueTeamIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        return matches.Select(m =>
+        {
+            var ht = lookup.GetValueOrDefault(m.HomeLeagueTeamId);
+            var at = lookup.GetValueOrDefault(m.AwayLeagueTeamId);
+            return new LeagueMatchRecord(
+                Id: Guid.TryParse(m.Id, out var mid) ? mid : Guid.Empty,
+                Matchday: m.Matchday,
+                HomeName: ht?.TeamName ?? m.HomeTeamName ?? "Unknown",
+                AwayName: at?.TeamName ?? m.AwayTeamName ?? "Unknown",
+                HomeLogo: ht?.Logo ?? m.HomeLogo ?? "logo_default",
+                AwayLogo: at?.Logo ?? m.AwayLogo ?? "logo_default",
+                HomeCountry: ht?.Country ?? m.HomeCountry ?? "DE",
+                AwayCountry: at?.Country ?? m.AwayCountry ?? "DE",
+                HomeStrength: (int)(ht?.Strength ?? m.HomeStrength),
+                AwayStrength: (int)(at?.Strength ?? m.AwayStrength),
+                HomeScore: m.HomeScore,
+                AwayScore: m.AwayScore,
+                IsPlayed: m.IsPlayed,
+                ScheduledDateUtc: m.ScheduledDateUtc,
+                HomeTeamId: ht?.TeamId ?? m.HomeLeagueTeamId,
+                AwayTeamId: at?.TeamId ?? m.AwayLeagueTeamId,
+                UserTeamId: teamId);
+        }).ToArray();
     }
 }

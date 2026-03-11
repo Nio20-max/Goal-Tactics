@@ -17,19 +17,29 @@ public sealed class SponsorService(ITeamStore teamStore) : ISponsorService
     public async Task<SponsorOffersResponse> GetOffersAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
-        var baseAmount = Math.Max(25_000L, (long)Math.Round(team.MarketValue / 30m, MidpointRounding.AwayFromZero));
+
+        // Deterministic random per team for consistent amounts
+        var seed = HashCode.Combine(team.TeamId, "sponsor");
+        var rng = new Random(seed);
+
+        var mainMoney = rng.Next(50_000, 300_001);
+        var secondaryMoney = rng.Next(30_000, 100_001);
+
+        var mainId = Guid.Parse("4ce8e811-3c1a-4cea-9d0e-614e3b164dc1");
+        var secondaryId = Guid.Parse("c36c62e6-f373-455b-9c6d-e598cc8dd95c");
+
         var mainAmounts = new[]
         {
-            new OfferAmountData { Current = baseAmount / 3, Previous = 0 },
-            new OfferAmountData { Current = baseAmount * 2, Previous = 0 },
-            new OfferAmountData { Current = baseAmount * 3, Previous = 0 }
+            new OfferAmountData { Current = mainMoney / 3, Previous = 0 },
+            new OfferAmountData { Current = mainMoney * 2, Previous = 0 },
+            new OfferAmountData { Current = mainMoney * 3, Previous = 0 }
         };
 
         var secondaryAmounts = new[]
         {
-            new OfferAmountData { Current = Math.Max(5_000L, baseAmount / 8), Previous = 0 },
-            new OfferAmountData { Current = Math.Max(2_500L, baseAmount / 16), Previous = 0 },
-            new OfferAmountData { Current = Math.Max(1_000L, baseAmount / 32), Previous = 0 }
+            new OfferAmountData { Current = Math.Max(5_000L, secondaryMoney / 8), Previous = 0 },
+            new OfferAmountData { Current = Math.Max(2_500L, secondaryMoney / 16), Previous = 0 },
+            new OfferAmountData { Current = Math.Max(1_000L, secondaryMoney / 32), Previous = 0 }
         };
 
         return new SponsorOffersResponse
@@ -37,9 +47,10 @@ public sealed class SponsorService(ITeamStore teamStore) : ISponsorService
             Success = true,
             NegotiateCost = 100,
             ManagerName = team.Name,
+            // Xamarin / legacy client
             Main = new SponsorData
             {
-                OfferId = Guid.Parse("4ce8e811-3c1a-4cea-9d0e-614e3b164dc1"),
+                OfferId = mainId,
                 Name = "Tankstelle Oiltec",
                 Description = "Benzin zu fairen und stabil hohen Preisen",
                 Date = DateTime.UtcNow.Date.AddDays(30).AddHours(18).ToString("O"),
@@ -50,7 +61,7 @@ public sealed class SponsorService(ITeamStore teamStore) : ISponsorService
             },
             Secondary = new SponsorData
             {
-                OfferId = Guid.Parse("c36c62e6-f373-455b-9c6d-e598cc8dd95c"),
+                OfferId = secondaryId,
                 Name = "Fensterreinigung WischWasch",
                 Description = "Wir putzen Ihre Fenster bei jedem Wetter, auch Nachts!",
                 Date = DateTime.UtcNow.AddDays(3).ToString("O"),
@@ -58,7 +69,27 @@ public sealed class SponsorService(ITeamStore teamStore) : ISponsorService
                 Stars = 200,
                 Cards = 2,
                 Accepted = true
-            }
+            },
+            // Android / new client
+            Offers =
+            [
+                new SponsorOfferData
+                {
+                    Id = mainId,
+                    Name = "Tankstelle Oiltec",
+                    Description = "Benzin zu fairen und stabil hohen Preisen",
+                    Money = mainMoney,
+                    Stars = 300
+                },
+                new SponsorOfferData
+                {
+                    Id = secondaryId,
+                    Name = "Fensterreinigung WischWasch",
+                    Description = "Wir putzen Ihre Fenster bei jedem Wetter, auch Nachts!",
+                    Money = secondaryMoney,
+                    Stars = 200
+                }
+            ]
         };
     }
 

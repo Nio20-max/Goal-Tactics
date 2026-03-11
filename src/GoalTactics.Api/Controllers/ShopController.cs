@@ -74,4 +74,18 @@ public sealed class ShopController(IShopService shopService) : ControllerBase
         await shopService.UseEquipmentAsync(userId, request.Id, cancellationToken);
         return Ok(new ResponseObject { Success = true, Message = "Applied" });
     }
+
+    [HttpPost("WatchAd")]
+    [HttpPost("ClaimAdReward")]
+    public async Task<ActionResult<ResponseObject>> WatchAd([FromBody] RequestObject request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+        }
+
+        await shopService.ClaimAdRewardAsync(userId, cancellationToken);
+        return Ok(new ResponseObject { Success = true, Message = "100 stars awarded" });
+    }
 }

@@ -1,5 +1,5 @@
+using GoalTactics.Application.League;
 using GoalTactics.Contracts.Live;
-using GoalTactics.Contracts.Team;
 
 namespace GoalTactics.Application.Live;
 
@@ -10,41 +10,76 @@ public interface ILiveService
     Task<LiveMatchResponse> GetMatchReportAsync(string userId, Guid matchId, CancellationToken cancellationToken = default);
 }
 
-public sealed class LiveService : ILiveService
+public sealed class LiveService(ILeagueStore leagueStore) : ILiveService
 {
-    public Task<LiveMatchResponse> GetLiveMatchAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
+    public async Task<LiveMatchResponse> GetLiveMatchAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new LiveMatchResponse
+        var match = await leagueStore.GetMatchAsync(matchId, cancellationToken);
+        if (match is null)
+        {
+            return new LiveMatchResponse
+            {
+                Success = true,
+                Match = new LiveMatchData
+                {
+                    MatchId = matchId,
+                    Report = "Match not found"
+                }
+            };
+        }
+
+        return new LiveMatchResponse
         {
             Success = true,
-            Report = "Match has not started",
-            Match = new MatchData
+            Match = new LiveMatchData
             {
-                Id = matchId == Guid.Empty ? Guid.NewGuid() : matchId,
-                HomeName = "My Team",
-                AwayName = "Opponent",
-                HomeScore = 0,
-                AwayScore = 0,
-                Date = DateTime.UtcNow.ToString("O")
+                MatchId = match.Id,
+                HomeTeam = match.HomeName,
+                AwayTeam = match.AwayName,
+                HomeScore = match.HomeScore ?? 0,
+                AwayScore = match.AwayScore ?? 0,
+                Report = match.IsPlayed
+                    ? GenerateReport(match)
+                    : "Match has not started yet"
             }
-        });
+        };
     }
 
-    public Task<LiveMatchResponse> GetMatchReportAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
+    public async Task<LiveMatchResponse> GetMatchReportAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new LiveMatchResponse
+        var match = await leagueStore.GetMatchAsync(matchId, cancellationToken);
+        if (match is null)
+        {
+            return new LiveMatchResponse
+            {
+                Success = true,
+                Match = new LiveMatchData
+                {
+                    MatchId = matchId,
+                    Report = "Match not found"
+                }
+            };
+        }
+
+        return new LiveMatchResponse
         {
             Success = true,
-            Report = "Generated report placeholder",
-            Match = new MatchData
+            Match = new LiveMatchData
             {
-                Id = matchId == Guid.Empty ? Guid.NewGuid() : matchId,
-                HomeName = "My Team",
-                AwayName = "Opponent",
-                HomeScore = 1,
-                AwayScore = 0,
-                Date = DateTime.UtcNow.ToString("O")
+                MatchId = match.Id,
+                HomeTeam = match.HomeName,
+                AwayTeam = match.AwayName,
+                HomeScore = match.HomeScore ?? 0,
+                AwayScore = match.AwayScore ?? 0,
+                Report = match.IsPlayed
+                    ? GenerateReport(match)
+                    : $"Upcoming match: {match.HomeName} vs {match.AwayName} on {match.ScheduledDateUtc:yyyy-MM-dd}"
             }
-        });
+        };
+    }
+
+    private static string GenerateReport(LeagueMatchRecord m)
+    {
+        return $"<b>{m.HomeName} {m.HomeScore} - {m.AwayScore} {m.AwayName}</b>";
     }
 }

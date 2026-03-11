@@ -69,6 +69,7 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
         var matchday = Math.Clamp(leagueTable.Teams.FirstOrDefault(x => x.IsMine) is { } mineTeam
             ? mineTeam.MatchesHome + mineTeam.MatchesAway + 1
             : 1, 1, 30);
+        var (selectedShirt, _) = await teamStore.GetSelectedEquipmentAsync(userId, cancellationToken);
 
         return new ExtendedTeamDataResponse
         {
@@ -82,7 +83,7 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
                 CountryName = team.CountryName,
                 LeagueId = leagueId,
                 LeagueName = team.LeagueName,
-                HomeTrikot = LegacyAppCompatibility.BuildShirtId(team.TeamId, "home"),
+                HomeTrikot = selectedShirt ?? LegacyAppCompatibility.BuildShirtId(team.TeamId, "home"),
                 AwayTrikot = LegacyAppCompatibility.BuildShirtId(team.TeamId, "away"),
                 MarketValue = team.MarketValue,
                 Mood = team.Mood,

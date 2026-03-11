@@ -12,5 +12,14 @@ public sealed class TeamTrainingStateEntity
 
     public DateTime? CampActiveUntilUtc { get; set; }
 
+    /// <summary>When team training was last changed (for efficiency decay after 3 days).</summary>
+    public DateTime? TrainingChangedAtUtc { get; set; }
+
+    /// <summary>Currently trained tactic ID (GUID string).</summary>
+    public string? SelectedTacticId { get; set; }
+
+    /// <summary>When the current tactic training started (for 2%/day progression).</summary>
+    public DateTime? SelectedTacticStartUtc { get; set; }
+
     public TeamEntity? Team { get; set; }
 }

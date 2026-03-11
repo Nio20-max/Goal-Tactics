@@ -26,6 +26,8 @@ public interface ITeamStore
 
     Task<IReadOnlyList<AccomplishmentRecord>> GetAccomplishmentsAsync(string userId, CancellationToken cancellationToken = default);
 
+    Task AddAccomplishmentAsync(string userId, string name, string image, CancellationToken cancellationToken = default);
+
     Task RenameTeamAsync(string userId, string teamId, string name, CancellationToken cancellationToken = default);
 
     Task<StadiumStateRecord> GetStadiumStateAsync(string userId, CancellationToken cancellationToken = default);
@@ -45,6 +47,8 @@ public interface ITeamStore
     Task<TeamTrainingStateRecord> GetTrainingStateAsync(string userId, CancellationToken cancellationToken = default);
 
     Task SaveTeamTrainingAsync(string userId, int mainSkillIndex, int subSkillIndex, CancellationToken cancellationToken = default);
+
+    Task SaveTacticTrainingAsync(string userId, string tacticId, CancellationToken cancellationToken = default);
 
     Task<bool> BookCampAsync(string userId, string campType, CancellationToken cancellationToken = default);
 
@@ -69,7 +73,17 @@ public interface ITeamStore
     Task<bool> TrySpendStarsAsync(string userId, decimal stars, CancellationToken cancellationToken = default);
 
     Task<Guid> GetLeagueIdForTeamAsync(string teamId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OwnedEquipmentRecord>> GetOwnedEquipmentAsync(string userId, CancellationToken cancellationToken = default);
+
+    Task<bool> BuyEquipmentAsync(string userId, string image, string equipmentType, int starsCost, CancellationToken cancellationToken = default);
+
+    Task<bool> UseEquipmentAsync(string userId, string equipmentId, CancellationToken cancellationToken = default);
+
+    Task<(string? Shirt, string? Emblem)> GetSelectedEquipmentAsync(string userId, CancellationToken cancellationToken = default);
 }
+
+public sealed record OwnedEquipmentRecord(string Id, string Image, string EquipmentType, bool IsActive);
 
 public sealed record TeamRecord(string TeamId, string UserId, string Name, string Country, string CountryName, string LeagueName, decimal MarketValue, int Mood, string TeamMood, int Wins, int Losses, int Fans, int Members, int Strength, string MatchTrend, string ManagerName, string UserEmail, DateTime UserCreatedAtUtc, DateTime? UserLastActivityAtUtc);
 
@@ -118,7 +132,10 @@ public sealed record TeamTrainingStateRecord(
     int EfficiencyValue,
     int TrainPrice,
     string CampType,
-    DateTime? CampActiveUntilUtc);
+    DateTime? CampActiveUntilUtc,
+    string? SelectedTacticId,
+    DateTime? SelectedTacticStartUtc,
+    int LeagueTier);
 
 public sealed record SquadPlayerRecord(
     Guid Id,
@@ -135,4 +152,5 @@ public sealed record SquadPlayerRecord(
     int YellowCards,
     int RedCards,
     string? IndividualTrainingSkill,
-    DateTime? IndividualTrainingUntilUtc);
+    DateTime? IndividualTrainingUntilUtc,
+    DateTime? ContractEndUtc);

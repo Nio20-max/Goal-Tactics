@@ -72,11 +72,12 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
         return new LadderTeamData
         {
             TeamId = team.TeamId,
-            Name = team.TeamName,
-            Logo = team.TeamLogo,
+            TeamName = team.TeamName,
+            TeamLogo = team.TeamLogo,
             Points = team.Points,
-            Strength = team.Strength,
-            IsMine = team.IsMine
+            Strength = (int)team.Strength,
+            IsMine = team.IsMine,
+            Rank = team.Rank
         };
     }
 
@@ -85,11 +86,12 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
         return new LadderChallengeTeamData
         {
             TeamId = team.TeamId,
-            Name = team.TeamName,
-            Logo = team.TeamLogo,
+            TeamName = team.TeamName,
+            TeamLogo = team.TeamLogo,
             Points = team.Points,
-            Strength = team.Strength,
-            IsMine = team.IsMine
+            Strength = (int)team.Strength,
+            IsMine = team.IsMine,
+            Rank = team.Rank
         };
     }
 }

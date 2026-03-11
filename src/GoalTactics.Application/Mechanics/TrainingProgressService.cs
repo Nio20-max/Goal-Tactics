@@ -64,4 +64,7 @@ public sealed class TrainingProgressService
         var baseGain = 0.20m + (0.03m * talent);
         return Math.Round(baseGain * ageFactor * fitnessFactor, 3);
     }
+
+    public decimal CalculateIndividualGainPublic(int age, int talent, int fitness)
+        => CalculateIndividualGain(age, talent, fitness);
 }

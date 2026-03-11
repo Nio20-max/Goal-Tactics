@@ -42,6 +42,25 @@ public sealed class StadiumController(IStadiumService stadiumService) : Controll
     public Task<ActionResult<ResponseObject>> BuildStadium([FromBody] IdRequest request, CancellationToken cancellationToken) =>
         ExecuteMutation(request.Id, cancellationToken, stadiumService.BuildAsync, "Build started");
 
+    [HttpPost("BuildPlaces")]
+    public async Task<ActionResult<ResponseObject>> BuildPlaces([FromBody] StadiumPlacesRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+        }
+
+        var place = request.Places?.FirstOrDefault(p => p.Count > 0);
+        if (place is null)
+        {
+            return Ok(new ResponseObject { Success = false, Message = "No places specified" });
+        }
+
+        await stadiumService.BuildAsync(userId, place.Id, cancellationToken);
+        return Ok(new ResponseObject { Success = true, Message = "Build started" });
+    }
+
     [HttpPost("SpeedupBuilding")]
     [HttpPost("Speedup")]
     public Task<ActionResult<ResponseObject>> SpeedupBuilding([FromBody] IdRequest request, CancellationToken cancellationToken) =>

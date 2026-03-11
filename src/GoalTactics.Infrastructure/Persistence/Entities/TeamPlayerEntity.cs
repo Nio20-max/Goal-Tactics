@@ -34,5 +34,7 @@ public sealed class TeamPlayerEntity
 
     public DateTime? IndividualTrainingUntilUtc { get; set; }
 
+    public DateTime? ContractEndUtc { get; set; }
+
     public TeamEntity? Team { get; set; }
 }

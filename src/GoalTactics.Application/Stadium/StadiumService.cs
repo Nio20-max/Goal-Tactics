@@ -31,13 +31,17 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
         return new StadiumResponse
         {
             Success = true,
-            Name = stadium.Name,
-            GrassQuality = stadium.GrassQuality,
+            Stadium = new StadiumData
+            {
+                Name = stadium.Name,
+                GrassQuality = stadium.GrassQuality,
+                Capacity = stadium.Capacity,
+                EarningsAverage = stadium.EarningsAverage
+            },
             VisitorsLastMatch = stadium.VisitorsLastMatch,
             VisitorsAverage = stadium.VisitorsAverage,
             VisitorsTotal = stadium.VisitorsTotal,
             EarningsLastMatch = (long)Math.Round(stadium.EarningsLastMatch, MidpointRounding.AwayFromZero),
-            EarningsAverage = stadium.EarningsAverage,
             EarningsTotal = (long)Math.Round(stadium.EarningsTotal, MidpointRounding.AwayFromZero),
             Buildings = places.Select(place => ToBuilding(place, activeConstruction)).ToList(),
             ChangeNameCost = 500,
@@ -57,7 +61,19 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
             {
                 Id = x.Id,
                 BuildingType = x.BuildingType,
-                Level = x.Level,
+                // The Xamarin client treats the `level` field as a generic
+                // "building level" and performs its own office‑level check
+                // (`officeLevel >= level + 1`).  If we send the raw seat
+                // counts the check always fails and the stadium entries are
+                // locked.  Convert to block counts so that the front end sees
+                // a sensible small number.
+                Level = x.BuildingType switch
+                {
+                    "StadiumVips" => x.Level / 10,
+                    "StadiumSeats" => x.Level / 100,
+                    "StadiumStands" => x.Level / 100,
+                    _ => x.Level
+                },
                 CanBuild = x.CanBuild
             }).ToArray()
         };
@@ -134,8 +150,20 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
     private static BuildingData ToBuilding(BuildPlaceRecord place, ConstructionRecord? activeConstruction)
     {
         var construction = activeConstruction?.PlaceId == place.Id ? activeConstruction : null;
-        var currentValue = construction?.CurrentValue ?? place.Level;
-        var newValue = construction?.NewValue ?? GetNextValue(place);
+        var rawCurrent = construction?.CurrentValue ?? place.Level;
+        var rawNew = construction?.NewValue ?? GetNextValue(place);
+
+        // stadium entries are stored as absolute seat counts in the database but
+        // the old mobile client treats "level" as the number of completed
+        // blocks (10 VIP seats, 100 sit/stand seats).  Convert the raw counts
+        // to block counts for any field that is conceptually a level.
+        var isStadium = place.BuildingType == "StadiumVips" 
+                        || place.BuildingType == "StadiumSeats"
+                        || place.BuildingType == "StadiumStands";
+        var blockSize = place.BuildingType == "StadiumVips" ? 10 : 100;
+
+        var currentValue = isStadium ? rawCurrent / blockSize : rawCurrent;
+        var newValue = isStadium ? rawNew / blockSize : rawNew;
 
         return new BuildingData
         {
@@ -148,16 +176,16 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
             NewValue = newValue,
             BuildStart = construction?.BuildStartUtc.ToString("O"),
             BuildEnd = construction?.BuildEndUtc.ToString("O"),
-            Earnings = GetEarnings(place.BuildingType, currentValue),
+            Earnings = GetEarnings(place.BuildingType, rawCurrent),
             UpgradeCost = construction?.UpgradeCost ?? GetUpgradeCost(place),
             UpgradeCostPremium = construction?.UpgradeCostPremium ?? Math.Round(GetUpgradeCost(place) / 50m, 2),
-            Duration = GetDurationMinutes(place.BuildingType),
-            DailyCost = GetDailyCost(place.BuildingType, currentValue),
+            Duration = GetDurationMinutes(place.BuildingType, currentValue),
+            DailyCost = GetDailyCost(place.BuildingType, rawCurrent),
             DailyCostIncrease = GetDailyCostIncrease(place.BuildingType),
-            Profit = GetProfit(place.BuildingType, currentValue),
+            Profit = GetProfit(place.BuildingType, rawCurrent),
             ProfitSign = GetProfitSign(place.BuildingType),
             ProfitIncrease = GetProfitIncrease(place.BuildingType),
-            Capacity = GetCapacity(place.BuildingType, newValue),
+            Capacity = isStadium ? rawNew : GetCapacity(place.BuildingType, newValue),
             Utilization = GetUtilization(place.BuildingType),
             HasWarning = false
         };
@@ -176,29 +204,43 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
 
     private static decimal GetUpgradeCost(BuildPlaceRecord place)
     {
+        // The cost calculation mirrors the server-side logic used when the
+        // build request actually runs (see TeamDbStore.BuildPlaceAsync).  In
+        // particular we must divide the stadium seat counts by the block size
+        // before applying the quadratic growth formula.  The previous
+        // implementation blindly divided every stadium type by 10 which meant
+        // sitting/standing seats were charged as if they were ten times as
+        // expensive, leading to ridiculous prices and a client that assumed
+        // the team could not afford the upgrade.
+        var currentLevel = place.BuildingType switch
+        {
+            "StadiumVips" => place.Level / 10,
+            "StadiumSeats" => place.Level / 100,
+            "StadiumStands" => place.Level / 100,
+            _ => place.Level
+        };
+
         return place.BuildingType switch
         {
             "Office" => 4000m + (place.Level * place.Level * 1250m),
             "Parking" => 1250m + (place.Level * 650m),
-            "StadiumVips" or "StadiumSeats" or "StadiumStands" => 8500m + (Math.Max(1, place.Level / 10) * Math.Max(1, place.Level / 10) * 2200m),
+            "StadiumVips" or "StadiumSeats" or "StadiumStands" =>
+                8500m + (Math.Max(1, currentLevel) * Math.Max(1, currentLevel) * 2200m),
             _ => 12000m + (place.Level * place.Level * 2400m)
         };
     }
 
-    private static decimal GetDurationMinutes(string buildingType)
+    private static decimal GetDurationMinutes(string buildingType, int currentLevel)
     {
-        return buildingType switch
-        {
-            "Parking" => 62m,
-            "FanShop" => 22m,
-            "TrainingCenter" => 1890m,
-            "MedicalCenter" => 1260m,
-            "YouthAcademy" => 1400m,
-            "StadiumVips" => 50m,
-            "StadiumSeats" => 140m,
-            "StadiumStands" => 100m,
-            _ => 30m
-        };
+        // Seat durations are fixed per block (from information.md)
+        if (buildingType is "StadiumVips") return 50m;
+        if (buildingType is "StadiumSeats") return 140m;
+        if (buildingType is "StadiumStands") return 100m;
+
+        // Facility durations depend on level: Level 0→1: 30min, Level 19→20: 50hrs (3000min), linear
+        const decimal minMinutes = 30m;
+        const decimal maxMinutes = 50m * 60m;
+        return Math.Round(minMinutes + (Math.Clamp(currentLevel, 0, 19) * ((maxMinutes - minMinutes) / 19m)), 0);
     }
 
     private static int GetMaxValue(string buildingType)

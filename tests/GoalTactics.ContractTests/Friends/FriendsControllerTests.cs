@@ -39,9 +39,9 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         Assert.NotNull(incomingFriendsBody);
         Assert.True(incomingFriendsBody!.Success);
         Assert.NotEmpty(incomingFriendsBody.Friends);
-        Assert.True(incomingFriendsBody.Friends[0].LikesMe);
+        Assert.True(incomingFriendsBody.Friends[0].IsLiked);
 
-        var friendTeamId = incomingFriendsBody.Friends[0].TeamId;
+        var friendTeamId = incomingFriendsBody.Friends[0].ForeignTeamId;
         var acceptResponse = await client.PostAsJsonAsync("/api/Accept", new IdRequest { Id = friendTeamId });
         Assert.Equal(HttpStatusCode.OK, acceptResponse.StatusCode);
 
@@ -50,7 +50,7 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         Assert.Equal(HttpStatusCode.OK, friendsAfterAcceptResponse.StatusCode);
         var friendsAfterAcceptBody = await friendsAfterAcceptResponse.Content.ReadFromJsonAsync<FriendsResponse>();
         Assert.NotNull(friendsAfterAcceptBody);
-        Assert.Contains(friendsAfterAcceptBody!.Friends, x => x.TeamId == teamBId);
+        Assert.Contains(friendsAfterAcceptBody!.Friends, x => x.ForeignTeamId == teamBId);
 
         var sendChallengeResponse = await client.PostAsJsonAsync("/api/SendChallenge", new IdRequest { Id = teamBId });
         Assert.Equal(HttpStatusCode.OK, sendChallengeResponse.StatusCode);
@@ -70,7 +70,7 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         Assert.Equal(HttpStatusCode.OK, replyResponse.StatusCode);
         var replyBody = await replyResponse.Content.ReadFromJsonAsync<ChallengesResponse>();
         Assert.NotNull(replyBody);
-        Assert.Contains(replyBody!.Challenges, x => x.Id == challengeId && x.IsAccepted);
+        Assert.Contains(replyBody!.Challenges, x => x.Id == challengeId && x.Accepted);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", userA.Token);
         var unlikeResponse = await client.PostAsJsonAsync("/api/Unlike", new IdRequest { Id = teamBId });
@@ -79,7 +79,7 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         var friendsAfterUnlikeResponse = await client.PostAsJsonAsync("/api/GetFriends", new SearchRequest());
         var friendsAfterUnlikeBody = await friendsAfterUnlikeResponse.Content.ReadFromJsonAsync<FriendsResponse>();
         Assert.NotNull(friendsAfterUnlikeBody);
-        Assert.DoesNotContain(friendsAfterUnlikeBody!.Friends, x => x.TeamId == teamBId);
+        Assert.DoesNotContain(friendsAfterUnlikeBody!.Friends, x => x.ForeignTeamId == teamBId);
     }
 
     private async Task<(string Token, string Email)> RegisterAndLoginAsync(string managerName)

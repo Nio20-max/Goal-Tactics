@@ -23,7 +23,8 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
     public async Task<AuthUserRecord?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
+        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == email, cancellationToken)
+                ?? await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.ManagerName == email, cancellationToken);
         return user is null
             ? null
             : new AuthUserRecord(user.Id, user.Email, user.PasswordHash, user.ManagerName);
@@ -490,7 +491,8 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
                 Matches = random.Next(0, 30),
                 Goals = position == "FWD" ? random.Next(0, 20) : random.Next(0, 6),
                 YellowCards = random.Next(0, 6),
-                RedCards = random.Next(0, 2)
+                RedCards = random.Next(0, 2),
+                ContractEndUtc = DateTime.UtcNow.AddDays(random.Next(15, 90))
             });
         }
 

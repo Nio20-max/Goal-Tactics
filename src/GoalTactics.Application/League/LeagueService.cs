@@ -45,39 +45,47 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
 
     public async Task<MatchesResponse> GetMatchesAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default)
     {
-        var table = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
-        var teams = table.Teams.ToArray();
+        var matches = await leagueStore.GetMatchesForUserAsync(userId, leagueId, cancellationToken);
 
         return new MatchesResponse
         {
             Success = true,
             HomeTrikot = "trikot0",
             AwayTrikot = "trikot0",
-            Matches = teams
-                .Chunk(2)
-                .Where(pair => pair.Length == 2)
-                .Select((pair, index) => new MatchData
+            Matches = matches.Select(m =>
+            {
+                var userTeamId = m.UserTeamId;
+                int myTeam = 0;
+                if (userTeamId is not null)
                 {
-                    Id = Guid.NewGuid(),
-                    Date = DateTime.UtcNow.Date.AddDays(index).AddHours(18).ToString("O"),
-                    HomeLogo = pair[0].Logo,
-                    AwayLogo = pair[1].Logo,
-                    HomeName = pair[0].Name,
-                    AwayName = pair[1].Name,
-                    MyTeam = pair[0].IsMine ? 1 : (pair[1].IsMine ? 2 : 0),
-                    HomeCountry = pair[0].Country,
-                    AwayCountry = pair[1].Country,
-                    HomeScore = pair[0].PointsHome >= pair[1].PointsHome ? 1 : 0,
-                    AwayScore = pair[1].PointsHome > pair[0].PointsHome ? 1 : 0,
-                    OpponentTeamId = pair[0].IsMine ? pair[1].Id : pair[0].Id,
-                    HomeStrength = (int)Math.Round(pair[0].Strength, MidpointRounding.AwayFromZero),
-                    AwayStrength = (int)Math.Round(pair[1].Strength, MidpointRounding.AwayFromZero),
-                    HasLineup = pair[0].IsMine || pair[1].IsMine,
+                    if (m.HomeTeamId == userTeamId) myTeam = 1;
+                    else if (m.AwayTeamId == userTeamId) myTeam = 2;
+                }
+
+                return new MatchData
+                {
+                    Id = m.Id,
+                    Date = m.ScheduledDateUtc.ToString("O"),
+                    HomeLogo = m.HomeLogo,
+                    AwayLogo = m.AwayLogo,
+                    HomeName = m.HomeName,
+                    AwayName = m.AwayName,
+                    MyTeam = myTeam,
+                    HomeCountry = m.HomeCountry,
+                    AwayCountry = m.AwayCountry,
+                    HomeScore = m.HomeScore ?? 0,
+                    AwayScore = m.AwayScore ?? 0,
+                    OpponentTeamId = myTeam == 1
+                        ? (Guid.TryParse(m.AwayTeamId, out var oid) ? oid : Guid.Empty)
+                        : (Guid.TryParse(m.HomeTeamId, out var oid2) ? oid2 : Guid.Empty),
+                    HomeStrength = m.HomeStrength,
+                    AwayStrength = m.AwayStrength,
+                    HasLineup = myTeam > 0,
                     HomeTrikot = "trikot0",
                     AwayTrikot = "trikot0",
                     IsFriendly = false
-                })
-                .ToArray()
+                };
+            }).ToArray()
         };
     }
 

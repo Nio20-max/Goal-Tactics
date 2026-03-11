@@ -4,6 +4,7 @@ using GoalTactics.Application.Stadium;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace GoalTactics.Infrastructure.Team;
 
@@ -11,8 +12,11 @@ public sealed class TeamDbStore(
     GoalTacticsDbContext dbContext,
     StadiumEconomyService stadiumEconomy,
     TrainingProgressService trainingProgress,
-    TeamStrengthCalculator strengthCalculator) : ITeamStore
+    TeamStrengthCalculator strengthCalculator,
+    IConfiguration configuration) : ITeamStore
 {
+    private readonly IConfiguration _configuration = configuration;
+
     private const int FacilityMaxLevel = 20;
     private const int SeasonLengthDays = 30;
     private const int IndividualTrainingWeeklyStars = 1_000;
@@ -200,36 +204,169 @@ public sealed class TeamDbStore(
 
     public async Task<FinancesRecord> GetFinancesAsync(string userId, CancellationToken cancellationToken = default)
     {
-        var history = await GetFinanceHistoryAsync(userId, cancellationToken);
-        var today = history.FirstOrDefault();
-        var yesterday = history.Skip(1).FirstOrDefault();
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
 
-        var todays = today is null
-            ? Array.Empty<FinanceEntryRecord>()
-            : new[]
-            {
-                new FinanceEntryRecord("Income", today.Income, "Daily income", true),
-                new FinanceEntryRecord("Outcome", today.Outcome, "Daily outcome", false)
-            };
+        // Find the latest 2 matchdays that have ledger entries
+        var recentMatchdays = await dbContext.TeamFinanceLedger.AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .Select(x => x.Matchday)
+            .Distinct()
+            .OrderByDescending(x => x)
+            .Take(2)
+            .ToListAsync(cancellationToken);
 
-        var yesterdays = yesterday is null
-            ? Array.Empty<FinanceEntryRecord>()
-            : new[]
-            {
-                new FinanceEntryRecord("Income", yesterday.Income, "Daily income", true),
-                new FinanceEntryRecord("Outcome", yesterday.Outcome, "Daily outcome", false)
-            };
+        var todayMatchday = recentMatchdays.Count > 0 ? recentMatchdays[0] : 0;
+        var yesterdayMatchday = recentMatchdays.Count > 1 ? recentMatchdays[1] : 0;
 
-        return new FinancesRecord((int)(today?.Balance ?? 0), (int)(yesterday?.Balance ?? 0), todays, yesterdays);
+        var ledger = recentMatchdays.Count > 0
+            ? await dbContext.TeamFinanceLedger.AsNoTracking()
+                .Where(x => x.UserId == userId && (x.Matchday == todayMatchday || x.Matchday == yesterdayMatchday))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        var todays = ledger.Where(x => x.Matchday == todayMatchday)
+            .Select(x => new FinanceEntryRecord(x.BookingType, x.Value, x.Description, x.IsEarning))
+            .ToArray();
+
+        var yesterdays = ledger.Where(x => x.Matchday == yesterdayMatchday && yesterdayMatchday != todayMatchday)
+            .Select(x => new FinanceEntryRecord(x.BookingType, x.Value, x.Description, x.IsEarning))
+            .ToArray();
+
+        return new FinancesRecord(todayMatchday, yesterdayMatchday, todays, yesterdays);
     }
 
     public async Task<IReadOnlyList<AccomplishmentRecord>> GetAccomplishmentsAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
-        return new[]
+        var items = await dbContext.TeamAccomplishments.AsNoTracking()
+            .Where(x => x.TeamId == team.TeamId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var records = items.Select(x => new AccomplishmentRecord(x.Name, x.Image)).ToList();
+        // Always include the founder accomplishment as a fallback/first item
+        records.Insert(0, new AccomplishmentRecord($"Gründer\0{team.Name}", "founder"));
+        return records;
+    }
+
+    public async Task AddAccomplishmentAsync(string userId, string name, string image, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        // avoid duplicates of identical name for this team
+        var exists = await dbContext.TeamAccomplishments.AnyAsync(x => x.TeamId == team.TeamId && x.Name == name, cancellationToken);
+        if (exists)
         {
-            new AccomplishmentRecord($"Founder of {team.Name}", "founder")
+            return;
+        }
+
+        var entity = new TeamAccomplishmentEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            TeamId = team.TeamId,
+            Name = name,
+            Image = image,
+            CreatedAtUtc = DateTime.UtcNow
         };
+
+        dbContext.Add(entity);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private int ComputeCurrentSeasonNumber()
+    {
+        var seasonLengthDays = int.TryParse(_configuration["App:SeasonLengthDays"], out var d) ? d : SeasonLengthDays;
+        var startDate = DateTime.TryParse(_configuration["App:SeasonStartDate"], out var sd)
+            ? sd
+            : new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var elapsed = (DateTime.UtcNow - startDate).TotalDays;
+        return (int)(elapsed / seasonLengthDays) + 1;
+    }
+
+    private async Task EnsureSeasonTransitionAsync(CancellationToken cancellationToken)
+    {
+        var currentSeason = ComputeCurrentSeasonNumber();
+        var state = await dbContext.SeasonStates.FirstOrDefaultAsync(cancellationToken);
+        if (state is null)
+        {
+            state = new SeasonStateEntity { Id = "singleton", LastSeasonProcessed = 0 };
+            dbContext.SeasonStates.Add(state);
+        }
+
+        if (state.LastSeasonProcessed >= currentSeason)
+        {
+            return;
+        }
+
+        await ProcessSeasonEnd(currentSeason, cancellationToken);
+        state.LastSeasonProcessed = currentSeason;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task ProcessSeasonEnd(int seasonNumber, CancellationToken cancellationToken)
+    {
+        // find all leagues with actual team memberships
+        var leagueIds = await dbContext.LeagueTeams
+            .Where(x => x.TeamId != null)
+            .Select(x => x.LeagueId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        foreach (var leagueId in leagueIds)
+        {
+            var league = await dbContext.Leagues.FirstOrDefaultAsync(x => x.Id == leagueId, cancellationToken);
+            if (league is null)
+            {
+                continue;
+            }
+
+            var teams = await dbContext.LeagueTeams
+                .Where(x => x.LeagueId == leagueId && x.TeamId != null)
+                .ToListAsync(cancellationToken);
+
+            // determine champion
+            var championEntry = teams
+                .OrderByDescending(x => x.PointsHome + x.PointsAway)
+                .ThenByDescending(x => (x.GoalsScoredHome + x.GoalsScoredAway) - (x.GoalsReceivedHome + x.GoalsReceivedAway))
+                .ThenByDescending(x => x.GoalsScoredHome + x.GoalsScoredAway)
+                .ThenBy(x => x.TeamName)
+                .FirstOrDefault();
+
+            if (championEntry?.TeamId != null)
+            {
+                var championTeam = await dbContext.Teams.FirstOrDefaultAsync(x => x.Id == championEntry.TeamId, cancellationToken);
+                if (championTeam != null)
+                {
+                    await AddAccomplishmentAsync(championTeam.UserId,
+                        $"Meisterschaft\0{league.Name}\0Saison #{seasonNumber}",
+                        "04.png",
+                        cancellationToken);
+                }
+            }
+
+            // top scorer in league
+            var leagueTeamIds = teams.Select(x => x.TeamId!).ToList();
+            var topScorer = await dbContext.TeamPlayers
+                .Where(p => leagueTeamIds.Contains(p.TeamId))
+                .OrderByDescending(p => p.Goals)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (topScorer != null && leagueTeamIds.Contains(topScorer.TeamId))
+            {
+                var owningTeam = await dbContext.Teams.FirstOrDefaultAsync(x => x.Id == topScorer.TeamId, cancellationToken);
+                if (owningTeam != null)
+                {
+                    await AddAccomplishmentAsync(owningTeam.UserId,
+                        $"Torschützenkönig\0{topScorer.Name}\0Saison #{seasonNumber}",
+                        "02.png",
+                        cancellationToken);
+                }
+            }
+        }
+
+        // reset seasonal statistics: player goals
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE team_players SET goals = 0", cancellationToken);
     }
 
     public async Task RenameTeamAsync(string userId, string teamId, string name, CancellationToken cancellationToken = default)
@@ -459,8 +596,16 @@ public sealed class TeamDbStore(
         await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
 
         var resources = await dbContext.TeamResources.AsNoTracking().FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        var teamEntity = await dbContext.Teams.AsNoTracking().FirstAsync(x => x.Id == team.TeamId, cancellationToken);
         var state = await EnsureTrainingStateAsync(team.TeamId, cancellationToken);
-        var efficiency = trainingProgress.CalculateEfficiencyValue(resources.TrainingCenterLevel);
+        var baseEfficiency = trainingProgress.CalculateEfficiencyValue(resources.TrainingCenterLevel);
+
+        // Efficiency decays after 3 days without changing training
+        var daysSinceChange = state.TrainingChangedAtUtc.HasValue
+            ? (int)(DateTime.UtcNow - state.TrainingChangedAtUtc.Value).TotalDays
+            : 0;
+        var decay = Math.Max(0, daysSinceChange - 3) * 5;
+        var efficiency = Math.Max(10, baseEfficiency - decay);
         var trainPrice = IndividualTrainingWeeklyStars;
 
         return new TeamTrainingStateRecord(
@@ -470,7 +615,10 @@ public sealed class TeamDbStore(
             efficiency,
             trainPrice,
             state.CampType,
-            state.CampActiveUntilUtc);
+            state.CampActiveUntilUtc,
+            state.SelectedTacticId,
+            state.SelectedTacticStartUtc,
+            teamEntity.LeagueTier);
     }
 
     public async Task SaveTeamTrainingAsync(string userId, int mainSkillIndex, int subSkillIndex, CancellationToken cancellationToken = default)
@@ -480,6 +628,17 @@ public sealed class TeamDbStore(
 
         state.MainSkillIndex = Math.Clamp(mainSkillIndex, 0, 3);
         state.SubSkillIndex = Math.Clamp(subSkillIndex, 0, 9);
+        state.TrainingChangedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SaveTacticTrainingAsync(string userId, string tacticId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var state = await EnsureTrainingStateAsync(team.TeamId, cancellationToken);
+
+        state.SelectedTacticId = tacticId;
+        state.SelectedTacticStartUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -487,12 +646,22 @@ public sealed class TeamDbStore(
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        var teamEntity = await dbContext.Teams.AsNoTracking().FirstAsync(x => x.Id == team.TeamId, cancellationToken);
         var state = await EnsureTrainingStateAsync(team.TeamId, cancellationToken);
 
-        if (resources.Money >= 200_000m)
+        // Camp cost depends on league tier
+        var campCost = teamEntity.LeagueTier switch
         {
-            resources.Money -= 200_000m;
-            await AddFinanceHistoryAsync(userId, income: 0m, outcome: 200_000m, resources.Money, cancellationToken);
+            1 => 10_000_000m,
+            2 => 5_000_000m,
+            3 => 2_000_000m,
+            _ => 500_000m
+        };
+
+        if (resources.Money >= campCost)
+        {
+            resources.Money -= campCost;
+            await AddFinanceHistoryAsync(userId, income: 0m, outcome: campCost, resources.Money, cancellationToken);
         }
         else if (resources.GTStars >= 1_000m)
         {
@@ -705,8 +874,22 @@ public sealed class TeamDbStore(
         if (economyDays > 0)
         {
             var totalIncome = 0m;
+            var totalExpense = 0m;
+            var matchday = resources.ProgressDayCounter;
+
+            // Deterministic sponsor EUR amounts (same seed as SponsorService)
+            var sponsorSeed = HashCode.Combine(team.Id, "sponsor");
+            var sponsorRng = new Random(sponsorSeed);
+            var mainSponsorPerMatch = sponsorRng.Next(50_000, 300_001);
+            // skip main goalscorer+championship to align rng
+            sponsorRng.Next(); sponsorRng.Next();
+            var secondarySponsorPerMatch = sponsorRng.Next(30_000, 100_001);
+            var secondarySponsorPerWin = sponsorRng.Next(10_000, 40_001);
+            var secondarySponsorPerGoal = sponsorRng.Next(5_000, 20_001);
+
             for (var i = 0; i < economyDays; i++)
             {
+                var dayMatchday = matchday + i;
                 var economy = stadiumEconomy.CalculateMatchday(
                     team.LeagueTier,
                     team.Wins,
@@ -726,11 +909,43 @@ public sealed class TeamDbStore(
                 resources.Money += economy.Earnings;
                 totalIncome += economy.Earnings;
 
+                // Sponsor EUR income per matchday
+                var mainEur = (decimal)mainSponsorPerMatch;
+                var secondaryEur = (decimal)secondarySponsorPerMatch;
+                resources.Money += mainEur + secondaryEur;
+                totalIncome += mainEur + secondaryEur;
+
+                AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Hauptsponsor", mainEur, "Grundbetrag", true);
+                AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Nebensponsor", secondaryEur, "Grundbetrag", true);
+
+                // Stadium building maintenance costs (itemized)
+                RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Geschäftsstelle", resources.OfficeLevel, 700m, ref totalExpense, resources);
+                RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Trainingsgelände", resources.TrainingCenterLevel, 700m, ref totalExpense, resources);
+                RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Medizinische Abteilung", resources.MedicalCenterLevel, 225m, ref totalExpense, resources);
+                RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Jugendzentrum", resources.YouthAcademyLevel, 240m, ref totalExpense, resources);
+
+                // Seat maintenance
+                var standCost = resources.StadiumStandSeats * 2m;
+                var sitCost = resources.StadiumSitSeats * 5m;
+                var vipCost = resources.StadiumVipSeats * 150m;
+                if (standCost > 0) { AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Stadion", standCost, "Stehplätze", false); resources.Money -= standCost; totalExpense += standCost; }
+                if (sitCost > 0) { AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Stadion", sitCost, "Sitzplätze", false); resources.Money -= sitCost; totalExpense += sitCost; }
+                if (vipCost > 0) { AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Stadion", vipCost, "VIP-Logen", false); resources.Money -= vipCost; totalExpense += vipCost; }
+
+                // Player salaries (computed from strength)
+                var totalSalary = players.Sum(p => Math.Max(1_000m, p.Strength * p.Strength / 4m));
+                if (totalSalary > 0)
+                {
+                    AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Spielergehälter", totalSalary, "", false);
+                    resources.Money -= totalSalary;
+                    totalExpense += totalSalary;
+                }
+
                 // Grass degrades slowly with usage and should be renewed periodically.
                 team.GrassQuality = Math.Max(45, team.GrassQuality - 1);
             }
 
-            AddFinanceHistoryForTeam(team.UserId, totalIncome, 0m, resources.Money);
+            AddFinanceHistoryForTeam(team.UserId, totalIncome, totalExpense, resources.Money);
             resources.LastEconomyTickUtc = now.Date;
         }
 
@@ -747,16 +962,34 @@ public sealed class TeamDbStore(
             for (var i = 0; i < trainingDays; i++)
             {
                 var tickDate = now.Date.AddDays(-trainingDays + i + 1);
+
+                // Capture pre-tick state for training report
+                var preStrengths = players.ToDictionary(p => p.Id, p => p.Strength);
+                var preFitness = players.ToDictionary(p => p.Id, p => p.Fitness);
+                var preTeamStrength = players
+                    .OrderBy(x => x.ShirtNumber).ThenByDescending(x => x.Strength)
+                    .Take(11).Sum(x => x.Strength);
+
                 ApplyDailyTrainingTick(players, resources, training, tickDate);
+
+                var postTeamStrength = players
+                    .OrderBy(x => x.ShirtNumber).ThenByDescending(x => x.Strength)
+                    .Take(11).Sum(x => x.Strength);
+
+                AddTrainingReportMail(team.UserId, players, preStrengths, preFitness,
+                    training, preTeamStrength, postTeamStrength, tickDate);
                 resources.ProgressDayCounter++;
 
-                if (resources.ProgressDayCounter >= SeasonLengthDays)
+                        if (resources.ProgressDayCounter >= SeasonLengthDays)
                 {
                     resources.ProgressDayCounter -= SeasonLengthDays;
                     foreach (var player in players)
                     {
                         player.Age++;
                     }
+
+                    // season rollover: process achievements and reset seasonal counters once
+                    await EnsureSeasonTransitionAsync(cancellationToken);
                 }
             }
 
@@ -861,6 +1094,181 @@ public sealed class TeamDbStore(
         });
     }
 
+    private void AddLedgerEntry(string userId, int matchday, DateTime date, string bookingType, decimal value, string description, bool isEarning)
+    {
+        dbContext.TeamFinanceLedger.Add(new TeamFinanceLedgerEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            UserId = userId,
+            Matchday = matchday,
+            Date = date,
+            BookingType = bookingType,
+            Value = value,
+            Description = description,
+            IsEarning = isEarning
+        });
+    }
+
+    private void RecordBuildingCost(string userId, int matchday, DateTime date, string buildingName, int level, decimal costPerLevel, ref decimal totalExpense, TeamResourcesEntity resources)
+    {
+        if (level <= 0) return;
+        var cost = level * costPerLevel;
+        AddLedgerEntry(userId, matchday, date, "Stadion", cost, $"{buildingName} Stufe {level}", false);
+        resources.Money -= cost;
+        totalExpense += cost;
+    }
+
+    private static readonly string[] GermanMonths =
+        ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+    private static string PositionGerman(string pos) => pos switch
+    {
+        "GK" => "Torwart",
+        "DEF" => "Verteidigung",
+        "MID" => "Mittelfeld",
+        "FWD" => "Angriff",
+        _ => pos
+    };
+
+    private void AddTrainingReportMail(
+        string userId,
+        IReadOnlyList<TeamPlayerEntity> players,
+        Dictionary<string, decimal> preStrengths,
+        Dictionary<string, int> preFitness,
+        TeamTrainingStateEntity training,
+        decimal preTeamStrength,
+        decimal postTeamStrength,
+        DateTime tickDate)
+    {
+        var teamDelta = postTeamStrength - preTeamStrength;
+        var teamStrInt = (int)Math.Round(postTeamStrength);
+
+        // Motivation text based on training staleness
+        var staleDays = training.TrainingChangedAtUtc.HasValue
+            ? (int)(tickDate.Date - training.TrainingChangedAtUtc.Value.Date).TotalDays
+            : 0;
+        var motivation = staleDays switch
+        {
+            <= 2 => "Durch dein abwechslungsreiches Training sind deine Spieler top-motiviert und können zu Höchstformen aufsteigen!",
+            <= 5 => "Die Spieler sind noch motiviert, würden sich aber über Abwechslung freuen, sonst könnte ihr Trainingsforschritt sich verlangsamen.",
+            _ => "Deine Spieler sind gelangweilt davon, immer wieder dasselbe zu trainieren und ihr Trainingsfortschritt lässt nach. Bringe mehr Abwechslung in dein Training!"
+        };
+
+        var hasCamp = training.CampActiveUntilUtc.HasValue && training.CampActiveUntilUtc.Value.Date >= tickDate.Date;
+
+        var sb = new System.Text.StringBuilder(4096);
+        sb.Append("\r\n<html>\r\n<head>\r\n<meta charset=\"utf-8\">\r\n<style type=\"text/css\">\r\n");
+        sb.Append(".icon { height: 1em; vertical-align: middle; }\r\n");
+        sb.Append(".good { color: #00aa00; }\r\n.bad { color: #ff0000; }\r\n");
+        sb.Append(".detailtable { width: 100%; } .detailtable th { text-align: left; } .detailtable th, .detailtable td { border-bottom: 1px solid #777; padding: 0.5em; }\r\n");
+        sb.Append(".middle { vertical-align: middle; }\r\n\r\n.title {\r\npadding: 0.5em;\r\ntext-align: center;\r\nfont-weight: bold;\r\n}\r\n");
+        sb.Append(".total {\r\nbackground-color: #cceecc;\r\nfont-size: 1em;\r\n}\r\n");
+        sb.Append(".icon2 {\r\nheight: 1.3em;\r\nvertical-align: middle;\r\n}\r\n");
+        sb.Append("</style>\r\n</head>\r\n<body>\r\n");
+        sb.Append($"<p>Hey Chef,</p><p>{motivation}</p>");
+        sb.Append("<p>Folgende Spieler haben das heutige Training mit bravour absolviert und sind in guter Verfassung:</p>\r\n");
+
+        // Main table
+        sb.Append("<table class=\"detailtable\" cellspacing=\"0\">\r\n");
+        sb.Append($"<tr class=\"total\">\r\n<th colspan=\"3\">Team strength</th>\r\n");
+        sb.Append($"<th colspan=\"2\"><img class=\"icon2\" src=\"[Stars_{teamStrInt}]\" />&nbsp;");
+        sb.Append($"<span class=\"middle\">{postTeamStrength:N2}&nbsp;&nbsp;");
+        if (teamDelta >= 0)
+            sb.Append($"<img class=\"icon\" src=\"[ArrowUp]\" />&nbsp;<span class=\"good\">+{teamDelta:N2}</span>");
+        else
+            sb.Append($"<img class=\"icon\" src=\"[ArrowDown]\" />&nbsp;<span class=\"bad\">{teamDelta:N2}</span>");
+        sb.Append("</span></th>\r\n</tr>\r\n");
+        sb.Append("<tr>\r\n<th>Spielername (Position)</th>\r\n<th>Alter</th>\r\n<th>Talent</th>\r\n<th>Form</th>\r\n<th>Stärke</th>\r\n</tr>\r\n");
+
+        var sorted = players.OrderBy(p => p.Position switch { "GK" => 0, "DEF" => 1, "MID" => 2, _ => 3 }).ThenBy(p => p.Name);
+        foreach (var player in sorted)
+        {
+            var strengthBefore = preStrengths.GetValueOrDefault(player.Id, player.Strength);
+            var fitBefore = preFitness.GetValueOrDefault(player.Id, player.Fitness);
+            var sDelta = player.Strength - strengthBefore;
+            var fDelta = player.Fitness - fitBefore;
+            var sInt = (int)Math.Round(player.Strength);
+
+            sb.Append("\r\n<tr>\r\n");
+            sb.Append($"<td>{System.Net.WebUtility.HtmlEncode(player.Name)}<br />({PositionGerman(player.Position)})</td>\r\n");
+            sb.Append($"<td><b>{player.Age}</b></td>\r\n");
+            sb.Append($"<td><b>{player.Talent}</b></td>\r\n");
+
+            // Form (Fitness)
+            sb.Append($"<td>{player.Fitness:N2}<br />");
+            if (fDelta > 0)
+                sb.Append($"&nbsp;<img class=\"icon\" src=\"[ArrowUp]\" />&nbsp;<span class=\"good\">+{(decimal)fDelta:N2}</span>");
+            sb.Append("</td>\r\n");
+
+            // Stärke (Strength)
+            sb.Append($"<td><img class=\"icon\" src=\"[Stars_{sInt}]\" /><br />{player.Strength:N2}<br />");
+            if (sDelta > 0)
+                sb.Append($"&nbsp;<img class=\"icon\" src=\"[ArrowUp]\" />&nbsp;<span class=\"good\">+{sDelta:N2}</span>");
+            sb.Append("</td>\r\n</tr>\r\n");
+        }
+        sb.Append("\r\n</table>\r\n");
+
+        // Camp section
+        if (hasCamp)
+        {
+            var campName = training.CampType switch
+            {
+                "altitude" => "Höhentrainingslager",
+                "beach" => "Strandtrainingslager",
+                "forest" => "Waldtrainingslager",
+                _ => "Trainingslager"
+            };
+            sb.Append($"<br />\r\n<div class=\"title\">Trainingslager ({campName})</div>\r\n");
+            sb.Append("<table class=\"detailtable\" cellspacing=\"0\">\r\n");
+            sb.Append("<tr>\r\n<th>Spielername (Position)</th>\r\n<th>Fähigkeit</th>\r\n<th>Fortschritt</th>\r\n</tr>\r\n");
+            foreach (var player in sorted)
+            {
+                sb.Append($"\r\n<tr>\r\n<td>{System.Net.WebUtility.HtmlEncode(player.Name)}<br />({PositionGerman(player.Position)})</td>\r\n");
+                sb.Append("<td>Erfahrung</td>\r\n");
+                sb.Append($"<td>{player.Strength:N2}<br />&nbsp;<img class=\"icon\" src=\"[ArrowUp]\" />&nbsp;<span class=\"good\">+1.50</span></td>\r\n</tr>\r\n");
+            }
+            sb.Append("\r\n</table>\r\n");
+        }
+
+        // Individual training section
+        var individualPlayers = players.Where(p =>
+            !string.IsNullOrWhiteSpace(p.IndividualTrainingSkill)
+            && p.IndividualTrainingUntilUtc.HasValue
+            && p.IndividualTrainingUntilUtc.Value.Date >= tickDate.Date)
+            .OrderBy(p => p.Position switch { "GK" => 0, "DEF" => 1, "MID" => 2, _ => 3 })
+            .ThenBy(p => p.Name)
+            .ToList();
+
+        if (individualPlayers.Count > 0)
+        {
+            sb.Append("<br />\r\n<div class=\"title\">Einzeltraining</div>\r\n");
+            sb.Append("<table class=\"detailtable\" cellspacing=\"0\">\r\n");
+            sb.Append("<tr>\r\n<th>Spielername (Position)</th>\r\n<th>Fähigkeit</th>\r\n<th>Fortschritt</th>\r\n</tr>\r\n");
+            foreach (var player in individualPlayers)
+            {
+                var indGain = trainingProgress.CalculateIndividualGainPublic(player.Age, player.Talent, player.Fitness);
+                sb.Append($"\r\n<tr>\r\n<td>{System.Net.WebUtility.HtmlEncode(player.Name)}<br />({PositionGerman(player.Position)})</td>\r\n");
+                sb.Append($"<td>{System.Net.WebUtility.HtmlEncode(player.IndividualTrainingSkill!)}</td>\r\n");
+                sb.Append($"<td>{player.Strength:N2}<br />&nbsp;<img class=\"icon\" src=\"[ArrowUp]\" />&nbsp;<span class=\"good\">+{indGain:N2}</span></td>\r\n</tr>\r\n");
+            }
+            sb.Append("\r\n</table>\r\n");
+        }
+
+        sb.Append("<br /><br />\r\n<p>Viele Grüße,<br />Coach Johnson.</p>\r\n</body>\r\n</html>\r\n");
+
+        dbContext.TeamMail.Add(new TeamMailEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            UserId = userId,
+            DateText = tickDate.ToString("yyyy-MM-ddT06:00:00.0000000"),
+            Subject = $"Trainingsreport vom {tickDate.Day} {GermanMonths[tickDate.Month - 1]}",
+            Sender = "Coach Johnson",
+            Message = sb.ToString(),
+            IsNew = true,
+            SenderType = 1
+        });
+    }
+
     private static int FullDaysElapsed(DateTime? fromUtc, DateTime nowUtc)
     {
         if (!fromUtc.HasValue)
@@ -896,8 +1304,20 @@ public sealed class TeamDbStore(
             return false;
         }
 
-        // Decompiled clue: requiredOfficeLevel = building.Level + 1.
-        return officeLevel >= (level + 1);
+        // Older client logic treated a facility as upgradable when its level
+        // was strictly less than the office level.  The decompiled comment
+        // suggested "requiredOfficeLevel = building.Level + 1" which meant
+        // you needed the office one level higher than the thing you were
+        // trying to upgrade.  The Xamarin frontend did its own check using
+        // the raw level from the server, so offices of level 1 would block
+        // every other building (level 1 &gt;= 2 is false) and the stadium
+        // entries were effectively forever locked because the returned
+        // `Level` for them was a large seat count.
+        //
+        // We now simplify the rule to match the expected behaviour: the
+        // office must be at least as high as the thing being upgraded.  A
+        // level‑1 office therefore allows all other facilities at level 1.
+        return officeLevel >= level;
     }
 
     private bool CanUpgradeStadium(TeamResourcesEntity resources, int officeLevel, int leagueTier, Guid placeId)
@@ -971,7 +1391,8 @@ public sealed class TeamDbStore(
                 Age = age,
                 Talent = talent,
                 Strength = strength,
-                Fitness = fitness
+                Fitness = fitness,
+                ContractEndUtc = DateTime.UtcNow.AddDays(random.Next(15, 90))
             });
         }
 
@@ -995,7 +1416,8 @@ public sealed class TeamDbStore(
             player.YellowCards,
             player.RedCards,
             player.IndividualTrainingSkill,
-            player.IndividualTrainingUntilUtc);
+            player.IndividualTrainingUntilUtc,
+            player.ContractEndUtc);
     }
 
     private static BuildPlaceRecord ToBuildPlace(Guid id, string type, int level, bool canBuild)
@@ -1241,5 +1663,78 @@ public sealed class TeamDbStore(
             userEmail,
             userCreatedAtUtc,
             userLastActivityAtUtc);
+    }
+
+    public async Task<IReadOnlyList<OwnedEquipmentRecord>> GetOwnedEquipmentAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var items = await dbContext.TeamEquipment.AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .ToListAsync(cancellationToken);
+        return items.Select(x => new OwnedEquipmentRecord(x.Id, x.Image, x.EquipmentType, x.IsActive)).ToArray();
+    }
+
+    public async Task<bool> BuyEquipmentAsync(string userId, string image, string equipmentType, int starsCost, CancellationToken cancellationToken = default)
+    {
+        var resources = await dbContext.TeamResources.FirstOrDefaultAsync(
+            x => dbContext.Teams.Any(t => t.Id == x.TeamId && t.UserId == userId), cancellationToken);
+        if (resources is null || resources.GTStars < starsCost)
+            return false;
+
+        // Check if already owned
+        var alreadyOwned = await dbContext.TeamEquipment.AnyAsync(
+            x => x.UserId == userId && x.Image == image, cancellationToken);
+        if (alreadyOwned)
+            return false;
+
+        resources.GTStars -= starsCost;
+
+        dbContext.TeamEquipment.Add(new TeamEquipmentEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            UserId = userId,
+            Image = image,
+            EquipmentType = equipmentType,
+            IsActive = false
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> UseEquipmentAsync(string userId, string equipmentId, CancellationToken cancellationToken = default)
+    {
+        var item = await dbContext.TeamEquipment.FirstOrDefaultAsync(
+            x => x.UserId == userId && x.Id == equipmentId, cancellationToken);
+        if (item is null)
+            return false;
+
+        // Deactivate all items of the same type for this user
+        var sameType = await dbContext.TeamEquipment
+            .Where(x => x.UserId == userId && x.EquipmentType == item.EquipmentType && x.IsActive)
+            .ToListAsync(cancellationToken);
+        foreach (var s in sameType)
+            s.IsActive = false;
+
+        item.IsActive = true;
+
+        // Update team's selected equipment
+        var team = await dbContext.Teams.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        if (team is not null)
+        {
+            if (item.EquipmentType == "shirt")
+                team.SelectedShirt = item.Image;
+            else if (item.EquipmentType == "emblem")
+                team.SelectedEmblem = item.Image;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<(string? Shirt, string? Emblem)> GetSelectedEquipmentAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var team = await dbContext.Teams.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        return (team?.SelectedShirt, team?.SelectedEmblem);
     }
 }
