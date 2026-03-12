@@ -34,7 +34,7 @@ public sealed class LeagueController(ILeagueService leagueService) : ControllerB
             return Unauthorized(new MatchesResponse { Success = false, Message = "Invalid token context" });
         }
 
-        return Ok(await leagueService.GetMatchesAsync(userId, request.Id, cancellationToken));
+        return Ok(await leagueService.GetMatchesAsync(userId, request.Id, request.SafePage, request.SafePageSize, cancellationToken));
     }
 
     [HttpPost("GetGoalGetters")]

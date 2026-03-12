@@ -115,7 +115,15 @@ public sealed class TeamControllerTests : IClassFixture<WebApplicationFactory<Pr
         var beforeBidResources = await (await client.PostAsJsonAsync("/api/Team/GetMyResources", new RequestObject())).Content.ReadFromJsonAsync<ResourcesResponse>();
         Assert.NotNull(beforeBidResources);
 
-        var bidResponse = await client.PostAsJsonAsync("/api/Transfermarket/PlaceBid", new BidRequest { Id = Guid.NewGuid(), Bid = 12345 });
+        // Search for an existing auction to bid on (system auctions are auto-generated)
+        var searchResponse = await client.PostAsJsonAsync("/api/Transfermarket/Search", new TransferSearchRequest());
+        Assert.Equal(HttpStatusCode.OK, searchResponse.StatusCode);
+        var searchBody = await searchResponse.Content.ReadFromJsonAsync<TransferSearchResponse>();
+        Assert.NotNull(searchBody);
+        Assert.NotEmpty(searchBody!.Players);
+        var auctionId = searchBody.Players[0].AuctionId;
+
+        var bidResponse = await client.PostAsJsonAsync("/api/Transfermarket/PlaceBid", new BidRequest { Id = auctionId, Bid = (int)(searchBody.Players[0].Bid + 1000) });
         Assert.Equal(HttpStatusCode.OK, bidResponse.StatusCode);
 
         var afterBidResources = await (await client.PostAsJsonAsync("/api/Team/GetMyResources", new RequestObject())).Content.ReadFromJsonAsync<ResourcesResponse>();

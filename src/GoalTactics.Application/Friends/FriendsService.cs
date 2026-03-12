@@ -28,11 +28,19 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
         var friends = await friendsStore.GetFriendsAsync(userId, request.Text, cancellationToken);
         var friendName = await friendsStore.FindFriendNameAsync(request.Text, cancellationToken);
 
+        var totalCount = friends.Count;
+        var page = request.SafePage;
+        var pageSize = request.SafePageSize;
+        var paged = friends.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
+
         return new FriendsResponse
         {
             Success = true,
-            Friends = friends.Select(MapFriend).ToArray(),
-            FriendName = friendName
+            Friends = paged.Select(MapFriend).ToArray(),
+            FriendName = friendName,
+            TotalCount = totalCount,
+            CurrentPage = page,
+            TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
         };
     }
 

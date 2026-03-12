@@ -20,6 +20,12 @@ public sealed class LadderEntryEntity
 
     public int Strength { get; set; }
 
+    public int Played { get; set; }
+
+    public int GoalsScored { get; set; }
+
+    public int GoalsReceived { get; set; }
+
     public bool IsBot { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }

@@ -21,4 +21,9 @@ public sealed class SponsorOfferData
     public string? Description { get; init; }
     public int Money { get; init; }
     public int Stars { get; init; }
+    public int BonusPerWin { get; init; }
+    public int BonusPerGoal { get; init; }
+    public int ContractDays { get; init; }
+    public bool IsActive { get; init; }
+    public string? Type { get; init; }
 }

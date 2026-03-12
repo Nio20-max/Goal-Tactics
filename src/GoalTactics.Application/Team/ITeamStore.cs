@@ -86,9 +86,18 @@ public interface ITeamStore
 
     Task<IReadOnlyList<SquadPlayerRecord>> GetScoutedPlayersAsync(string userId, CancellationToken cancellationToken = default);
 
-    Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, CancellationToken cancellationToken = default);
+    /// <summary>Returns scouted players including those still pending (not yet ready).</summary>
+    Task<IReadOnlyList<SquadPlayerRecord>> GetAllScoutedPlayersAsync(string userId, CancellationToken cancellationToken = default);
+
+    Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, DateTime? readyAtUtc = null, CancellationToken cancellationToken = default);
 
     Task<bool> RecruitScoutedPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
+
+    /// <summary>Set a scouted player's ScoutingReadyAtUtc to now (for star speed-up).</summary>
+    Task<bool> SpeedupScoutAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
+
+    /// <summary>Count of scouted players that are still pending (not yet ready).</summary>
+    Task<int> GetPendingScoutCountAsync(string userId, CancellationToken cancellationToken = default);
 
     Task<bool> TrySpendMoneyAsync(string userId, decimal amount, string description, CancellationToken cancellationToken = default);
 }
@@ -164,4 +173,5 @@ public sealed record SquadPlayerRecord(
     int RedCards,
     string? IndividualTrainingSkill,
     DateTime? IndividualTrainingUntilUtc,
-    DateTime? ContractEndUtc);
+    DateTime? ContractEndUtc,
+    DateTime? ScoutingReadyAtUtc = null);

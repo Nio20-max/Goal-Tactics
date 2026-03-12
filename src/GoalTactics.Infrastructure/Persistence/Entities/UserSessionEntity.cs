@@ -22,5 +22,11 @@ public sealed class UserSessionEntity
 
     public string? DeviceId { get; set; }
 
+    public string? RefreshToken { get; set; }
+
+    public DateTime? RefreshTokenExpiresUtc { get; set; }
+
+    public bool RefreshTokenUsed { get; set; }
+
     public UserEntity? User { get; set; }
 }

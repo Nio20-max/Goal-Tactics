@@ -1,6 +1,5 @@
 using GoalTactics.Contracts.TransferMarket;
 using GoalTactics.Application.Team;
-using GoalTactics.Application.Common;
 
 namespace GoalTactics.Application.TransferMarket;
 
@@ -15,50 +14,54 @@ public interface ITransferMarketService
     Task UpdateFavoriteAsync(string userId, Guid id, CancellationToken cancellationToken = default);
 
     Task<TransferSearchResponse> GetFavoritesAsync(string userId, CancellationToken cancellationToken = default);
+
+    Task<Guid> ListPlayerForSaleAsync(string userId, SellPlayerRequest request, CancellationToken cancellationToken = default);
 }
 
-public sealed class TransferMarketService(ITeamStore teamStore) : ITransferMarketService
+public sealed class TransferMarketService(ITeamStore teamStore, IAuctionStore auctionStore) : ITransferMarketService
 {
+    private const int BidStarsCost = 200;
+    private const int MinimumSystemAuctions = 10;
+
     public async Task<TransferSearchResponse> SearchAsync(string userId, TransferSearchRequest request, CancellationToken cancellationToken = default)
     {
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
-        var players = BuildTransferPlayers()
-            .Where(player => request.Age is null ||
-                ((request.Age.Min is null || player.Age >= request.Age.Min) &&
-                 (request.Age.Max is null || player.Age <= request.Age.Max)))
-            .Where(player => request.Strength is null ||
-                ((request.Strength.Min is null || player.Strength >= request.Strength.Min) &&
-                 (request.Strength.Max is null || player.Strength <= request.Strength.Max)))
-            .Where(player => request.Talent is null ||
-                ((request.Talent.Min is null || player.Talent >= request.Talent.Min) &&
-                 (request.Talent.Max is null || player.Talent <= request.Talent.Max)))
-            .Where(player => request.Budget is null || player.Bid <= (long)request.Budget)
-            .Where(player => request.SkillIndex < 0 || player.Position == PositionCodeFromSkillIndex(request.SkillIndex))
-            .Where(player => request.OnlyKeeper is not true || player.Position == 0)
-            .ToArray();
+        var myTeamId = Guid.TryParse(team.TeamId, out var tid) ? tid : Guid.Empty;
+
+        // Ensure there are enough system auctions on the market
+        await auctionStore.EnsureSystemAuctionsAsync(MinimumSystemAuctions, cancellationToken);
+
+        var (players, totalCount) = await auctionStore.SearchAsync(request, cancellationToken);
+        var favorites = await auctionStore.GetFavoritesAsync(userId, cancellationToken);
+        var sellings = await auctionStore.GetSellingsAsync(team.TeamId, cancellationToken);
+
+        var pageSize = request.SafePageSize;
 
         return new TransferSearchResponse
         {
             Success = true,
             Players = players,
-            Favorites = players.Take(1).ToArray(),
-            Sellings = [],
-            MyTeamId = Guid.TryParse(team.TeamId, out var myTeamId) ? myTeamId : Guid.Empty
+            Favorites = favorites,
+            Sellings = sellings,
+            MyTeamId = myTeamId,
+            TotalCount = totalCount,
+            CurrentPage = request.SafePage,
+            TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
         };
     }
 
     public async Task<TransferDetailsResponse> GetDetailsAsync(string userId, Guid id, CancellationToken cancellationToken = default)
     {
-        var search = await SearchAsync(userId, new TransferSearchRequest(), cancellationToken);
-        var player = search.Players.FirstOrDefault(candidate => candidate.AuctionId == id)
-            ?? search.Players.FirstOrDefault(candidate => candidate.Id == id)
-            ?? search.Players.FirstOrDefault();
+        var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var myTeamId = Guid.TryParse(team.TeamId, out var tid) ? tid : Guid.Empty;
+
+        var player = await auctionStore.GetAuctionAsync(id, cancellationToken);
 
         return new TransferDetailsResponse
         {
             Success = true,
-            BidCost = 200,
-            MyTeamId = search.MyTeamId,
+            BidCost = BidStarsCost,
+            MyTeamId = myTeamId,
             Player = player,
             AuctionPlayer = player
         };
@@ -67,107 +70,65 @@ public sealed class TransferMarketService(ITeamStore teamStore) : ITransferMarke
     public async Task BidAsync(string userId, BidRequest request, CancellationToken cancellationToken = default)
     {
         if (request.Bid <= 0)
-        {
             throw new InvalidOperationException("Bid must be positive.");
-        }
 
-        var spent = await teamStore.TrySpendStarsAsync(userId, 200m, cancellationToken);
+        var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+
+        // Charge GT Stars for placing a bid
+        var spent = await teamStore.TrySpendStarsAsync(userId, BidStarsCost, cancellationToken);
         if (!spent)
-        {
             throw new InvalidOperationException("Bidding on a player costs 200 GT Stars.");
-        }
+
+        // Place the actual bid in the auction store
+        var accepted = await auctionStore.PlaceBidAsync(
+            request.Id,
+            team.TeamId,
+            team.Name,
+            null,
+            request.Bid,
+            cancellationToken);
+
+        if (!accepted)
+            throw new InvalidOperationException("Bid was not accepted. It may be too low or the auction has ended.");
     }
 
-    public Task UpdateFavoriteAsync(string userId, Guid id, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-    public Task<TransferSearchResponse> GetFavoritesAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task UpdateFavoriteAsync(string userId, Guid id, CancellationToken cancellationToken = default)
     {
-        return SearchAsync(userId, new TransferSearchRequest(), cancellationToken);
+        await auctionStore.ToggleFavoriteAsync(userId, id, cancellationToken);
     }
 
-    private static TransferPlayerData[] BuildTransferPlayers()
+    public async Task<TransferSearchResponse> GetFavoritesAsync(string userId, CancellationToken cancellationToken = default)
     {
-        return
-        [
-            new TransferPlayerData
-            {
-                Id = Guid.Parse("9c912da7-372e-41de-a7f2-830196e4ead3"),
-                AuctionId = Guid.Parse("81700e20-7f5b-417e-b3a9-10c4aef8d2c1"),
-                Name = "Calvin Johnston",
-                Country = "ie",
-                Head = "01_head-A12",
-                Position = 6,
-                Strength = 92.5735375175m,
-                Talent = 6,
-                Age = 24,
-                Bid = 103332,
-                EndDate = DateTime.UtcNow.AddMinutes(35).ToString("O")
-            },
-            new TransferPlayerData
-            {
-                Id = Guid.Parse("de49cc43-12f0-4e01-9c83-0af5f78eb6c3"),
-                AuctionId = Guid.Parse("a82ca2ae-6e92-426e-8b3b-76fa4467b691"),
-                Name = "Vyshezor Raizgys",
-                Country = "lt",
-                Head = "01_head-A08",
-                Position = 2,
-                Strength = 117.2972567072m,
-                Talent = 6,
-                Age = 29,
-                Bid = 155804,
-                EndDate = DateTime.UtcNow.AddMinutes(38).ToString("O")
-            },
-            new TransferPlayerData
-            {
-                Id = Guid.Parse("157e6fea-d701-4993-8d31-230641af018b"),
-                AuctionId = Guid.Parse("f9e4b338-1d91-40d8-b7ed-ccea5eeb8dd2"),
-                Name = "Falkmar Pfalz-sulzbach",
-                Country = "de",
-                Head = "01_head-C03",
-                Position = 4,
-                Strength = 93.8022860000m,
-                Talent = 8,
-                Age = 20,
-                Bid = 104904,
-                EndDate = DateTime.UtcNow.AddHours(1).ToString("O")
-            },
-            new TransferPlayerData
-            {
-                Id = Guid.Parse("4ed4ee16-5c47-4384-bd0b-572cd4aec0e2"),
-                AuctionId = Guid.Parse("e1b36faa-feaf-4e78-af99-e5aebbcde1c6"),
-                Name = "Jade Morante",
-                Country = "es",
-                Head = "01_head-A05",
-                Position = 6,
-                Strength = 66.9142060000m,
-                Talent = 7,
-                Age = 22,
-                Bid = 74552,
-                EndDate = DateTime.UtcNow.AddHours(2).ToString("O")
-            },
-            new TransferPlayerData
-            {
-                Id = Guid.Parse("093178ec-0864-4913-924f-e71f51544ad9"),
-                AuctionId = Guid.Parse("b4e20c31-9e1a-4b7f-8a32-d5f7a6c89012"),
-                Name = "Hendrik Haintzl",
-                Country = "de",
-                Head = "01_head-A14",
-                Position = 0,
-                Strength = 79.5120000000m,
-                Talent = 7,
-                Age = 25,
-                Bid = 86390,
-                EndDate = DateTime.UtcNow.AddHours(3).ToString("O")
-            }
-        ];
+        var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var myTeamId = Guid.TryParse(team.TeamId, out var tid) ? tid : Guid.Empty;
+
+        var favorites = await auctionStore.GetFavoritesAsync(userId, cancellationToken);
+
+        return new TransferSearchResponse
+        {
+            Success = true,
+            Players = favorites,
+            Favorites = favorites,
+            Sellings = [],
+            MyTeamId = myTeamId
+        };
     }
 
-    /// <summary>Maps Xamarin SkillIndex (1=keeper,2=mid,3=striker) to position code used in transfer data.</summary>
-    private static int PositionCodeFromSkillIndex(int skillIndex) => skillIndex switch
+    public async Task<Guid> ListPlayerForSaleAsync(string userId, SellPlayerRequest request, CancellationToken cancellationToken = default)
     {
-        1 => 0,  // keeper
-        2 => 2,  // midfielder (position code 2 = DEF area, but Xamarin maps 2=MID; use raw code)
-        3 => 6,  // striker (position code 6 in transfer data = FWD)
-        _ => -1  // no filter
-    };
+        if (request.MinimumBid <= 0)
+            throw new InvalidOperationException("Minimum bid must be positive.");
+
+        var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+
+        var durationHours = Math.Clamp(request.DurationHours, 1, 24);
+        var auctionId = await auctionStore.ListPlayerAsync(
+            team.TeamId,
+            request.PlayerId.ToString("N"),
+            request.MinimumBid,
+            TimeSpan.FromHours(durationHours),
+            cancellationToken);
+
+        return auctionId;
+    }
 }

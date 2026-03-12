@@ -39,5 +39,10 @@ public sealed class TeamPlayerEntity
     /// <summary>True while the player is in the scouted pool (not yet recruited).</summary>
     public bool IsScouted { get; set; }
 
+    /// <summary>When this scouted player becomes visible/ready. Null for non-scouted players.</summary>
+    public DateTime? ScoutingReadyAtUtc { get; set; }
+
+    public string Head { get; set; } = "01_head-A01";
+
     public TeamEntity? Team { get; set; }
 }

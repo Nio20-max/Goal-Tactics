@@ -1,4 +1,5 @@
 using GoalTactics.Contracts.Shop;
+using GoalTactics.Application.Common;
 using GoalTactics.Application.Team;
 
 namespace GoalTactics.Application.Shop;
@@ -22,18 +23,9 @@ public sealed class ShopService(ITeamStore teamStore) : IShopService
 {
     private const int EquipmentCostStars = 500;
 
-    // 56 trikots (trikot0 – trikot55)
-    private static readonly string[] ShirtImages = Enumerable.Range(0, 56).Select(i => $"trikot{i}").ToArray();
-
-    // 81 wappen extracted from APK
-    private static readonly int[] EmblemNumbers =
-    [
-        1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,
-        31,33,34,37,40,42,43,44,45,50,51,52,53,56,58,61,63,65,67,68,71,76,78,79,80,
-        83,84,88,90,92,95,97,100,104,105,106,107,111,113,114,117,118,121,125,126,128,
-        130,131,132,135,137,142,143,146,150,157
-    ];
-    private static readonly string[] EmblemImages = EmblemNumbers.Select(i => $"wappen{i:00}").ToArray();
+    // Use shared catalog as single source of truth for valid drawable names
+    private static readonly string[] ShirtImages = EquipmentCatalog.Shirts;
+    private static readonly string[] EmblemImages = EquipmentCatalog.Emblems;
 
     private static Guid DeterministicId(string image)
     {
@@ -210,6 +202,10 @@ public sealed class ShopService(ITeamStore teamStore) : IShopService
         }
 
         if (image is null || type is null)
+            return;
+
+        // Validate drawable name against canonical catalog
+        if (!EquipmentCatalog.IsValidDrawable(image))
             return;
 
         await teamStore.BuyEquipmentAsync(userId, image, type, EquipmentCostStars, cancellationToken);

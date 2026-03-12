@@ -50,7 +50,7 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
                 IsFriend: x.Status == AcceptedStatus,
                 IsRequestIncoming: incoming,
                 IsRequestOutgoing: outgoing,
-                IsLiked: x.RequesterUserId == userId && x.IsLikedByRequester,
+                IsLiked: x.IsLikedByRequester,
                 TeamName: foreignTeam?.Name,
                 Country: foreignTeam?.Country?.ToLowerInvariant(),
                 TeamLogo: "wappen01",

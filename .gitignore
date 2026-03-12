@@ -8,6 +8,8 @@ android-app/app/build/intermediates/processed_res/debug/out/resources-debug.ap_
 *.ap_
 tmp/*
 analysis/phase2_run_20260310_073203_20season_foreground/*
+__pycache__/*
+*/__pycache__/*
 
 # .NET build artifacts
 **/bin/

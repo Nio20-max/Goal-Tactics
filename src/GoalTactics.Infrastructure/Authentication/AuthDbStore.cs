@@ -27,7 +27,8 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
                 ?? await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.ManagerName == email, cancellationToken);
         return user is null
             ? null
-            : new AuthUserRecord(user.Id, user.Email, user.PasswordHash, user.ManagerName);
+            : new AuthUserRecord(user.Id, user.Email, user.PasswordHash, user.ManagerName,
+                user.FailedLoginAttempts, user.LockedUntilUtc, user.EmailVerified);
     }
 
     public async Task<AuthUserRecord?> GetUserByIdAsync(string userId, CancellationToken cancellationToken = default)
@@ -35,7 +36,8 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
         return user is null
             ? null
-            : new AuthUserRecord(user.Id, user.Email, user.PasswordHash, user.ManagerName);
+            : new AuthUserRecord(user.Id, user.Email, user.PasswordHash, user.ManagerName,
+                user.FailedLoginAttempts, user.LockedUntilUtc, user.EmailVerified);
     }
 
     public async Task<bool> IsManagerNameTakenAsync(string managerName, CancellationToken cancellationToken = default)
@@ -83,7 +85,10 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             ClientVersion = session.ClientVersion,
             Capabilities = session.Capabilities,
             Platform = session.Platform,
-            DeviceId = session.DeviceId
+            DeviceId = session.DeviceId,
+            RefreshToken = session.RefreshToken,
+            RefreshTokenExpiresUtc = session.RefreshTokenExpiresUtc,
+            RefreshTokenUsed = false
         });
 
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == session.UserId, cancellationToken);
@@ -114,6 +119,114 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
         session.RevokedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RecordFailedLoginAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is not null)
+        {
+            user.FailedLoginAttempts++;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task ResetFailedLoginsAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is not null)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockedUntilUtc = null;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task LockAccountAsync(string userId, DateTime lockedUntilUtc, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is not null)
+        {
+            user.LockedUntilUtc = lockedUntilUtc;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task SetEmailVerificationTokenAsync(string userId, string token, DateTime expiresUtc, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is not null)
+        {
+            user.EmailVerificationToken = token;
+            user.EmailVerificationTokenExpiresUtc = expiresUtc;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<bool> VerifyEmailAsync(string userId, string token, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is null || user.EmailVerificationToken != token)
+            return false;
+        if (user.EmailVerificationTokenExpiresUtc.HasValue && user.EmailVerificationTokenExpiresUtc.Value < DateTime.UtcNow)
+            return false;
+
+        user.EmailVerified = true;
+        user.EmailVerificationToken = null;
+        user.EmailVerificationTokenExpiresUtc = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task SetPasswordResetTokenAsync(string userId, string token, DateTime expiresUtc, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is not null)
+        {
+            user.PasswordResetToken = token;
+            user.PasswordResetTokenExpiresUtc = expiresUtc;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<bool> ResetPasswordAsync(string email, string token, string newPasswordHash, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
+        if (user is null || user.PasswordResetToken != token)
+            return false;
+        if (user.PasswordResetTokenExpiresUtc.HasValue && user.PasswordResetTokenExpiresUtc.Value < DateTime.UtcNow)
+            return false;
+
+        user.PasswordHash = newPasswordHash;
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpiresUtc = null;
+        user.FailedLoginAttempts = 0;
+        user.LockedUntilUtc = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<AuthSessionRecord?> GetSessionByRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        var session = await dbContext.UserSessions.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.RefreshToken == refreshToken, cancellationToken);
+        if (session is null) return null;
+        return new AuthSessionRecord(
+            session.Id, session.UserId, session.TokenId,
+            session.IssuedAtUtc, session.ExpiresAtUtc, session.RevokedAtUtc,
+            session.ClientVersion, session.Capabilities, session.Platform, session.DeviceId,
+            session.RefreshToken, session.RefreshTokenExpiresUtc);
+    }
+
+    public async Task MarkRefreshTokenUsedAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        var session = await dbContext.UserSessions.FirstOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
+        if (session is not null)
+        {
+            session.RefreshTokenUsed = true;
+            session.RevokedAtUtc = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private async Task EnsureLeaguePyramidSeededAsync(CancellationToken cancellationToken)

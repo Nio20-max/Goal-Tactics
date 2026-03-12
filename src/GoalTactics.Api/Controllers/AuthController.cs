@@ -40,6 +40,49 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return Ok(result);
     }
 
+    [EnableRateLimiting("auth-sensitive")]
+    [HttpPost("RefreshToken")]
+    public async Task<ActionResult<AuthResponse>> RefreshToken([FromBody] RefreshTokenRequest request, CancellationToken cancellationToken)
+    {
+        var result = await authService.RefreshTokenAsync(request.RefreshToken, cancellationToken);
+        return Ok(result);
+    }
+
+    [EnableRateLimiting("auth-sensitive")]
+    [HttpPost("RequestPasswordReset")]
+    public async Task<ActionResult<ResponseObject>> RequestPasswordReset([FromBody] PasswordResetRequest request, CancellationToken cancellationToken)
+    {
+        var result = await authService.RequestPasswordResetAsync(request.Email, cancellationToken);
+        return Ok(result);
+    }
+
+    [EnableRateLimiting("auth-sensitive")]
+    [HttpPost("ConfirmPasswordReset")]
+    public async Task<ActionResult<ResponseObject>> ConfirmPasswordReset([FromBody] PasswordResetConfirmRequest request, CancellationToken cancellationToken)
+    {
+        var result = await authService.ConfirmPasswordResetAsync(request.Email, request.Token, request.NewPassword, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("VerifyEmail")]
+    public async Task<ActionResult<ResponseObject>> VerifyEmail([FromBody] EmailVerificationRequest request, CancellationToken cancellationToken)
+    {
+        var result = await authService.VerifyEmailAsync(request.UserId, request.Token, cancellationToken);
+        return Ok(result);
+    }
+
+    [Authorize]
+    [HttpPost("ResendEmailVerification")]
+    public async Task<ActionResult<ResponseObject>> ResendEmailVerification(CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+
+        var result = await authService.ResendEmailVerificationAsync(userId, cancellationToken);
+        return Ok(result);
+    }
+
     [Authorize]
     [HttpGet("Me")]
     public ActionResult<AuthResponse> Me()

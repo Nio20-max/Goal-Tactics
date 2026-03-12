@@ -88,6 +88,13 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
 
         myEntry.Stamina = Math.Max(0, myEntry.Stamina - StaminaCost);
 
+        // Deduct GT Stars match cost
+        var resources = await dbContext.TeamResources.FirstOrDefaultAsync(x => x.TeamId == team.Id, cancellationToken);
+        if (resources is not null)
+        {
+            resources.GTStars = Math.Max(0, resources.GTStars - MatchCost);
+        }
+
         var seed = HashCode.Combine(myEntry.TeamId ?? myEntry.Id, opponent.TeamId ?? opponent.Id, DateTime.UtcNow.Date.DayOfYear);
         var random = new Random(seed);
         var homeScore = random.Next(0, 5);
@@ -97,6 +104,15 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
         var awayWeighted = awayScore + opponent.Strength / 25.0;
 
         var isWin = homeWeighted >= awayWeighted;
+
+        // Track goals and matches played
+        myEntry.Played++;
+        myEntry.GoalsScored += homeScore;
+        myEntry.GoalsReceived += awayScore;
+        opponent.Played++;
+        opponent.GoalsScored += awayScore;
+        opponent.GoalsReceived += homeScore;
+
         if (isWin)
         {
             myEntry.Points += WinPoints;
@@ -299,7 +315,10 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
             Points: entry.Points,
             Rank: entry.Rank,
             Strength: entry.Strength,
-            IsMine: isMine);
+            IsMine: isMine,
+            Played: entry.Played,
+            GoalsScored: entry.GoalsScored,
+            GoalsReceived: entry.GoalsReceived);
     }
 
     private static Guid ParseGuid(string value)

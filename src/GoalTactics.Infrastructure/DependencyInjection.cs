@@ -4,7 +4,9 @@ using GoalTactics.Application.Friends;
 using GoalTactics.Application.League;
 using GoalTactics.Application.Ladder;
 using GoalTactics.Application.Mechanics;
+using GoalTactics.Application.Sponsors;
 using GoalTactics.Application.Team;
+using GoalTactics.Application.TransferMarket;
 using GoalTactics.Application.Tutorial;
 using GoalTactics.Application.User;
 using GoalTactics.Infrastructure.Authentication;
@@ -13,7 +15,9 @@ using GoalTactics.Infrastructure.Friends;
 using GoalTactics.Infrastructure.League;
 using GoalTactics.Infrastructure.Ladder;
 using GoalTactics.Infrastructure.Persistence;
+using GoalTactics.Infrastructure.Sponsors;
 using GoalTactics.Infrastructure.Team;
+using GoalTactics.Infrastructure.TransferMarket;
 using GoalTactics.Infrastructure.Tutorial;
 using GoalTactics.Infrastructure.User;
 using Microsoft.EntityFrameworkCore;
@@ -43,6 +47,8 @@ public static class DependencyInjection
         services.AddSingleton<TeamStrengthCalculator>();
         services.AddSingleton<ContractCostService>();
         services.AddScoped<ITeamStore, TeamDbStore>();
+        services.AddScoped<IAuctionStore, AuctionDbStore>();
+        services.AddScoped<ISponsorStore, SponsorDbStore>();
         services.AddScoped<ITutorialStore, TutorialDbStore>();
         services.AddScoped<IUserStore, UserDbStore>();
 

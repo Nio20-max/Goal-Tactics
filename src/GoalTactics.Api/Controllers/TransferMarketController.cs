@@ -80,4 +80,19 @@ public sealed class TransferMarketController(ITransferMarketService transferMark
 
         return Ok(await transferMarketService.GetFavoritesAsync(userId, cancellationToken));
     }
+
+    [HttpPost("SellPlayer")]
+    [HttpPost("ListPlayer")]
+    [EnableRateLimiting("mutation-write")]
+    public async Task<ActionResult<ResponseObject>> SellPlayer([FromBody] SellPlayerRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+        }
+
+        var auctionId = await transferMarketService.ListPlayerForSaleAsync(userId, request, cancellationToken);
+        return Ok(new ResponseObject { Success = true, Message = $"Player listed with auction {auctionId}" });
+    }
 }

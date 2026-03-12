@@ -60,20 +60,8 @@ public static class LegacyAppCompatibility
         };
     }
 
-    private static readonly string[] ValidLogos =
-    [
-        "wappen01", "wappen02", "wappen03", "wappen04", "wappen05", "wappen06", "wappen07", "wappen08",
-        "wappen09", "wappen10", "wappen11", "wappen12", "wappen13", "wappen14", "wappen15", "wappen16",
-        "wappen17", "wappen18", "wappen19", "wappen20", "wappen21", "wappen22", "wappen23", "wappen24",
-        "wappen25", "wappen26", "wappen31", "wappen33", "wappen34", "wappen37", "wappen40", "wappen42",
-        "wappen43", "wappen44", "wappen45", "wappen50", "wappen51", "wappen52", "wappen53", "wappen56",
-        "wappen58", "wappen61", "wappen63", "wappen65", "wappen67", "wappen68", "wappen71", "wappen76",
-        "wappen78", "wappen79", "wappen80", "wappen83", "wappen84", "wappen88", "wappen90", "wappen92",
-        "wappen95", "wappen97", "wappen100", "wappen104", "wappen105", "wappen106", "wappen107", "wappen111",
-        "wappen113", "wappen114", "wappen117", "wappen118", "wappen121", "wappen125", "wappen126", "wappen128",
-        "wappen130", "wappen131", "wappen132", "wappen135", "wappen137", "wappen142", "wappen143", "wappen146",
-        "wappen150", "wappen157"
-    ];
+    // Use shared catalog as single source of truth
+    private static readonly string[] ValidLogos = EquipmentCatalog.Emblems;
 
     public static string BuildLogoId(string stableKey)
     {
@@ -83,9 +71,8 @@ public static class LegacyAppCompatibility
 
     public static string BuildShirtId(string stableKey, string variant)
     {
-        var modulo = variant == "away" ? 48 : 12;
-        var value = Math.Abs(HashCode.Combine(stableKey, variant)) % modulo;
-        return $"trikot{value}";
+        var index = Math.Abs(HashCode.Combine(stableKey, variant)) % EquipmentCatalog.Shirts.Length;
+        return EquipmentCatalog.Shirts[index];
     }
 
     public static string BuildHeadId(Guid playerId)

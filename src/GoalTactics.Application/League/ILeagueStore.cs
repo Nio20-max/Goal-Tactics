@@ -6,6 +6,8 @@ public interface ILeagueStore
     Task<IReadOnlyList<LeagueMatchRecord>> GetMatchesForUserAsync(string userId, Guid requestedLeagueId, CancellationToken cancellationToken = default);
     Task<LeagueMatchRecord?> GetMatchAsync(Guid matchId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<LeagueMatchRecord>> GetUpcomingMatchesForTeamAsync(string teamId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<GoalGetterRecord>> GetTopScorersAsync(Guid leagueId, int count, CancellationToken cancellationToken = default);
+    Task ResolveMatchAsync(Guid matchId, int homeScore, int awayScore, IReadOnlyList<MatchScorerEvent> scorers, CancellationToken cancellationToken = default);
 }
 
 public sealed record LeagueTableRecord(string LeagueName, int Mount, int Dismount, IReadOnlyList<LeagueTableTeamRecord> Teams);
@@ -51,3 +53,22 @@ public sealed record LeagueTableTeamRecord(
     int GoalsReceivedAway,
     int PointsHome,
     int PointsAway);
+
+public sealed record GoalGetterRecord(
+    Guid PlayerId,
+    string PlayerName,
+    string Origin,
+    string Head,
+    decimal Strength,
+    int Talent,
+    int Age,
+    string Position,
+    int Goals,
+    string TeamName,
+    string TeamLogo,
+    bool IsMine);
+
+public sealed record MatchScorerEvent(
+    string TeamId,
+    string PlayerId,
+    int Minute);

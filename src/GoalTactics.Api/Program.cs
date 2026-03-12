@@ -18,12 +18,14 @@ using GoalTactics.Application.Squad;
 using GoalTactics.Application.Stadium;
 using GoalTactics.Application.Training;
 using GoalTactics.Application.TransferMarket;
+using GoalTactics.Api.Extensions;
 using GoalTactics.Api.Middleware;
 using GoalTactics.Api.Security;
 using GoalTactics.Api.Validation;
 using GoalTactics.Infrastructure;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Realtime;
+using GoalTactics.Worker;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -36,9 +38,20 @@ using System.IO;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
+using System.Globalization;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Structured JSON logging for production; keep default console in development.
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = true;
+        options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff ";
+    });
+}
 
 // Add services to the container.
 
@@ -49,6 +62,14 @@ builder.Services
         options.InvalidModelStateResponseFactory = ValidationErrorFactory.Create;
     });
 builder.Services.AddSingleton<ICountryCatalog, InMemoryCountryCatalog>();
+builder.Services.AddLocalization();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var supportedCultures = new[] { new CultureInfo("de"), new CultureInfo("en") };
+    options.DefaultRequestCulture = new Microsoft.AspNetCore.Localization.RequestCulture("de");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+});
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 builder.Services.AddDataProtection()
@@ -57,6 +78,7 @@ builder.Services.AddDataProtection()
 builder.Services.AddGoalTacticsInfrastructure(builder.Configuration);
 builder.Services.AddGoalTacticsRealtime();
 builder.Services.AddGoalTacticsRealtimeFilters();
+builder.Services.AddGoalTacticsWorkerJobs();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -108,7 +130,8 @@ builder.Services
         };
     });
 builder.Services.AddAuthorization();
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database");
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -118,6 +141,34 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("RateLimiting");
+        var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var path = context.HttpContext.Request.Path;
+        logger.LogWarning("Rate limit exceeded for IP {IpAddress} on {Path} (policy: {Policy})", ip, path, context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter) ? $"retry-after {retryAfter}" : "none");
+
+        context.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+        await context.HttpContext.Response.WriteAsync(
+            """{"success":false,"message":"Too many requests. Please try again later."}""",
+            cancellationToken);
+    };
+
+    // Global fallback: IP-based limit for all endpoints (generous ceiling)
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: ip,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 600,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
 
     static string BuildLimiterKey(HttpContext httpContext)
     {
@@ -229,6 +280,7 @@ using (var scope = app.Services.CreateScope())
 app.UseMiddleware<ErrorEnvelopeMiddleware>();
 
 app.UseForwardedHeaders();
+app.UseRequestLocalization();
 
 // Extract JWT from request body "Token" field for the legacy Xamarin app.
 app.UseMiddleware<BodyTokenAuthMiddleware>();

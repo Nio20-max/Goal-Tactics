@@ -6,6 +6,8 @@ public sealed class AuthResponse : ResponseObject
 {
     public string? Token { get; init; }
 
+    public string? RefreshToken { get; init; }
+
     public string? ManagerName { get; init; }
 
     public Guid UserId { get; init; }

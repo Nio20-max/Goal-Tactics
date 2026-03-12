@@ -145,7 +145,7 @@ Both are additive (ADD COLUMN) and non-destructive. Existing data will automatic
 ```bash
 # 1. Build
 dotnet publish src/GoalTactics.Api/GoalTactics.Api.csproj -c Release -o /opt/goaltactics/api/
-
+ 
 # 2. Stop service
 sudo systemctl stop goaltactics-api.service
 

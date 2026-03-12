@@ -367,6 +367,12 @@ public sealed class TeamDbStore(
 
         // reset seasonal statistics: player goals
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE team_players SET goals = 0", cancellationToken);
+
+        // sync change tracker with the raw SQL update so tracked entities reflect the reset
+        foreach (var entry in dbContext.ChangeTracker.Entries<TeamPlayerEntity>())
+        {
+            entry.Property(p => p.Goals).CurrentValue = 0;
+        }
     }
 
     public async Task RenameTeamAsync(string userId, string teamId, string name, CancellationToken cancellationToken = default)
@@ -571,7 +577,17 @@ public sealed class TeamDbStore(
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         var teamEntity = await dbContext.Teams.FirstAsync(x => x.Id == team.TeamId, cancellationToken);
+        var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+
+        const decimal renameCost = 500m;
+        if (resources.Money < renameCost)
+        {
+            return;
+        }
+
+        resources.Money -= renameCost;
         teamEntity.StadiumName = string.IsNullOrWhiteSpace(name) ? "My Stadium" : name.Trim();
+        await AddFinanceHistoryAsync(userId, income: 0m, outcome: renameCost, resources.Money, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -918,20 +934,32 @@ public sealed class TeamDbStore(
                 resources.Money += economy.Earnings;
                 totalIncome += economy.Earnings;
 
+                // Stadium gate receipts as ledger entry (matches original "Zuschauer"/"Eintrittsgelder")
+                if (economy.Earnings > 0)
+                {
+                    AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Zuschauer", economy.Earnings, "Eintrittsgelder", true);
+                }
+
                 // Sponsor EUR income per matchday
                 var mainEur = (decimal)mainSponsorPerMatch;
                 var secondaryEur = (decimal)secondarySponsorPerMatch;
-                resources.Money += mainEur + secondaryEur;
-                totalIncome += mainEur + secondaryEur;
+                var winBonusEur = (decimal)secondarySponsorPerWin;
+                var goalBonusEur = (decimal)secondarySponsorPerGoal;
+                resources.Money += mainEur + secondaryEur + winBonusEur + goalBonusEur;
+                totalIncome += mainEur + secondaryEur + winBonusEur + goalBonusEur;
 
                 AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Hauptsponsor", mainEur, "Grundbetrag", true);
                 AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Nebensponsor", secondaryEur, "Grundbetrag", true);
+                AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Nebensponsor", winBonusEur, "Siegprämie", true);
+                AddLedgerEntry(team.UserId, dayMatchday, now.Date, "Nebensponsor", goalBonusEur, "Torprämie", true);
 
                 // Stadium building maintenance costs (itemized)
                 RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Geschäftsstelle", resources.OfficeLevel, 700m, ref totalExpense, resources);
                 RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Trainingsgelände", resources.TrainingCenterLevel, 700m, ref totalExpense, resources);
-                RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Medizinische Abteilung", resources.MedicalCenterLevel, 225m, ref totalExpense, resources);
+                RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Fitnessstudio", resources.MedicalCenterLevel, 225m, ref totalExpense, resources);
                 RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Jugendzentrum", resources.YouthAcademyLevel, 240m, ref totalExpense, resources);
+                RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Fanshop", resources.FanShopLevel, 180m, ref totalExpense, resources);
+                RecordBuildingCost(team.UserId, dayMatchday, now.Date, "Parkplätze", resources.ParkingLevel, 150m, ref totalExpense, resources);
 
                 // Seat maintenance
                 var standCost = resources.StadiumStandSeats * 2m;
@@ -1376,13 +1404,23 @@ public sealed class TeamDbStore(
     public async Task<IReadOnlyList<SquadPlayerRecord>> GetScoutedPlayersAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var now = DateTime.UtcNow;
+        var players = await dbContext.TeamPlayers.AsNoTracking()
+            .Where(x => x.TeamId == team.TeamId && x.IsScouted && (x.ScoutingReadyAtUtc == null || x.ScoutingReadyAtUtc <= now))
+            .ToListAsync(cancellationToken);
+        return players.Select(MapPlayer).ToArray();
+    }
+
+    public async Task<IReadOnlyList<SquadPlayerRecord>> GetAllScoutedPlayersAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         var players = await dbContext.TeamPlayers.AsNoTracking()
             .Where(x => x.TeamId == team.TeamId && x.IsScouted)
             .ToListAsync(cancellationToken);
         return players.Select(MapPlayer).ToArray();
     }
 
-    public async Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, CancellationToken cancellationToken = default)
+    public async Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, DateTime? readyAtUtc = null, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         dbContext.TeamPlayers.Add(new TeamPlayerEntity
@@ -1398,6 +1436,7 @@ public sealed class TeamDbStore(
             Strength = strength,
             Fitness = fitness,
             IsScouted = true,
+            ScoutingReadyAtUtc = readyAtUtc,
             ContractEndUtc = DateTime.UtcNow.AddDays(90)
         });
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -1425,8 +1464,33 @@ public sealed class TeamDbStore(
 
         player.IsScouted = false;
         player.ShirtNumber = nextShirt;
+        player.ScoutingReadyAtUtc = null;
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<bool> SpeedupScoutAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var key = playerId.ToString("N");
+        var player = await dbContext.TeamPlayers
+            .FirstOrDefaultAsync(x => x.TeamId == team.TeamId && x.Id == key && x.IsScouted && x.ScoutingReadyAtUtc > DateTime.UtcNow, cancellationToken);
+
+        if (player is null)
+            return false;
+
+        player.ScoutingReadyAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<int> GetPendingScoutCountAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var now = DateTime.UtcNow;
+        return await dbContext.TeamPlayers.CountAsync(
+            x => x.TeamId == team.TeamId && x.IsScouted && x.ScoutingReadyAtUtc > now,
+            cancellationToken);
     }
 
     public async Task<bool> TrySpendMoneyAsync(string userId, decimal amount, string description, CancellationToken cancellationToken = default)
@@ -1504,7 +1568,8 @@ public sealed class TeamDbStore(
             player.RedCards,
             player.IndividualTrainingSkill,
             player.IndividualTrainingUntilUtc,
-            player.ContractEndUtc);
+            player.ContractEndUtc,
+            player.ScoutingReadyAtUtc);
     }
 
     private static BuildPlaceRecord ToBuildPlace(Guid id, string type, int level, bool canBuild)

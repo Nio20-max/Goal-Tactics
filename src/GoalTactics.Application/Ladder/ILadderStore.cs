@@ -18,7 +18,10 @@ public sealed record LadderTeamRecord(
     int Points,
     int Rank,
     int Strength,
-    bool IsMine);
+    bool IsMine,
+    int Played,
+    int GoalsScored,
+    int GoalsReceived);
 
 public sealed record LadderRecord(Guid LadderId, DateTime EndDateUtc, IReadOnlyList<LadderTeamRecord> Teams);
 

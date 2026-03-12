@@ -1,10 +1,11 @@
 # Bot concept
 
 ## 0. Scores of each bot
-- activity indicator: from 1 to 99
+- activity indicator: from 1 to 99 (The activity index should go up when a team goes up a league.)
 - risk: from 1 to 99
 - youth focus: from 1 to 99
 - stars bonus: from 0 up to 50.000
+- social indicator: from 1 to 100, dependent on the activity indicator, updatet when the activity index is updated
 
 ## 1. Active times
 Every bot should get a timezone given when it is created. That timezone should be the main factor for when the bot is online. Most bots should be in European timezones. 
@@ -35,6 +36,7 @@ Bots should have friends, that means that they don't overbid each other. There s
 There should also be a enemy level from 0 to 100. When a bot overbids another bot often it rises. When a bot doesn't overbid another bot for a while it sinks. 
 Implement a system that groups of bots can build and certain groups can be enemys. That can mean just overbidding someone out of spite and not because a bot needs a player. 
 This whole system should include accounts made by humans as well. 
+The likelyhood of a bot being active like this and how much is dependent on a social indicator. The social indicator should depend on the activity indicator, but should still have a randomness to it. A higher activity indicator should make a higher social indicator more likely, but low social indicators should still be possible. Same the other way around. 
 
 ## 5. Training
 Depending on the youth focus a bot spents different amounts of stars on training. The players the bots bids on on the transfer market should also be influenced by this. 
@@ -44,3 +46,83 @@ Depending on the youth focus a bot spents different amounts of stars on scouting
 
 ## 7. Stars
 Depending on the activity indicatot of a bot, the bot has a different daily stars bonus. This should simulate watching ads and spending money. This stars bonus should be on top of the stars from the sponsors. The star bonus should be calculated by getting a random number between 0 and 500. This number should then be multiplied by the activity indicator. 
+
+---
+
+## 8. Database
+
+The bot system uses its own **standalone database**, not connected to the main GoalTactics game database. 
+
+### 8.1 `Bots` table
+
+| Column | Type | Description |
+|--------|------|-------------|
+| BotId | BIGINT, PK | Unique bot identifier |
+| Password | VARCHAR(64) | Securely generated random alphanumeric password (32 characters), created once at bot registration using a cryptographically secure RNG |
+| ValidationToken | VARCHAR(128) | API authentication token |
+| TeamName | VARCHAR(64) | Display name of the bot's club — chosen uniquely from a large curated list of team names at creation time; no two bots share the same team name |
+| ManagerName | VARCHAR(64) | Display name of the bot's manager — composed of a first name + last name picked uniquely from large curated name lists at creation time; no two bots share the same manager name |
+| Timezone | VARCHAR(32) | IANA timezone string (e.g. `Europe/Berlin`) |
+| ActiveHours | JSON | Per-bot dictionary of peak/quiet time windows, e.g. `{"peak":["06:00-08:00","18:00-22:00"],"quiet":["00:00-05:00","08:00-16:00"]}` — can vary by weekday |
+| SleepHours | JSON | Per-bot dictionary of hours the bot is offline or nearly offline |
+| Activity | TINYINT | 1–99, controls online frequency and general engagement |
+| Risk | TINYINT | 1–99, controls auction aggressiveness |
+| YouthFocus | TINYINT | 1–99, controls training/scouting spending and transfer preferences |
+| SocialScore | TINYINT | 1–100, derived from Activity with randomness |
+| StarsDaily | INT | Daily stars bonus (0–50 000), `Random(0,500) * Activity` |
+| NextOnline | TIMESTAMP | When the bot is scheduled to wake up next |
+| LastOffline | TIMESTAMP | When the bot last went offline |
+| GroupId | SMALLINT, nullable | Dynamic group membership (max 5 groups) |
+| CreatedAt | TIMESTAMP | Row creation time |
+| UpdatedAt | TIMESTAMP | Last modification time |
+
+**Password generation**: When a bot is created the password is generated using a cryptographically secure random number generator (e.g. `RandomNumberGenerator` in .NET or equivalent) producing a 32-character alphanumeric string (`[A-Za-z0-9]`). The password as the generated password in text. 
+
+### 8.2 `BotRelationships` table
+
+| Column | Type | Description |
+|--------|------|-------------|
+| BotId1 | BIGINT, FK → Bots | First party in the relationship |
+| BotId2 | BIGINT, FK → Bots | Second party in the relationship |
+| Level | SMALLINT | –100 to +100. Negative = enemy, positive = friend, 0 = neutral |
+
+**Primary key**: `(BotId1, BotId2)`.
+
+Relationship thresholds (mapped from the –100 to +100 scale):
+- **Level ≥ 30**: reduced chance of overbidding each other
+- **Level ≥ 70**: never overbid; chat cooperation and co-bidding kicks in
+- **Level ≤ –30**: increased spite-bidding probability
+- Level changes: rises from friendly actions (friendlies, cooperation), sinks from overbidding or inactivity
+
+Human accounts are included in this same table — bots treat them identically.
+
+### 8.3 `BotSchedule` table
+
+A **separate, indexed table** optimised for the scheduler to quickly find the next bot to wake up.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| BotId | BIGINT, PK, FK → Bots | The bot to wake |
+| NextOnline | TIMESTAMP, indexed | When this bot should come online |
+
+The scheduler script queries:
+```sql
+SELECT BotId, NextOnline
+FROM BotSchedule
+WHERE NextOnline <= CURRENT_TIMESTAMP
+ORDER BY NextOnline
+LIMIT 10;
+```
+
+This avoids scanning the full `Bots` table. When a bot goes offline it calls the API, which recalculates `NextOnline` and upserts both `BotSchedule.NextOnline` and `Bots.NextOnline`.
+
+### 8.4 `BotGroups` table (optional metadata)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| GroupId | SMALLINT, PK | Group identifier (max 5) |
+| Name | VARCHAR(64) | Optional label |
+| CreatedAt | TIMESTAMP | When the group formed |
+
+Groups are dynamic and formed by interaction — when a cluster of bots exceeds a mutual friendliness threshold they are assigned a shared `GroupId`.
+Some groups can be enemys with another groups. Then all of the members of the groups are enemys. 

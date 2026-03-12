@@ -82,9 +82,9 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
             Name = team.TeamName,
             Logo = team.TeamLogo,
             Country = "de",
-            Played = 0,
-            GoalsScored = 0,
-            GoalsReceived = 0
+            Played = team.Played,
+            GoalsScored = team.GoalsScored,
+            GoalsReceived = team.GoalsReceived
         };
     }
 
@@ -102,9 +102,9 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
             Name = team.TeamName,
             Logo = team.TeamLogo,
             Country = "de",
-            Played = 0,
-            GoalsScored = 0,
-            GoalsReceived = 0
+            Played = team.Played,
+            GoalsScored = team.GoalsScored,
+            GoalsReceived = team.GoalsReceived
         };
     }
 }

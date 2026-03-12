@@ -1,6 +1,8 @@
+using GoalTactics.Contracts.Common;
+
 namespace GoalTactics.Contracts.Friends;
 
-public sealed class SearchRequest
+public sealed class SearchRequest : RequestObject
 {
     public string? Text { get; init; }
 

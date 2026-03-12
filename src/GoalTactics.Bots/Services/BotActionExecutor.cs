@@ -27,8 +27,9 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
                 break;
 
             case "training.update":
-                bot.Strength += 1;
-                await logWriter.WriteAsync("simulation-events.log", $"{nowUtc:O}|training|bot={bot.BotId}|strength={bot.Strength}");
+                var trainingGain = bot.TrainingCenterLevel >= 4 ? 2 : 1;
+                bot.Strength += trainingGain;
+                await logWriter.WriteAsync("simulation-events.log", $"{nowUtc:O}|training|bot={bot.BotId}|strength={bot.Strength}|gain={trainingGain}|center_lv={bot.TrainingCenterLevel}");
                 cooldowns.SetCooldown(bot.BotId, intent.IntentType, nowUtc, TimeSpan.FromHours(12));
                 break;
 

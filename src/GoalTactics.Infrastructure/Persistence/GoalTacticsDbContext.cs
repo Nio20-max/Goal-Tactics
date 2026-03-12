@@ -55,6 +55,14 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
 
     public DbSet<MatchPushSubscriptionEntity> MatchPushSubscriptions => Set<MatchPushSubscriptionEntity>();
 
+    public DbSet<AuctionEntity> Auctions => Set<AuctionEntity>();
+
+    public DbSet<AuctionBidEntity> AuctionBids => Set<AuctionBidEntity>();
+
+    public DbSet<AuctionFavoriteEntity> AuctionFavorites => Set<AuctionFavoriteEntity>();
+
+    public DbSet<SponsorContractEntity> SponsorContracts => Set<SponsorContractEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<UserEntity>(entity =>
@@ -69,6 +77,13 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.LastLoginAtUtc).HasColumnName("last_login_at");
             entity.Property(x => x.LastActivityAtUtc).HasColumnName("last_activity_at");
             entity.Property(x => x.DeletedAtUtc).HasColumnName("deleted_at");
+            entity.Property(x => x.FailedLoginAttempts).HasColumnName("failed_login_attempts").HasDefaultValue(0);
+            entity.Property(x => x.LockedUntilUtc).HasColumnName("locked_until");
+            entity.Property(x => x.EmailVerified).HasColumnName("email_verified").HasDefaultValue(false);
+            entity.Property(x => x.EmailVerificationToken).HasColumnName("email_verification_token").HasMaxLength(128);
+            entity.Property(x => x.EmailVerificationTokenExpiresUtc).HasColumnName("email_verification_token_expires");
+            entity.Property(x => x.PasswordResetToken).HasColumnName("password_reset_token").HasMaxLength(128);
+            entity.Property(x => x.PasswordResetTokenExpiresUtc).HasColumnName("password_reset_token_expires");
             entity.HasIndex(x => x.Email).IsUnique();
         });
 
@@ -86,6 +101,9 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.Capabilities).HasColumnName("capabilities").HasMaxLength(256);
             entity.Property(x => x.Platform).HasColumnName("platform").HasMaxLength(32);
             entity.Property(x => x.DeviceId).HasColumnName("device_id").HasMaxLength(128);
+            entity.Property(x => x.RefreshToken).HasColumnName("refresh_token").HasMaxLength(128);
+            entity.Property(x => x.RefreshTokenExpiresUtc).HasColumnName("refresh_token_expires");
+            entity.Property(x => x.RefreshTokenUsed).HasColumnName("refresh_token_used").HasDefaultValue(false);
             entity.HasIndex(x => x.TokenId).IsUnique();
             entity.HasIndex(x => x.UserId);
             entity.HasOne(x => x.User)
@@ -220,6 +238,8 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.IndividualTrainingUntilUtc).HasColumnName("individual_training_until_utc");
             entity.Property(x => x.ContractEndUtc).HasColumnName("contract_end_utc");
             entity.Property(x => x.IsScouted).HasColumnName("is_scouted").HasDefaultValue(false);
+            entity.Property(x => x.ScoutingReadyAtUtc).HasColumnName("scouting_ready_at_utc");
+            entity.Property(x => x.Head).HasColumnName("head").HasMaxLength(32).HasDefaultValue("01_head-A01");
             entity.HasIndex(x => x.TeamId);
             entity.HasOne(x => x.Team)
                 .WithMany()
@@ -470,6 +490,9 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.Rank).HasColumnName("rank").IsRequired();
             entity.Property(x => x.Stamina).HasColumnName("stamina").IsRequired();
             entity.Property(x => x.Strength).HasColumnName("strength").IsRequired();
+            entity.Property(x => x.Played).HasColumnName("played").IsRequired();
+            entity.Property(x => x.GoalsScored).HasColumnName("goals_scored").IsRequired();
+            entity.Property(x => x.GoalsReceived).HasColumnName("goals_received").IsRequired();
             entity.Property(x => x.IsBot).HasColumnName("is_bot").IsRequired();
             entity.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at").IsRequired();
             entity.HasIndex(x => x.LadderId);
@@ -520,6 +543,86 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.HasOne(x => x.User)
                 .WithMany()
                 .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AuctionEntity>(entity =>
+        {
+            entity.ToTable("auctions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.PlayerId).HasColumnName("player_id");
+            entity.Property(x => x.SellerTeamId).HasColumnName("seller_team_id");
+            entity.Property(x => x.PlayerName).HasColumnName("player_name").HasMaxLength(128).IsRequired();
+            entity.Property(x => x.PlayerCountry).HasColumnName("player_country").HasMaxLength(8).IsRequired();
+            entity.Property(x => x.PlayerHead).HasColumnName("player_head").HasMaxLength(32).IsRequired();
+            entity.Property(x => x.PlayerPosition).HasColumnName("player_position").IsRequired();
+            entity.Property(x => x.PlayerStrength).HasColumnName("player_strength").IsRequired();
+            entity.Property(x => x.PlayerTalent).HasColumnName("player_talent").IsRequired();
+            entity.Property(x => x.PlayerAge).HasColumnName("player_age").IsRequired();
+            entity.Property(x => x.MinimumBid).HasColumnName("minimum_bid").IsRequired();
+            entity.Property(x => x.CurrentBid).HasColumnName("current_bid").IsRequired();
+            entity.Property(x => x.CurrentBidderTeamId).HasColumnName("current_bidder_team_id");
+            entity.Property(x => x.CurrentBidderTeamName).HasColumnName("current_bidder_team_name").HasMaxLength(128);
+            entity.Property(x => x.CurrentBidderTeamLogo).HasColumnName("current_bidder_team_logo").HasMaxLength(64);
+            entity.Property(x => x.EndDateUtc).HasColumnName("end_date_utc").IsRequired();
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at").IsRequired();
+            entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => x.EndDateUtc);
+            entity.HasIndex(x => x.SellerTeamId);
+        });
+
+        modelBuilder.Entity<AuctionBidEntity>(entity =>
+        {
+            entity.ToTable("auction_bids");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.AuctionId).HasColumnName("auction_id").IsRequired();
+            entity.Property(x => x.TeamId).HasColumnName("team_id").IsRequired();
+            entity.Property(x => x.TeamName).HasColumnName("team_name").HasMaxLength(128);
+            entity.Property(x => x.Amount).HasColumnName("amount").IsRequired();
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at").IsRequired();
+            entity.HasIndex(x => x.AuctionId);
+            entity.HasOne(x => x.Auction)
+                .WithMany()
+                .HasForeignKey(x => x.AuctionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AuctionFavoriteEntity>(entity =>
+        {
+            entity.ToTable("auction_favorites");
+            entity.HasKey(x => new { x.UserId, x.AuctionId });
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.AuctionId).HasColumnName("auction_id");
+            entity.HasIndex(x => x.UserId);
+            entity.HasOne(x => x.Auction)
+                .WithMany()
+                .HasForeignKey(x => x.AuctionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SponsorContractEntity>(entity =>
+        {
+            entity.ToTable("sponsor_contracts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id").HasMaxLength(32);
+            entity.Property(x => x.TeamId).HasColumnName("team_id").HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Type).HasColumnName("type").HasMaxLength(16).IsRequired();
+            entity.Property(x => x.SponsorName).HasColumnName("sponsor_name").HasMaxLength(128).IsRequired();
+            entity.Property(x => x.SponsorDescription).HasColumnName("sponsor_description").HasMaxLength(256);
+            entity.Property(x => x.BaseMoney).HasColumnName("base_money").IsRequired();
+            entity.Property(x => x.BonusPerWin).HasColumnName("bonus_per_win");
+            entity.Property(x => x.BonusPerGoal).HasColumnName("bonus_per_goal");
+            entity.Property(x => x.StarsPayout).HasColumnName("stars_payout");
+            entity.Property(x => x.StartDateUtc).HasColumnName("start_date_utc").IsRequired();
+            entity.Property(x => x.EndDateUtc).HasColumnName("end_date_utc").IsRequired();
+            entity.Property(x => x.IsActive).HasColumnName("is_active").IsRequired();
+            entity.HasIndex(x => new { x.TeamId, x.IsActive });
+            entity.HasOne(x => x.Team)
+                .WithMany()
+                .HasForeignKey(x => x.TeamId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

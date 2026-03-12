@@ -12,4 +12,13 @@ public class ResponseObject
     public string? ErrorMessage => Success ? null : Message;
 
     public int Punishment { get; init; }
+
+    /// <summary>Pagination metadata: total number of items across all pages. 0 if not paginated.</summary>
+    public int TotalCount { get; init; }
+
+    /// <summary>Pagination metadata: current page number (1-based).</summary>
+    public int CurrentPage { get; init; }
+
+    /// <summary>Pagination metadata: total number of pages.</summary>
+    public int TotalPages { get; init; }
 }

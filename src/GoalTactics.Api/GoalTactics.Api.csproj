@@ -16,6 +16,7 @@
     <ProjectReference Include="..\GoalTactics.Contracts\GoalTactics.Contracts.csproj" />
     <ProjectReference Include="..\GoalTactics.Infrastructure\GoalTactics.Infrastructure.csproj" />
     <ProjectReference Include="..\GoalTactics.Realtime\GoalTactics.Realtime.csproj" />
+    <ProjectReference Include="..\GoalTactics.Worker\GoalTactics.Worker.csproj" />
   </ItemGroup>
 
 </Project>

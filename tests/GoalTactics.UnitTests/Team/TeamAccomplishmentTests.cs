@@ -67,7 +67,7 @@ public class TeamAccomplishmentTests
         await ctx.SaveChangesAsync();
 
         // trigger progression tick for team1
-        var resources = await store.GetTeamResourcesAsync("u1");
+        var resources = await store.GetTeamResourcesAsync("t1");
 
         // after tick, accomplishments should exist
         var accs = await ctx.TeamAccomplishments.ToListAsync();
@@ -79,7 +79,7 @@ public class TeamAccomplishmentTests
         Assert.All(players, p => Assert.Equal(0, p.Goals));
 
         // second call should not duplicate
-        await store.GetTeamResourcesAsync("u1");
+        await store.GetTeamResourcesAsync("t1");
         var accCount = await ctx.TeamAccomplishments.CountAsync();
         Assert.Equal(accs.Count, accCount);
     }

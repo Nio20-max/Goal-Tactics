@@ -18,5 +18,19 @@ public sealed class UserEntity
 
     public DateTime? DeletedAtUtc { get; set; }
 
+    public int FailedLoginAttempts { get; set; }
+
+    public DateTime? LockedUntilUtc { get; set; }
+
+    public bool EmailVerified { get; set; }
+
+    public string? EmailVerificationToken { get; set; }
+
+    public DateTime? EmailVerificationTokenExpiresUtc { get; set; }
+
+    public string? PasswordResetToken { get; set; }
+
+    public DateTime? PasswordResetTokenExpiresUtc { get; set; }
+
     public ICollection<UserSessionEntity> Sessions { get; set; } = new List<UserSessionEntity>();
 }

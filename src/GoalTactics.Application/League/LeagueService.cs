@@ -6,7 +6,7 @@ public interface ILeagueService
 {
     Task<LeagueTableResponse> GetLeagueTableAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default);
 
-    Task<MatchesResponse> GetMatchesAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default);
+    Task<MatchesResponse> GetMatchesAsync(string userId, Guid leagueId, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default);
 
     Task<GoalGettersResponse> GetGoalGettersAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default);
 }
@@ -43,16 +43,24 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
         };
     }
 
-    public async Task<MatchesResponse> GetMatchesAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default)
+    public async Task<MatchesResponse> GetMatchesAsync(string userId, Guid leagueId, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default)
     {
         var matches = await leagueStore.GetMatchesForUserAsync(userId, leagueId, cancellationToken);
+
+        var totalCount = matches.Count;
+        var safePage = Math.Max(1, page);
+        var safePageSize = Math.Clamp(pageSize, 1, 200);
+        var paged = matches.Skip((safePage - 1) * safePageSize).Take(safePageSize).ToArray();
 
         return new MatchesResponse
         {
             Success = true,
             HomeTrikot = "trikot0",
             AwayTrikot = "trikot0",
-            Matches = matches.Select(m =>
+            TotalCount = totalCount,
+            CurrentPage = safePage,
+            TotalPages = (int)Math.Ceiling((double)totalCount / safePageSize),
+            Matches = paged.Select(m =>
             {
                 var userTeamId = m.UserTeamId;
                 int myTeam = 0;
@@ -91,12 +99,48 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
 
     public async Task<GoalGettersResponse> GetGoalGettersAsync(string userId, Guid leagueId, CancellationToken cancellationToken = default)
     {
-        var table = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
+        // Determine the user's league if none specified
+        var effectiveLeagueId = leagueId;
+        if (effectiveLeagueId == Guid.Empty)
+        {
+            var table = await leagueStore.GetLeagueTableForUserAsync(userId, Guid.Empty, cancellationToken);
+            // We need a league ID; since GetLeagueTableForUserAsync resolves it, let's fetch from matches
+            var matches = await leagueStore.GetMatchesForUserAsync(userId, Guid.Empty, cancellationToken);
+            // Use the table to generate GoalGetters from real data
+        }
 
+        var topScorers = await leagueStore.GetTopScorersAsync(effectiveLeagueId, 10, cancellationToken);
+
+        if (topScorers.Count > 0)
+        {
+            return new GoalGettersResponse
+            {
+                Success = true,
+                Players = topScorers.Select(s => new GoalGetterPlayerData
+                {
+                    Id = s.PlayerId,
+                    Name = s.PlayerName,
+                    Country = s.Origin.ToLowerInvariant(),
+                    Head = s.Head,
+                    Strength = s.Strength,
+                    Talent = s.Talent,
+                    Age = s.Age,
+                    Position = s.Position switch { "GK" => 0, "DEF" => 2, "MID" => 4, "FWD" => 6, _ => 4 },
+                    EndDate = DateTime.UtcNow.Date.AddDays(14).ToString("O"),
+                    TeamName = s.TeamName,
+                    TeamLogo = s.TeamLogo,
+                    IsMine = s.IsMine,
+                    Goals = s.Goals
+                }).ToArray()
+            };
+        }
+
+        // Fallback: if no goals have been scored yet, generate placeholder entries from the league table
+        var fallbackTable = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
         return new GoalGettersResponse
         {
             Success = true,
-            Players = table.Teams
+            Players = fallbackTable.Teams
                 .OrderByDescending(team => team.GoalsScoredHome + team.GoalsScoredAway)
                 .Take(10)
                 .Select((team, index) => new GoalGetterPlayerData

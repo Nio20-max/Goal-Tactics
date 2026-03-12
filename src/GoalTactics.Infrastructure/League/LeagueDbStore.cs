@@ -458,4 +458,116 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
                 UserTeamId: teamId);
         }).ToArray();
     }
+
+    public async Task<IReadOnlyList<GoalGetterRecord>> GetTopScorersAsync(Guid leagueId, int count, CancellationToken cancellationToken = default)
+    {
+        var lid = leagueId.ToString("N");
+
+        // Get all team IDs in this league (real team IDs, not league team IDs)
+        var leagueTeams = await dbContext.LeagueTeams.AsNoTracking()
+            .Where(x => x.LeagueId == lid)
+            .ToListAsync(cancellationToken);
+
+        var teamIdToLeagueTeam = leagueTeams
+            .Where(lt => lt.TeamId is not null)
+            .ToDictionary(lt => lt.TeamId!, lt => lt);
+
+        var realTeamIds = teamIdToLeagueTeam.Keys.ToList();
+
+        // Query actual squad players with goals > 0 from teams in this league
+        var topPlayers = await dbContext.TeamPlayers.AsNoTracking()
+            .Where(p => realTeamIds.Contains(p.TeamId) && !p.IsScouted && p.Goals > 0)
+            .OrderByDescending(p => p.Goals)
+            .ThenByDescending(p => p.Strength)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+
+        return topPlayers.Select(p =>
+        {
+            var lt = teamIdToLeagueTeam.GetValueOrDefault(p.TeamId);
+            return new GoalGetterRecord(
+                PlayerId: Guid.TryParse(p.Id, out var pid) ? pid : Guid.Empty,
+                PlayerName: p.Name,
+                Origin: p.Origin,
+                Head: "01_head-A01",
+                Strength: p.Strength,
+                Talent: p.Talent,
+                Age: p.Age,
+                Position: p.Position,
+                Goals: p.Goals,
+                TeamName: lt?.TeamName ?? "Unknown",
+                TeamLogo: lt?.Logo ?? "wappen01",
+                IsMine: false);
+        }).ToArray();
+    }
+
+    public async Task ResolveMatchAsync(Guid matchId, int homeScore, int awayScore,
+        IReadOnlyList<MatchScorerEvent> scorers, CancellationToken cancellationToken = default)
+    {
+        var match = await dbContext.LeagueMatches
+            .FirstOrDefaultAsync(x => x.Id == matchId.ToString("N"), cancellationToken);
+        if (match is null || match.IsPlayed) return;
+
+        match.HomeScore = homeScore;
+        match.AwayScore = awayScore;
+        match.IsPlayed = true;
+        match.PlayedAtUtc = DateTime.UtcNow;
+
+        // Update league team statistics
+        var homeTeam = await dbContext.LeagueTeams.FirstOrDefaultAsync(x => x.Id == match.HomeLeagueTeamId, cancellationToken);
+        var awayTeam = await dbContext.LeagueTeams.FirstOrDefaultAsync(x => x.Id == match.AwayLeagueTeamId, cancellationToken);
+
+        if (homeTeam is not null)
+        {
+            homeTeam.MatchesHome++;
+            homeTeam.GoalsScoredHome += homeScore;
+            homeTeam.GoalsReceivedHome += awayScore;
+            if (homeScore > awayScore) { homeTeam.WinsHome++; homeTeam.PointsHome += 3; }
+            else if (homeScore == awayScore) { homeTeam.DrawsHome++; homeTeam.PointsHome++; }
+            else { homeTeam.LossesHome++; }
+        }
+
+        if (awayTeam is not null)
+        {
+            awayTeam.MatchesAway++;
+            awayTeam.GoalsScoredAway += awayScore;
+            awayTeam.GoalsReceivedAway += homeScore;
+            if (awayScore > homeScore) { awayTeam.WinsAway++; awayTeam.PointsAway += 3; }
+            else if (homeScore == awayScore) { awayTeam.DrawsAway++; awayTeam.PointsAway++; }
+            else { awayTeam.LossesAway++; }
+        }
+
+        // Increment individual player goal counts
+        foreach (var scorer in scorers)
+        {
+            var player = await dbContext.TeamPlayers
+                .FirstOrDefaultAsync(p => p.Id == scorer.PlayerId && p.TeamId == scorer.TeamId, cancellationToken);
+            if (player is not null)
+            {
+                player.Goals++;
+                player.Matches++; // Also credit match appearance
+            }
+        }
+
+        // Credit match appearances for all players in affected real teams
+        var realTeamIds = new List<string>();
+        if (homeTeam?.TeamId is not null) realTeamIds.Add(homeTeam.TeamId);
+        if (awayTeam?.TeamId is not null) realTeamIds.Add(awayTeam.TeamId);
+
+        if (realTeamIds.Count > 0)
+        {
+            var allPlayers = await dbContext.TeamPlayers
+                .Where(p => realTeamIds.Contains(p.TeamId) && !p.IsScouted)
+                .ToListAsync(cancellationToken);
+
+            // Only count matches for players not already counted as scorers
+            var scorerPlayerIds = scorers.Select(s => s.PlayerId).ToHashSet();
+            foreach (var player in allPlayers.Where(p => !scorerPlayerIds.Contains(p.Id)))
+            {
+                player.Matches++;
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

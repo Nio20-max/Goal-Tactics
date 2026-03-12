@@ -10,6 +10,8 @@ public sealed class ScoutingPlayersResponse : ResponseObject
     public int SpeedupCost { get; init; }
     public string? NextScoutingDate { get; init; }
     public string? NextPremiumScoutingDate { get; init; }
+    public int PendingScoutCount { get; init; }
+    public int MaxSimultaneousScouts { get; init; }
 }
 
 public sealed class ScoutedPlayerData
