@@ -47,13 +47,15 @@ public sealed class BotScheduler
         DateTime now = DateTime.UtcNow;
 
         // Base interval: higher activity → shorter gap (5 min to 4 hours)
-        double maxMinutes = 240.0;
-        double minMinutes = 5.0;
+        const double maxMinutes = 240.0;
+        const double minMinutes = 5.0;
+        const double jitterRange = 0.6;  // ±30 % (range of 60 %, centered)
+        const double jitterOffset = 0.3; // half the range, used to center around zero
+
         double activityFactor = bot.Activity / 99.0;
         double baseInterval = maxMinutes - (activityFactor * (maxMinutes - minMinutes));
 
-        // Add randomness (±30 %)
-        double jitter = baseInterval * (_rng.NextDouble() * 0.6 - 0.3);
+        double jitter = baseInterval * (_rng.NextDouble() * jitterRange - jitterOffset);
         double intervalMinutes = baseInterval + jitter;
 
         // Inactivity recovery: if bot has been offline a long time, pull it online sooner

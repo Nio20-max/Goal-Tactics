@@ -126,7 +126,8 @@ public sealed class TransferMarketBehavior
     private long CalculateBidAmount(long currentBid, long maxBid)
     {
         long minIncrement = Math.Max(100, currentBid / 20);
-        long bid = currentBid + minIncrement + _rng.Next(0, (int)Math.Min(minIncrement, int.MaxValue));
+        long jitter = (long)(_rng.NextDouble() * Math.Min(minIncrement, 100_000));
+        long bid = currentBid + minIncrement + jitter;
         return Math.Min(bid, maxBid);
     }
 

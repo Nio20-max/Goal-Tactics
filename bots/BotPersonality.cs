@@ -7,6 +7,9 @@ namespace GoalTactics.Bots.Client;
 /// </summary>
 public sealed class BotPersonality
 {
+    /// <summary>Maximum random multiplier for daily stars bonus calculation.</summary>
+    public const int MaxStarsMultiplier = 500;
+
     /// <summary>1–99. Controls online frequency and general engagement.</summary>
     public int Activity { get; set; }
 
@@ -55,7 +58,7 @@ public sealed class BotPersonality
         int risk = rng.Next(1, 100);
         int youthFocus = rng.Next(1, 100);
         int socialScore = DeriveSocialScore(activity, rng);
-        int starsDaily = rng.Next(0, 501) * activity;
+        int starsDaily = rng.Next(0, MaxStarsMultiplier + 1) * activity;
 
         // 85 % European timezone, 15 % other
         string timezone = rng.Next(100) < 85

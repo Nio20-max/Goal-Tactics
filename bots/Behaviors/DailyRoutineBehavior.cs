@@ -33,11 +33,13 @@ public sealed class DailyRoutineBehavior
     /// </summary>
     private async Task WatchAdsAsync(GoalTacticsApiClient api, BotRecord bot)
     {
-        int targetStars = _rng.Next(0, 501) * bot.Activity;
+        int targetStars = _rng.Next(0, BotPersonality.MaxStarsMultiplier + 1) * bot.Activity;
 
-        // Watch ads to accumulate stars; stop when target reached or API fails
+        // Cap to avoid excessive API calls; server limits ad watches anyway
+        targetStars = Math.Min(targetStars, 5000);
+
         int accumulated = 0;
-        int maxAttempts = 50; // Safety cap to avoid infinite loops
+        int maxAttempts = 50;
         for (int i = 0; i < maxAttempts && accumulated < targetStars; i++)
         {
             var result = await api.WatchAdAsync();

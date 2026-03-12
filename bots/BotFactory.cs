@@ -67,7 +67,7 @@ public sealed class BotFactory
                 countryId = 1;
         }
 
-        string email = $"bot_{teamName.Replace(" ", "_").ToLowerInvariant()}@goaltactics.bot";
+        string email = SanitizeEmail(teamName);
 
         var registerResult = await _api.RegisterAsync(new RegisterRequest
         {
@@ -124,12 +124,10 @@ public sealed class BotFactory
     private static string GenerateSecurePassword()
     {
         Span<char> password = stackalloc char[PasswordLength];
-        Span<byte> randomBytes = stackalloc byte[PasswordLength];
-        RandomNumberGenerator.Fill(randomBytes);
 
         for (int i = 0; i < PasswordLength; i++)
         {
-            password[i] = PasswordChars[randomBytes[i] % PasswordChars.Length];
+            password[i] = PasswordChars[RandomNumberGenerator.GetInt32(PasswordChars.Length)];
         }
 
         return new string(password);
@@ -180,6 +178,20 @@ public sealed class BotFactory
         string fallback = $"Manager {Guid.NewGuid():N}"[..20];
         _usedManagerNames.Add(fallback);
         return fallback;
+    }
+
+    /// <summary>
+    /// Consistent email derivation from a team name. Used by both BotFactory and BotRunner.
+    /// Strips all characters except letters, digits, and underscores.
+    /// </summary>
+    public static string SanitizeEmail(string teamName)
+    {
+        var sanitized = new string(teamName
+            .Replace(" ", "_")
+            .ToLowerInvariant()
+            .Where(c => char.IsLetterOrDigit(c) || c == '_')
+            .ToArray());
+        return $"bot_{sanitized}@goaltactics.bot";
     }
 
     private static List<string> LoadNames(string path)

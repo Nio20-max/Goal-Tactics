@@ -188,7 +188,7 @@ public sealed class BotRunner : IDisposable
         }
 
         // Re-login
-        string email = $"bot_{bot.TeamName.Replace(" ", "_").ToLowerInvariant()}@goaltactics.bot";
+        string email = BotFactory.SanitizeEmail(bot.TeamName);
         var loginResult = await _api.LoginAsync(new LoginRequest
         {
             Email = email,
