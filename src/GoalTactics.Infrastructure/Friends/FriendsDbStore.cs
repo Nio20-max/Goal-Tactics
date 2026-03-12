@@ -25,9 +25,13 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
             .ToDictionary(x => x.Key, x => x.First().Id);
 
         var normalizedQuery = queryText?.Trim();
+
+        // Build records from existing friend relations
+        var relatedUserIds = new HashSet<string>();
         var records = relations.Select(x =>
         {
             var foreignUserId = x.RequesterUserId == userId ? x.AddresseeUserId : x.RequesterUserId;
+            relatedUserIds.Add(foreignUserId);
             var name = users.TryGetValue(foreignUserId, out var foreignUser)
                 ? (string.IsNullOrWhiteSpace(foreignUser.ManagerName) ? foreignUser.Email : foreignUser.ManagerName)
                 : "Unknown";
@@ -52,11 +56,40 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
                 TeamLogo: "wappen01",
                 Strength: foreignTeam?.Strength ?? 0,
                 Language: "de");
-        });
+        }).ToList();
 
+        // When searching, also include non-friend users matching the query
         if (!string.IsNullOrWhiteSpace(normalizedQuery))
         {
-            records = records.Where(x => x.Name.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase));
+            records = records.Where(x => x.Name.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            foreach (var (uid, user) in users)
+            {
+                if (uid == userId || relatedUserIds.Contains(uid))
+                    continue;
+
+                var name = string.IsNullOrWhiteSpace(user.ManagerName) ? user.Email : user.ManagerName;
+                if (!name.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var foreignTeamId = teamByUserId.TryGetValue(uid, out var foundTeamId) ? foundTeamId : string.Empty;
+                var foreignTeam = teams.FirstOrDefault(t => t.Id == foreignTeamId);
+
+                records.Add(new FriendRecord(
+                    RelationId: string.Empty,
+                    ForeignUserId: uid,
+                    ForeignTeamId: foreignTeamId,
+                    Name: name,
+                    IsFriend: false,
+                    IsRequestIncoming: false,
+                    IsRequestOutgoing: false,
+                    IsLiked: false,
+                    TeamName: foreignTeam?.Name,
+                    Country: foreignTeam?.Country?.ToLowerInvariant(),
+                    TeamLogo: "wappen01",
+                    Strength: foreignTeam?.Strength ?? 0,
+                    Language: "de"));
+            }
         }
 
         return records

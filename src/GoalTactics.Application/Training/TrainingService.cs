@@ -92,6 +92,8 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         {
             throw new InvalidOperationException("Insufficient stars to refresh camps.");
         }
+
+        await teamStore.IncrementCampRefreshAsync(userId, cancellationToken);
     }
 
     public async Task SaveIndividualTrainingAsync(string userId, IndividualTrainingRequest request, CancellationToken cancellationToken = default)
@@ -200,9 +202,9 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
             _ => 500_000
         };
 
-        // Random camp attributes based on current date seed (changes daily)
+        // Camp selection changes daily and on each refresh
         var daySeed = (int)(DateTime.UtcNow.Date.Ticks / TimeSpan.TicksPerDay);
-        var rng = new Random(daySeed);
+        var rng = new Random(HashCode.Combine(daySeed, state.CampRefreshCount));
         var allCamps = new[]
         {
             (Effect: 2, Variant: 0, Name: "Höhentrainingslager", Image: "Camp_2_0_high"),

@@ -28,7 +28,7 @@ public sealed class TeamDbStore(
     private static readonly string[] InitialSquadPositions = ["GK", "GK", "DEF", "DEF", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "MID", "MID", "FWD", "FWD", "FWD", "FWD"];
     private static readonly string[] FirstNames = ["Ehrmut", "Dragoljub", "Manuel", "Hendrik", "Calvin", "Nikolai", "Lukas", "Jonas", "David", "Mika", "Tobias", "Felix", "Marco", "Adrian", "Dominik", "Sebastian", "Florian", "Jan", "Leon", "Patrick"];
     private static readonly string[] LastNames = ["Hoschatt", "Kumer", "Neuer", "Haintzl", "Johnston", "Pfalz-Sulzbach", "Morante", "Raizgys", "Schneider", "Vogel", "Mertens", "Lindner", "Baumann", "Reiter", "Hartmann", "Keller", "Schuster", "Brandt", "Scholz", "Bergmann"];
-    private static readonly string[] Origins = ["Deutschland", "Osterreich", "Schweiz", "Slowenien", "Irland", "Litauen"];
+    private static readonly string[] Origins = ["Deutschland", "\u00d6sterreich", "Schweiz", "Slowenien", "Irland", "Litauen", "Frankreich", "Spanien", "Italien", "Niederlande", "Belgien", "Portugal", "Schweden", "Brasilien", "Argentinien"];
 
     public async Task<TeamRecord> GetOrCreateMyTeamAsync(string userId, CancellationToken cancellationToken = default)
     {
@@ -482,7 +482,7 @@ public sealed class TeamDbStore(
                 ? resources.StadiumVipSeats / 10
                 : (placeId == StadiumBuildingCatalog.StadiumSeats ? resources.StadiumSitSeats / 100 : resources.StadiumStandSeats / 100);
 
-            var cost = GetFacilityUpgradeCost(currentLevel, teamIdGuid, 8_500m, 2_200m);
+            var cost = GetSeatUpgradeCost(placeId);
             if (resources.Money < cost)
             {
                 return false;
@@ -618,7 +618,8 @@ public sealed class TeamDbStore(
             state.CampActiveUntilUtc,
             state.SelectedTacticId,
             state.SelectedTacticStartUtc,
-            teamEntity.LeagueTier);
+            teamEntity.LeagueTier,
+            state.CampRefreshCount);
     }
 
     public async Task SaveTeamTrainingAsync(string userId, int mainSkillIndex, int subSkillIndex, CancellationToken cancellationToken = default)
@@ -687,13 +688,21 @@ public sealed class TeamDbStore(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task IncrementCampRefreshAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var state = await EnsureTrainingStateAsync(team.TeamId, cancellationToken);
+        state.CampRefreshCount++;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<SquadPlayerRecord>> GetSquadPlayersAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
 
         var players = await dbContext.TeamPlayers.AsNoTracking()
-            .Where(x => x.TeamId == team.TeamId)
+            .Where(x => x.TeamId == team.TeamId && !x.IsScouted)
             .OrderBy(x => x.ShirtNumber)
             .ToListAsync(cancellationToken);
 
@@ -706,7 +715,7 @@ public sealed class TeamDbStore(
         await ApplyProgressionTicksAsync(teamKey, cancellationToken);
 
         var players = await dbContext.TeamPlayers.AsNoTracking()
-            .Where(x => x.TeamId == teamKey)
+            .Where(x => x.TeamId == teamKey && !x.IsScouted)
             .OrderBy(x => x.ShirtNumber)
             .ToListAsync(cancellationToken);
 
@@ -860,7 +869,7 @@ public sealed class TeamDbStore(
         var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == teamId, cancellationToken);
         var training = await EnsureTrainingStateAsync(teamId, cancellationToken);
         CompleteConstructionIfFinished(resources, now, team.Id);
-        var players = await dbContext.TeamPlayers.Where(x => x.TeamId == teamId).ToListAsync(cancellationToken);
+        var players = await dbContext.TeamPlayers.Where(x => x.TeamId == teamId && !x.IsScouted).ToListAsync(cancellationToken);
         if (players.Count == 0)
         {
             foreach (var player in BuildInitialPlayers(teamId))
@@ -1297,6 +1306,15 @@ public sealed class TeamDbStore(
         return Math.Round(baseCost + (growth * currentLevel * currentLevel) + (randomizer * 150m), 0);
     }
 
+    private static decimal GetSeatUpgradeCost(Guid placeId)
+    {
+        // Flat per-block costs: Stand 10k/100 seats, Sit 30k/100 seats, VIP 20k/10 seats
+        if (placeId == StadiumBuildingCatalog.StadiumStands) return 10_000m;
+        if (placeId == StadiumBuildingCatalog.StadiumSeats) return 30_000m;
+        if (placeId == StadiumBuildingCatalog.StadiumVips) return 20_000m;
+        return 10_000m;
+    }
+
     private static bool CanUpgrade(int level, int officeLevel)
     {
         if (level >= FacilityMaxLevel)
@@ -1353,6 +1371,75 @@ public sealed class TeamDbStore(
 
         var cost = GetFacilityUpgradeCost(level, seed, 12_000m, 2_400m);
         return (true, cost, level, level + 1, buildingType);
+    }
+
+    public async Task<IReadOnlyList<SquadPlayerRecord>> GetScoutedPlayersAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var players = await dbContext.TeamPlayers.AsNoTracking()
+            .Where(x => x.TeamId == team.TeamId && x.IsScouted)
+            .ToListAsync(cancellationToken);
+        return players.Select(MapPlayer).ToArray();
+    }
+
+    public async Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        dbContext.TeamPlayers.Add(new TeamPlayerEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            TeamId = team.TeamId,
+            Name = name,
+            Origin = origin,
+            Position = position,
+            ShirtNumber = 0,
+            Age = age,
+            Talent = talent,
+            Strength = strength,
+            Fitness = fitness,
+            IsScouted = true,
+            ContractEndUtc = DateTime.UtcNow.AddDays(90)
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> RecruitScoutedPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var key = playerId.ToString("N");
+        var player = await dbContext.TeamPlayers
+            .FirstOrDefaultAsync(x => x.TeamId == team.TeamId && x.Id == key && x.IsScouted, cancellationToken);
+
+        if (player is null)
+            return false;
+
+        // Assign first free shirt number
+        var usedNumbers = await dbContext.TeamPlayers
+            .Where(x => x.TeamId == team.TeamId && !x.IsScouted)
+            .Select(x => x.ShirtNumber)
+            .ToListAsync(cancellationToken);
+
+        var nextShirt = 1;
+        while (usedNumbers.Contains(nextShirt)) nextShirt++;
+
+        player.IsScouted = false;
+        player.ShirtNumber = nextShirt;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> TrySpendMoneyAsync(string userId, decimal amount, string description, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        if (resources.Money < amount)
+            return false;
+
+        resources.Money -= amount;
+        await AddFinanceHistoryAsync(userId, income: 0m, outcome: amount, resources.Money, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private static IReadOnlyList<TeamPlayerEntity> BuildInitialPlayers(string teamId)
@@ -1576,7 +1663,7 @@ public sealed class TeamDbStore(
         return placeId switch
         {
             _ when placeId == StadiumBuildingCatalog.StadiumVips => 50m,
-            _ when placeId == StadiumBuildingCatalog.StadiumSeats => 140m,
+            _ when placeId == StadiumBuildingCatalog.StadiumSeats => 120m,
             _ => 100m
         };
     }

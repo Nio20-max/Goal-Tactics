@@ -54,6 +54,8 @@ public interface ITeamStore
 
     Task CancelCampAsync(string userId, CancellationToken cancellationToken = default);
 
+    Task IncrementCampRefreshAsync(string userId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<SquadPlayerRecord>> GetSquadPlayersAsync(string userId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SquadPlayerRecord>> GetSquadPlayersForTeamAsync(Guid teamId, CancellationToken cancellationToken = default);
@@ -81,6 +83,14 @@ public interface ITeamStore
     Task<bool> UseEquipmentAsync(string userId, string equipmentId, CancellationToken cancellationToken = default);
 
     Task<(string? Shirt, string? Emblem)> GetSelectedEquipmentAsync(string userId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SquadPlayerRecord>> GetScoutedPlayersAsync(string userId, CancellationToken cancellationToken = default);
+
+    Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, CancellationToken cancellationToken = default);
+
+    Task<bool> RecruitScoutedPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
+
+    Task<bool> TrySpendMoneyAsync(string userId, decimal amount, string description, CancellationToken cancellationToken = default);
 }
 
 public sealed record OwnedEquipmentRecord(string Id, string Image, string EquipmentType, bool IsActive);
@@ -135,7 +145,8 @@ public sealed record TeamTrainingStateRecord(
     DateTime? CampActiveUntilUtc,
     string? SelectedTacticId,
     DateTime? SelectedTacticStartUtc,
-    int LeagueTier);
+    int LeagueTier,
+    int CampRefreshCount);
 
 public sealed record SquadPlayerRecord(
     Guid Id,

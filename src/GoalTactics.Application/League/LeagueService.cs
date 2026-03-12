@@ -73,8 +73,8 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
                     MyTeam = myTeam,
                     HomeCountry = m.HomeCountry,
                     AwayCountry = m.AwayCountry,
-                    HomeScore = m.HomeScore ?? 0,
-                    AwayScore = m.AwayScore ?? 0,
+                    HomeScore = m.HomeScore ?? -1,
+                    AwayScore = m.AwayScore ?? -1,
                     OpponentTeamId = myTeam == 1
                         ? (Guid.TryParse(m.AwayTeamId, out var oid) ? oid : Guid.Empty)
                         : (Guid.TryParse(m.HomeTeamId, out var oid2) ? oid2 : Guid.Empty),
@@ -105,7 +105,7 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
                     Name = $"{team.Name} Striker",
                     Country = team.Country,
                     Head = $"01_head-A{index % 15:00}",
-                    Strength = team.Strength,
+                    Strength = Math.Clamp(60m + (team.GoalsScoredHome + team.GoalsScoredAway) * 0.5m, 55m, 95m),
                     Talent = Math.Clamp(10 - (index / 2), 6, 10),
                     Age = 18 + index,
                     Position = 6,

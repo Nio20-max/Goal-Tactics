@@ -1,4 +1,5 @@
 using GoalTactics.Application.League;
+using GoalTactics.Application.Team;
 using GoalTactics.Contracts.Live;
 
 namespace GoalTactics.Application.Live;
@@ -10,11 +11,11 @@ public interface ILiveService
     Task<LiveMatchResponse> GetMatchReportAsync(string userId, Guid matchId, CancellationToken cancellationToken = default);
 }
 
-public sealed class LiveService(ILeagueStore leagueStore) : ILiveService
+public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) : ILiveService
 {
     public async Task<LiveMatchResponse> GetLiveMatchAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
     {
-        var match = await leagueStore.GetMatchAsync(matchId, cancellationToken);
+        var match = await ResolveMatchAsync(userId, matchId, cancellationToken);
         if (match is null)
         {
             var report = "Match not found";
@@ -40,7 +41,7 @@ public sealed class LiveService(ILeagueStore leagueStore) : ILiveService
 
     public async Task<LiveMatchResponse> GetMatchReportAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
     {
-        var match = await leagueStore.GetMatchAsync(matchId, cancellationToken);
+        var match = await ResolveMatchAsync(userId, matchId, cancellationToken);
         if (match is null)
         {
             var report = "Match not found";
@@ -62,6 +63,17 @@ public sealed class LiveService(ILeagueStore leagueStore) : ILiveService
         }
 
         return BuildResponse(match);
+    }
+
+    private async Task<LeagueMatchRecord?> ResolveMatchAsync(string userId, Guid matchId, CancellationToken cancellationToken)
+    {
+        if (matchId != Guid.Empty)
+            return await leagueStore.GetMatchAsync(matchId, cancellationToken);
+
+        // No matchId provided — find the user's next/current match
+        var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var upcoming = await leagueStore.GetUpcomingMatchesForTeamAsync(team.TeamId, cancellationToken);
+        return upcoming.FirstOrDefault();
     }
 
     private static LiveMatchResponse BuildResponse(LeagueMatchRecord match)

@@ -14,7 +14,7 @@ public sealed class IndividualTrainingRequest : IdRequest
 
     public Guid ResolvedPlayerId => PlayerID != Guid.Empty && PlayerID.HasValue ? PlayerID.Value : Id;
 
-    public string? ResolvedSkillType => SkillType ?? (SkillIndex.HasValue ? IndexToSkill(SkillIndex.Value) : null);
+    public string? ResolvedSkillType => SkillType ?? IndexToSkill(SkillIndex ?? 0);
 
     private static string? IndexToSkill(int index) => index switch
     {

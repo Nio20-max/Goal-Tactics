@@ -21,5 +21,8 @@ public sealed class TeamTrainingStateEntity
     /// <summary>When the current tactic training started (for 2%/day progression).</summary>
     public DateTime? SelectedTacticStartUtc { get; set; }
 
+    /// <summary>Incremented each time the user refreshes camp offerings.</summary>
+    public int CampRefreshCount { get; set; }
+
     public TeamEntity? Team { get; set; }
 }

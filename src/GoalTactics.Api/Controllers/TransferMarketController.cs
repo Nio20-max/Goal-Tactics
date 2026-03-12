@@ -28,6 +28,7 @@ public sealed class TransferMarketController(ITransferMarketService transferMark
     }
 
     [HttpPost("GetTransferDetails")]
+    [HttpPost("GetDetails")]
     public async Task<ActionResult<TransferDetailsResponse>> GetTransferDetails([FromBody] TransferDetailsRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();

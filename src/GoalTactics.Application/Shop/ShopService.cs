@@ -56,38 +56,62 @@ public sealed class ShopService(ITeamStore teamStore) : IShopService
                 new ShopProductData
                 {
                     Id = Guid.Parse("a1b2c3d4-e5f6-0000-0000-000000000001"),
-                    Name = "Medi Pack",
-                    Category = "medi_pack",
-                    Price = 100,
-                    Identifier = "medi_pack_1",
-                    Image = "medi_pack",
+                    Name = "20.000 GT Stars",
+                    Category = "gt_stars",
+                    Price = 599,
+                    Identifier = "com.xyrality.goaltactics.stars_20k",
+                    Image = "",
                     Money = 0,
-                    Medipacks = 1,
-                    GTStars = 100
+                    Medipacks = 0,
+                    GTStars = 20000
                 },
                 new ShopProductData
                 {
                     Id = Guid.Parse("a1b2c3d4-e5f6-0000-0000-000000000002"),
-                    Name = "10.000 Coins",
-                    Category = "coins",
-                    Price = 50,
-                    Identifier = "coins_10k",
-                    Image = "coins_pack",
-                    Money = 10000,
+                    Name = "44.000 GT Stars",
+                    Category = "gt_stars",
+                    Price = 1099,
+                    Identifier = "com.xyrality.goaltactics.stars_44k",
+                    Image = "",
+                    Money = 0,
                     Medipacks = 0,
-                    GTStars = 50
+                    GTStars = 44000
                 },
                 new ShopProductData
                 {
                     Id = Guid.Parse("a1b2c3d4-e5f6-0000-0000-000000000003"),
-                    Name = "50.000 Coins",
-                    Category = "coins",
-                    Price = 200,
-                    Identifier = "coins_50k",
-                    Image = "coins_pack_big",
-                    Money = 50000,
+                    Name = "87.000 GT Stars",
+                    Category = "gt_stars",
+                    Price = 2199,
+                    Identifier = "com.xyrality.goaltactics.stars_87k",
+                    Image = "",
+                    Money = 0,
                     Medipacks = 0,
-                    GTStars = 200
+                    GTStars = 87000
+                },
+                new ShopProductData
+                {
+                    Id = Guid.Parse("a1b2c3d4-e5f6-0000-0000-000000000004"),
+                    Name = "250.000 GT Stars",
+                    Category = "gt_stars",
+                    Price = 5499,
+                    Identifier = "com.xyrality.goaltactics.stars_250k",
+                    Image = "",
+                    Money = 0,
+                    Medipacks = 0,
+                    GTStars = 250000
+                },
+                new ShopProductData
+                {
+                    Id = Guid.Parse("a1b2c3d4-e5f6-0000-0000-000000000005"),
+                    Name = "600.000 GT Stars",
+                    Category = "gt_stars",
+                    Price = 10999,
+                    Identifier = "com.xyrality.goaltactics.stars_600k",
+                    Image = "",
+                    Money = 0,
+                    Medipacks = 0,
+                    GTStars = 600000
                 }
             ]
         });

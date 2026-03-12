@@ -219,6 +219,7 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.IndividualTrainingSkill).HasColumnName("individual_training_skill").HasMaxLength(32);
             entity.Property(x => x.IndividualTrainingUntilUtc).HasColumnName("individual_training_until_utc");
             entity.Property(x => x.ContractEndUtc).HasColumnName("contract_end_utc");
+            entity.Property(x => x.IsScouted).HasColumnName("is_scouted").HasDefaultValue(false);
             entity.HasIndex(x => x.TeamId);
             entity.HasOne(x => x.Team)
                 .WithMany()
@@ -238,6 +239,7 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.TrainingChangedAtUtc).HasColumnName("training_changed_at_utc");
             entity.Property(x => x.SelectedTacticId).HasColumnName("selected_tactic_id").HasMaxLength(64);
             entity.Property(x => x.SelectedTacticStartUtc).HasColumnName("selected_tactic_start_utc");
+            entity.Property(x => x.CampRefreshCount).HasColumnName("camp_refresh_count").HasDefaultValue(0);
             entity.HasOne(x => x.Team)
                 .WithOne()
                 .HasForeignKey<TeamTrainingStateEntity>(x => x.TeamId)

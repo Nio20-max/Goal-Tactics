@@ -36,5 +36,8 @@ public sealed class TeamPlayerEntity
 
     public DateTime? ContractEndUtc { get; set; }
 
+    /// <summary>True while the player is in the scouted pool (not yet recruited).</summary>
+    public bool IsScouted { get; set; }
+
     public TeamEntity? Team { get; set; }
 }

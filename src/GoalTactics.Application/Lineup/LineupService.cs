@@ -17,14 +17,49 @@ public interface ILineupService
 
 public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore) : ILineupService
 {
+    // Standard position GUIDs referenced by MatchSystemFieldData.PositionId
+    private static readonly Guid PosGK = Guid.Parse("10000001-0000-0000-0000-000000000000");
+    private static readonly Guid PosDEF = Guid.Parse("10000002-0000-0000-0000-000000000000");
+    private static readonly Guid PosMID = Guid.Parse("10000003-0000-0000-0000-000000000000");
+    private static readonly Guid PosFWD = Guid.Parse("10000004-0000-0000-0000-000000000000");
+
+    private static List<MatchSystemFieldData> BuildFields(Guid systemId, int gk, int def, int mid, int fwd)
+    {
+        var list = new List<MatchSystemFieldData>();
+        int slot = 0;
+        void Add(Guid posId, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                list.Add(new MatchSystemFieldData
+                {
+                    Id = new Guid(slot, 0, 0, systemId.ToByteArray()[8..]),
+                    PositionId = posId
+                });
+                slot++;
+            }
+        }
+        Add(PosGK, gk);
+        Add(PosDEF, def);
+        Add(PosMID, mid);
+        Add(PosFWD, fwd);
+        return list;
+    }
+
     private static readonly MatchSystemData[] DefaultSystems =
     [
-        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000001"), Name = "4-4-2", Fields = [] },
-        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000002"), Name = "4-3-3", Fields = [] },
-        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000003"), Name = "3-5-2", Fields = [] },
-        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000004"), Name = "4-5-1", Fields = [] },
-        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000005"), Name = "5-3-2", Fields = [] },
-        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000006"), Name = "3-4-3", Fields = [] },
+        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000001"), Name = "4-4-2",
+                Fields = BuildFields(Guid.Parse("00000001-0000-0000-0000-000000000001"), 1, 4, 4, 2) },
+        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000002"), Name = "4-3-3",
+                Fields = BuildFields(Guid.Parse("00000001-0000-0000-0000-000000000002"), 1, 4, 3, 3) },
+        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000003"), Name = "3-5-2",
+                Fields = BuildFields(Guid.Parse("00000001-0000-0000-0000-000000000003"), 1, 3, 5, 2) },
+        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000004"), Name = "4-5-1",
+                Fields = BuildFields(Guid.Parse("00000001-0000-0000-0000-000000000004"), 1, 4, 5, 1) },
+        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000005"), Name = "5-3-2",
+                Fields = BuildFields(Guid.Parse("00000001-0000-0000-0000-000000000005"), 1, 5, 3, 2) },
+        new() { Id = Guid.Parse("00000001-0000-0000-0000-000000000006"), Name = "3-4-3",
+                Fields = BuildFields(Guid.Parse("00000001-0000-0000-0000-000000000006"), 1, 3, 4, 3) },
     ];
 
     private static readonly TacticData[] DefaultTactics =
@@ -58,7 +93,26 @@ public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore
             {
                 MatchId = m.Id,
                 Opponent = opponent,
-                IsLocked = false
+                IsLocked = false,
+                // BaseMatchData fields for Xamarin client
+                Id = m.Id,
+                Date = m.ScheduledDateUtc.ToString("O"),
+                HomeLogo = m.HomeLogo,
+                AwayLogo = m.AwayLogo,
+                HomeName = m.HomeName,
+                AwayName = m.AwayName,
+                MyTeam = isHome ? 1 : 2,
+                HomeCountry = m.HomeCountry,
+                AwayCountry = m.AwayCountry,
+                HomeScore = -1,
+                AwayScore = -1,
+                OpponentTeamId = Guid.TryParse(isHome ? m.AwayTeamId : m.HomeTeamId, out var oppId) ? oppId : Guid.Empty,
+                HomeStrength = -1,
+                AwayStrength = -1,
+                HasLineup = false,
+                IsFriendly = false,
+                HomeTrikot = null,
+                AwayTrikot = null
             };
         }).ToArray();
 
@@ -83,10 +137,10 @@ public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore
             {
                 MatchSystemID = DefaultSystems[0].Id,
                 MatchTacticID = DefaultTactics[0].ID,
-                Players = squad.Take(11).Select(p => new FormationPlayer
+                Players = squad.Take(11).Select((p, i) => new FormationPlayer
                 {
                     PlayerID = p.Id,
-                    MatchSystemFieldID = Guid.Empty,
+                    MatchSystemFieldID = i < DefaultSystems[0].Fields!.Count ? DefaultSystems[0].Fields[i].Id : Guid.Empty,
                     MatchPositionDirectionID = Guid.Empty
                 }).ToList()
             },

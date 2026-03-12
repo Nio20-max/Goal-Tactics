@@ -103,12 +103,12 @@ public sealed class TeamControllerTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Equal(10, stadiumBody.SpeedupCost);
 
         // stadium body should include building entries; verify upgrade cost of a
-        // stadium seat entry matches the same computation we use server-side.
+        // stadium seat entry matches the new flat per-block cost.
         var vipBuilding = stadiumBody.Buildings?.FirstOrDefault(b => b.Name == "VIP-Sitze");
         if (vipBuilding is not null)
         {
-            // starting with 200 vip seats => 20 blocks. cost = 8500 + (20*20*2200)
-            var expected = 8500m + (20m * 20m * 2200m);
+            // flat cost per VIP block = 20_000
+            var expected = 20_000m;
             Assert.Equal(expected, vipBuilding.UpgradeCost);
         }
 

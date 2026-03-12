@@ -45,7 +45,10 @@ public sealed class TrainingProgressService
 
     public int CalculateEfficiencyValue(int trainingCenterLevel)
     {
-        return Math.Clamp(45 + (trainingCenterLevel * 2), 40, 100);
+        // Efficiency always starts at 100 when training changes; decay is
+        // applied externally by TeamDbStore based on days since last change.
+        // Training center level reduces the decay rate (handled there).
+        return 100;
     }
 
     private static decimal CalculateIndividualGain(int age, int talent, int fitness)

@@ -23,11 +23,17 @@ public sealed class TransferMarketService(ITeamStore teamStore) : ITransferMarke
     {
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
         var players = BuildTransferPlayers()
-            .Where(player => request.MinimumBid is null || player.Bid >= request.MinimumBid)
-            .Where(player => request.Strength is null || player.Strength >= request.Strength)
+            .Where(player => request.Age is null ||
+                ((request.Age.Min is null || player.Age >= request.Age.Min) &&
+                 (request.Age.Max is null || player.Age <= request.Age.Max)))
+            .Where(player => request.Strength is null ||
+                ((request.Strength.Min is null || player.Strength >= request.Strength.Min) &&
+                 (request.Strength.Max is null || player.Strength <= request.Strength.Max)))
             .Where(player => request.Talent is null ||
                 ((request.Talent.Min is null || player.Talent >= request.Talent.Min) &&
                  (request.Talent.Max is null || player.Talent <= request.Talent.Max)))
+            .Where(player => request.Budget is null || player.Bid <= (long)request.Budget)
+            .Where(player => request.SkillIndex < 0 || player.Position == PositionCodeFromSkillIndex(request.SkillIndex))
             .Where(player => request.OnlyKeeper is not true || player.Position == 0)
             .ToArray();
 
@@ -44,7 +50,8 @@ public sealed class TransferMarketService(ITeamStore teamStore) : ITransferMarke
     public async Task<TransferDetailsResponse> GetDetailsAsync(string userId, Guid id, CancellationToken cancellationToken = default)
     {
         var search = await SearchAsync(userId, new TransferSearchRequest(), cancellationToken);
-        var player = search.Players.FirstOrDefault(candidate => candidate.Id == id)
+        var player = search.Players.FirstOrDefault(candidate => candidate.AuctionId == id)
+            ?? search.Players.FirstOrDefault(candidate => candidate.Id == id)
             ?? search.Players.FirstOrDefault();
 
         return new TransferDetailsResponse
@@ -154,4 +161,13 @@ public sealed class TransferMarketService(ITeamStore teamStore) : ITransferMarke
             }
         ];
     }
+
+    /// <summary>Maps Xamarin SkillIndex (1=keeper,2=mid,3=striker) to position code used in transfer data.</summary>
+    private static int PositionCodeFromSkillIndex(int skillIndex) => skillIndex switch
+    {
+        1 => 0,  // keeper
+        2 => 2,  // midfielder (position code 2 = DEF area, but Xamarin maps 2=MID; use raw code)
+        3 => 6,  // striker (position code 6 in transfer data = FWD)
+        _ => -1  // no filter
+    };
 }
