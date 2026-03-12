@@ -245,7 +245,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             IsBot = true,
             Strength = random.Next(35, 88),
             Country = "DE",
-            Logo = "logo_bot",
+            Logo = LegacyAppCompatibility.BuildLogoId(botTeamId),
             IsOnline = false,
             MatchesHome = 15,
             MatchesAway = 15,

@@ -16,7 +16,7 @@ public sealed class LeagueTeamEntity
 
     public string Country { get; set; } = "DE";
 
-    public string Logo { get; set; } = "logo_default";
+    public string Logo { get; set; } = "wappen01";
 
     public bool IsOnline { get; set; }
 

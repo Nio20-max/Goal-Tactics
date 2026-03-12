@@ -1,3 +1,4 @@
+using GoalTactics.Application.Common;
 using GoalTactics.Application.Ladder;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Infrastructure.Persistence.Entities;
@@ -175,7 +176,7 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
                 LadderId = ladder.Id,
                 TeamId = null,
                 TeamName = $"Ladder Bot {i}",
-                TeamLogo = "logo_bot",
+                TeamLogo = LegacyAppCompatibility.BuildLogoId($"ladder-bot-{i}"),
                 Points = random.Next(20, 120),
                 Rank = i,
                 Stamina = StaminaMax,
@@ -210,7 +211,7 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
                 LadderId = ladder.Id,
                 TeamId = team.Id,
                 TeamName = team.Name,
-                TeamLogo = "logo_default",
+                TeamLogo = LegacyAppCompatibility.BuildLogoId(team.Id),
                 Points = 0,
                 Rank = LadderSize,
                 Stamina = StaminaMax,
@@ -226,7 +227,7 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
             slot.IsBot = false;
             slot.TeamId = team.Id;
             slot.TeamName = team.Name;
-            slot.TeamLogo = "logo_default";
+            slot.TeamLogo = LegacyAppCompatibility.BuildLogoId(team.Id);
             slot.Strength = team.Strength;
             slot.Stamina = StaminaMax;
             slot.UpdatedAtUtc = DateTime.UtcNow;
