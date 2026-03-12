@@ -38,10 +38,14 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
                 Capacity = stadium.Capacity,
                 EarningsAverage = stadium.EarningsAverage
             },
+            // Flat fields for Xamarin
+            Name = stadium.Name,
+            GrassQuality = stadium.GrassQuality,
             VisitorsLastMatch = stadium.VisitorsLastMatch,
             VisitorsAverage = stadium.VisitorsAverage,
             VisitorsTotal = stadium.VisitorsTotal,
             EarningsLastMatch = (long)Math.Round(stadium.EarningsLastMatch, MidpointRounding.AwayFromZero),
+            EarningsAverage = stadium.EarningsAverage,
             EarningsTotal = (long)Math.Round(stadium.EarningsTotal, MidpointRounding.AwayFromZero),
             Buildings = places.Select(place => ToBuilding(place, activeConstruction)).ToList(),
             ChangeNameCost = 500,

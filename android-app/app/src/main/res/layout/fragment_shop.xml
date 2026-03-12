@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Shop screen with product/equipment tabs -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical">
-    <com.google.android.material.tabs.TabLayout android:id="@+id/tabLayout" style="@style/GT.TabLayout" android:layout_width="match_parent" android:layout_height="@dimen/tabbar_height" android:background="@drawable/navigationbar" />
-    <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerShop" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginTop="@dimen/gt_spacing_md" />
-</LinearLayout>

@@ -4,12 +4,19 @@ namespace GoalTactics.Contracts.Stadium;
 
 public sealed class StadiumResponse : ResponseObject
 {
+    // Nested for Android
     public StadiumData? Stadium { get; init; }
+
+    // Flat fields for Xamarin
+    public string? Name { get; init; }
+    public int GrassQuality { get; init; }
+
     public List<BuildingData>? Buildings { get; init; }
     public long VisitorsLastMatch { get; init; }
     public long VisitorsAverage { get; init; }
     public long VisitorsTotal { get; init; }
     public long EarningsLastMatch { get; init; }
+    public long EarningsAverage { get; init; }
     public long EarningsTotal { get; init; }
     public int ChangeNameCost { get; init; }
     public int RenewGrassCost { get; init; }

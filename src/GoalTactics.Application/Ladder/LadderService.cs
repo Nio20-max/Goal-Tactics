@@ -75,9 +75,16 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
             TeamName = team.TeamName,
             TeamLogo = team.TeamLogo,
             Points = team.Points,
-            Strength = (int)team.Strength,
+            Strength = team.Strength,
             IsMine = team.IsMine,
-            Rank = team.Rank
+            Rank = team.Rank,
+            // Xamarin fields
+            Name = team.TeamName,
+            Logo = team.TeamLogo,
+            Country = "de",
+            Played = 0,
+            GoalsScored = 0,
+            GoalsReceived = 0
         };
     }
 
@@ -89,9 +96,15 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
             TeamName = team.TeamName,
             TeamLogo = team.TeamLogo,
             Points = team.Points,
-            Strength = (int)team.Strength,
+            Strength = team.Strength,
             IsMine = team.IsMine,
-            Rank = team.Rank
+            Rank = team.Rank,
+            Name = team.TeamName,
+            Logo = team.TeamLogo,
+            Country = "de",
+            Played = 0,
+            GoalsScored = 0,
+            GoalsReceived = 0
         };
     }
 }

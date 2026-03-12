@@ -12,7 +12,7 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
     private const int StaminaMax = 100;
     private const int WinPoints = 12;
     private const int LosePoints = 6;
-    private const int MatchCost = 1000;
+    private const int MatchCost = 50;
 
     public async Task<LadderRecord> GetLadderAsync(string userId, Guid ladderId, CancellationToken cancellationToken = default)
     {

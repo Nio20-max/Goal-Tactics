@@ -58,7 +58,36 @@ public sealed class ShopService(ITeamStore teamStore) : IShopService
                     Id = Guid.Parse("a1b2c3d4-e5f6-0000-0000-000000000001"),
                     Name = "Medi Pack",
                     Category = "medi_pack",
-                    Price = 100
+                    Price = 100,
+                    Identifier = "medi_pack_1",
+                    Image = "medi_pack",
+                    Money = 0,
+                    Medipacks = 1,
+                    GTStars = 100
+                },
+                new ShopProductData
+                {
+                    Id = Guid.Parse("a1b2c3d4-e5f6-0000-0000-000000000002"),
+                    Name = "10.000 Coins",
+                    Category = "coins",
+                    Price = 50,
+                    Identifier = "coins_10k",
+                    Image = "coins_pack",
+                    Money = 10000,
+                    Medipacks = 0,
+                    GTStars = 50
+                },
+                new ShopProductData
+                {
+                    Id = Guid.Parse("a1b2c3d4-e5f6-0000-0000-000000000003"),
+                    Name = "50.000 Coins",
+                    Category = "coins",
+                    Price = 200,
+                    Identifier = "coins_50k",
+                    Image = "coins_pack_big",
+                    Money = 50000,
+                    Medipacks = 0,
+                    GTStars = 200
                 }
             ]
         });
@@ -70,25 +99,55 @@ public sealed class ShopService(ITeamStore teamStore) : IShopService
         var ownedImages = owned.Select(o => o.Image).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var allItems = new List<EquipmentData>();
+        var shirts = new List<EquipmentData>();
+        var emblems = new List<EquipmentData>();
+        var myShirts = new List<EquipmentData>();
+        var myEmblems = new List<EquipmentData>();
 
         foreach (var img in ShirtImages)
         {
             var eqId = DeterministicId(img);
-            var isOwned = owned.Any(o => o.Image == img);
-            allItems.Add(new EquipmentData { Id = eqId, Name = img, CostStars = isOwned ? 0 : EquipmentCostStars });
+            var isOwned = ownedImages.Contains(img);
+            var item = new EquipmentData
+            {
+                Id = eqId,
+                Name = img,
+                CostStars = isOwned ? 0 : EquipmentCostStars,
+                Image = img,
+                Cost = isOwned ? 0 : EquipmentCostStars,
+                InUse = false
+            };
+            allItems.Add(item);
+            shirts.Add(item);
+            if (isOwned) myShirts.Add(item);
         }
 
         foreach (var img in EmblemImages)
         {
             var eqId = DeterministicId(img);
-            var isOwned = owned.Any(o => o.Image == img);
-            allItems.Add(new EquipmentData { Id = eqId, Name = img, CostStars = isOwned ? 0 : EquipmentCostStars });
+            var isOwned = ownedImages.Contains(img);
+            var item = new EquipmentData
+            {
+                Id = eqId,
+                Name = img,
+                CostStars = isOwned ? 0 : EquipmentCostStars,
+                Image = img,
+                Cost = isOwned ? 0 : EquipmentCostStars,
+                InUse = false
+            };
+            allItems.Add(item);
+            emblems.Add(item);
+            if (isOwned) myEmblems.Add(item);
         }
 
         return new ShopEquipmentResponse
         {
             Success = true,
-            Equipment = allItems
+            Equipment = allItems,
+            Shirts = shirts,
+            Emblems = emblems,
+            MyShirts = myShirts,
+            MyEmblems = myEmblems
         };
     }
 

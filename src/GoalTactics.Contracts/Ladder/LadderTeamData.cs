@@ -9,4 +9,12 @@ public class LadderTeamData
     public int Rank { get; init; }
     public int Strength { get; init; }
     public bool IsMine { get; init; }
+
+    // Xamarin fields
+    public string? Name { get; init; }
+    public string? Logo { get; init; }
+    public string? Country { get; init; }
+    public int Played { get; init; }
+    public int GoalsScored { get; init; }
+    public int GoalsReceived { get; init; }
 }

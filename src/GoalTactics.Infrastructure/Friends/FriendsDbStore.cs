@@ -33,6 +33,7 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
                 : "Unknown";
 
             var foreignTeamId = teamByUserId.TryGetValue(foreignUserId, out var foundTeamId) ? foundTeamId : string.Empty;
+            var foreignTeam = teams.FirstOrDefault(t => t.Id == foreignTeamId);
 
             var incoming = x.Status == PendingStatus && x.AddresseeUserId == userId;
             var outgoing = x.Status == PendingStatus && x.RequesterUserId == userId;
@@ -45,7 +46,12 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
                 IsFriend: x.Status == AcceptedStatus,
                 IsRequestIncoming: incoming,
                 IsRequestOutgoing: outgoing,
-                IsLiked: x.RequesterUserId == userId && x.IsLikedByRequester);
+                IsLiked: x.RequesterUserId == userId && x.IsLikedByRequester,
+                TeamName: foreignTeam?.Name,
+                Country: foreignTeam?.Country?.ToLowerInvariant(),
+                TeamLogo: "wappen01",
+                Strength: foreignTeam?.Strength ?? 0,
+                Language: "de");
         });
 
         if (!string.IsNullOrWhiteSpace(normalizedQuery))

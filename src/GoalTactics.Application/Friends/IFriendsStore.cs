@@ -29,7 +29,12 @@ public sealed record FriendRecord(
     bool IsFriend,
     bool IsRequestIncoming,
     bool IsRequestOutgoing,
-    bool IsLiked);
+    bool IsLiked,
+    string? TeamName = null,
+    string? Country = null,
+    string? TeamLogo = null,
+    int Strength = 0,
+    string? Language = null);
 
 public sealed record ChallengeRecord(
     string Id,

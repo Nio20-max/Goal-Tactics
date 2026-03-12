@@ -90,16 +90,30 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
 
     private static FriendData MapFriend(FriendRecord x)
     {
+        var teamId = ParseGuid(x.ForeignTeamId);
         return new FriendData
         {
-            Id = ParseGuid(x.ForeignTeamId),
+            Id = teamId,
             ForeignUserId = ParseGuid(x.ForeignUserId),
-            ForeignTeamId = ParseGuid(x.ForeignTeamId),
+            ForeignTeamId = teamId,
             Name = x.Name,
             IsFriend = x.IsFriend,
             IsRequestIncoming = x.IsRequestIncoming,
             IsRequestOutgoing = x.IsRequestOutgoing,
-            IsLiked = x.IsLiked
+            IsLiked = x.IsLiked,
+            // Xamarin fields
+            TeamId = teamId,
+            UserName = x.Name,
+            TeamName = x.TeamName ?? x.Name,
+            Country = x.Country ?? "de",
+            TeamLogo = x.TeamLogo ?? "wappen01",
+            Strength = x.Strength,
+            LastActivity = DateTime.UtcNow.AddHours(-1).ToString("O"),
+            Language = x.Language ?? "de",
+            MyLike = x.IsLiked,
+            LikesMe = false,
+            ChallengeStatus = 0,
+            ChallengeId = Guid.Empty
         };
     }
 

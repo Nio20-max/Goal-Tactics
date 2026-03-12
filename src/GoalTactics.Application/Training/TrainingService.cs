@@ -249,7 +249,7 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         };
 
         var skills = Enumerable.Range(0, 14)
-            .Select(index => index == 0 ? Math.Round((double)player.Strength * 0.9, 6) : Math.Round(Math.Max(10.0, (double)player.Strength / (index + 2.0)), 6))
+            .Select(index => index == 0 ? Math.Round(player.Strength * 0.9m, 6) : Math.Round(Math.Max(10m, player.Strength / (index + 2m)), 6))
             .ToArray();
 
         var hasIndividualTraining = !string.IsNullOrWhiteSpace(player.IndividualTrainingSkill) && player.IndividualTrainingUntilUtc.HasValue;
@@ -260,7 +260,7 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
             Id = player.Id,
             Name = player.Name,
             Country = player.Origin.ToLowerInvariant(),
-            Strength = (double)player.Strength,
+            Strength = player.Strength,
             Talent = player.Talent,
             Age = player.Age,
             Position = position,
@@ -270,22 +270,22 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
             SkillChange = skillChange,
             TotalChange = Math.Round(skillChange * 7m, 6),
             Skills = skills,
-            Fitness = (double)player.Fitness,
+            Fitness = (int)player.Fitness,
             Shirt = player.ShirtNumber,
             YellowCards = player.YellowCards,
             HasRedCard = player.RedCards > 0,
             TransfermarketMaxHours = 48,
-            TransfermarketMinOffer = (long)Math.Max(1000m, player.Strength * 25m),
-            TransfermarketFee = (long)Math.Max(1000m, player.Strength * 25m),
-            TransfermarketMaxOffer = (long)Math.Max(10_000m, player.Strength * 250m),
+            TransfermarketMinOffer = Math.Max(1000m, player.Strength * 25m),
+            TransfermarketFee = Math.Max(1000m, player.Strength * 25m),
+            TransfermarketMaxOffer = Math.Max(10_000m, player.Strength * 250m),
             HasIndividualTraining = hasIndividualTraining,
             MainSkill = 0,
             BonusSkills = [1, 2],
-            MarketValue = (long)Math.Max(25_000m, player.Strength * 300m),
-            Salary = (long)Math.Max(1_000m, player.Strength * 12m),
+            MarketValue = Math.Max(25_000m, player.Strength * 300m),
+            Salary = Math.Max(1_000m, player.Strength * 12m),
             Origin = player.Origin,
             CanExtendContract = true,
-            MaxUpgradeStrength = Math.Round((double)player.Strength + 25.0, 3)
+            MaxUpgradeStrength = (int)(player.Strength + 25m)
         };
     }
 }
