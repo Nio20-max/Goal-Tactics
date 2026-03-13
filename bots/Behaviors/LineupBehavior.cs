@@ -134,10 +134,15 @@ public sealed class LineupBehavior
     /// <summary>
     /// Choose a tactic string based on the bot's personality.
     /// </summary>
+    // Tactic values as expected by the API (integer codes sent as strings)
+    private const string TacticAttacking = "2";
+    private const string TacticDefensive = "1";
+    private const string TacticBalanced = "0";
+
     private static string ChooseTactic(BotRecord bot)
     {
-        if (bot.Risk > 70) return "attacking";
-        if (bot.Risk < 30) return "defensive";
-        return "balanced";
+        if (bot.Risk > 70) return TacticAttacking;
+        if (bot.Risk < 30) return TacticDefensive;
+        return TacticBalanced;
     }
 }

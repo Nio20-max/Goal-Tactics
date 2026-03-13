@@ -5,7 +5,11 @@ namespace GoalTactics.Bots.Client;
 /// </summary>
 public sealed class BotConfig
 {
-    public string ApiBaseUrl { get; set; } = "https://localhost:5001";
+    /// <summary>
+    /// Base URL of the GoalTactics API. Use http:// for local development
+    /// or https:// with a valid certificate for production.
+    /// </summary>
+    public string ApiBaseUrl { get; set; } = "http://localhost:5000";
     public string DatabasePath { get; set; } = "bots.db";
     public int BotCount { get; set; } = 96;
     public int MaxGroups { get; set; } = 5;
