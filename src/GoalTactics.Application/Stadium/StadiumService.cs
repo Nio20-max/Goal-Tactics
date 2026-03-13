@@ -224,7 +224,7 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
     {
         // Seat durations are fixed per block (from information.md)
         if (buildingType is "StadiumVips") return 50m;
-        if (buildingType is "StadiumSeats") return 120m;
+        if (buildingType is "StadiumSeats") return 140m;
         if (buildingType is "StadiumStands") return 100m;
 
         // Facility durations depend on level: Level 0→1: 30min, Level 19→20: 50hrs (3000min), linear

@@ -207,12 +207,20 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         var rng = new Random(HashCode.Combine(daySeed, state.CampRefreshCount));
         var allCamps = new[]
         {
-            (Effect: 2, Variant: 0, Name: "Höhentrainingslager", Image: "Camp_2_0_high"),
-            (Effect: 1, Variant: 4, Name: "Aerobicunterricht", Image: "Camp_1_4_high"),
-            (Effect: 0, Variant: 3, Name: "Taktikanalyse", Image: "Camp_0_3_high"),
-            (Effect: 2, Variant: 1, Name: "Krafttraining", Image: "Camp_2_1_low"),
-            (Effect: 1, Variant: 2, Name: "Lauftraining", Image: "Camp_1_2_low"),
-            (Effect: 0, Variant: 0, Name: "Mannschaftsausflug", Image: "Camp_0_0_low")
+            (Effect: 0, Variant: 0, Name: "Defensivtraining", Image: "Camp_0_0"),
+            (Effect: 1, Variant: 0, Name: "Torwarttraining", Image: "Camp_1_0"),
+            (Effect: 2, Variant: 0, Name: "Schusstraining", Image: "Camp_2_0_high"),
+            (Effect: 0, Variant: 1, Name: "Spielaufbau-Workshop", Image: "Camp_0_1"),
+            (Effect: 1, Variant: 1, Name: "Passspiel-Seminar", Image: "Camp_1_1"),
+            (Effect: 2, Variant: 1, Name: "Ballkontrolle-Kurs", Image: "Camp_2_1_low"),
+            (Effect: 0, Variant: 2, Name: "Zweikampftraining", Image: "Camp_0_2"),
+            (Effect: 1, Variant: 2, Name: "Eins-gegen-Eins-Camp", Image: "Camp_1_2_low"),
+            (Effect: 0, Variant: 3, Name: "Kopfball-Workshop", Image: "Camp_0_3_high"),
+            (Effect: 1, Variant: 3, Name: "Schnelligkeitslager", Image: "Camp_1_3"),
+            (Effect: 2, Variant: 2, Name: "Flankentraining", Image: "Camp_2_2"),
+            (Effect: 1, Variant: 4, Name: "Eckball-Seminar", Image: "Camp_1_4_high"),
+            (Effect: 2, Variant: 3, Name: "Freistoß-Workshop", Image: "Camp_2_3"),
+            (Effect: 2, Variant: 4, Name: "Elfmetertraining", Image: "Camp_2_4")
         };
 
         // Pick 3 random camps

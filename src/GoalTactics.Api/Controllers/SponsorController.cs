@@ -41,6 +41,7 @@ public sealed class SponsorController(ISponsorService sponsorService) : Controll
     }
 
     [HttpPost("AcceptSponsor")]
+    [HttpPost("~/api/Sponsor/Accept")]
     public async Task<ActionResult<ResponseObject>> AcceptSponsor([FromBody] IdRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();

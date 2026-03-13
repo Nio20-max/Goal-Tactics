@@ -9,6 +9,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Ladder")]
 [Authorize]
 public sealed class LadderController(ILadderService ladderService) : ControllerBase
 {
