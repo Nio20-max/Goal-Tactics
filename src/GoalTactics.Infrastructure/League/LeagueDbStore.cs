@@ -155,7 +155,14 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
 
         var maxTier = allLeagues.Max(x => x.Tier);
         var maxTierLeagues = allLeagues.Where(x => x.Tier == maxTier).OrderBy(x => x.GroupNumber).ToList();
-        var maxGroupsAllowedAtTier = 1 << (maxTier - 1);
+        // Allow enough groups per tier to match the real league pyramid (1, 5, 15, 30, 60, …)
+        var maxGroupsAllowedAtTier = maxTier switch
+        {
+            1 => 1,
+            2 => 5,
+            3 => 15,
+            _ => 15 * (1 << (maxTier - 3))
+        };
 
         if (maxTierLeagues.Count < maxGroupsAllowedAtTier)
         {
