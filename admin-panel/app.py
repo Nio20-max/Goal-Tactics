@@ -237,8 +237,8 @@ def bots_page():
                            sort_dir=sort_dir)
 
 
-@app.route("/bots/<int:bot_id>")
-def bot_detail(bot_id: int):
+@app.route("/bots/<bot_id>")
+def bot_detail(bot_id):
     """Detailed view of a single bot."""
     bot = db_query(BOT_DB_PATH,
         "SELECT * FROM Bots WHERE BotId = ?", (bot_id,))

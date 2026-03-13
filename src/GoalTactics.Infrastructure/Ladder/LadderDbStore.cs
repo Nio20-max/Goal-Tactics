@@ -183,6 +183,14 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
         dbContext.LadderSeasons.Add(ladder);
 
         // Seed ladder with bot entries so matchmaking is always available.
+        string[] botTeamNames =
+        [
+            "FC Phönix", "Roter Stern", "SC Adler", "SV Blitz",
+            "Dynamo Sturm", "FC Falke", "Eintracht Löwe", "BV Titan",
+            "SC Rapid", "VfL Meteor", "1. FC Donner", "SV Greif",
+            "SC Orion", "FK Nordlicht", "VfB Anker", "Fortuna Tiger"
+        ];
+
         for (var i = 1; i <= LadderSize; i++)
         {
             var random = new Random(HashCode.Combine(i, ladder.Id.GetHashCode()));
@@ -191,9 +199,9 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
                 Id = Guid.NewGuid().ToString("N"),
                 LadderId = ladder.Id,
                 TeamId = null,
-                TeamName = $"Ladder Bot {i}",
+                TeamName = botTeamNames[i - 1],
                 TeamLogo = LegacyAppCompatibility.BuildLogoId($"ladder-bot-{i}"),
-                Points = random.Next(20, 120),
+                Points = 0,
                 Rank = i,
                 Stamina = StaminaMax,
                 Strength = random.Next(45, 90),

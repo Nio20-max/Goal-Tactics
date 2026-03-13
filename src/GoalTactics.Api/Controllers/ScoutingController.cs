@@ -9,6 +9,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Scouting")]
 [Authorize]
 public sealed class ScoutingController(IScoutingService scoutingService) : ControllerBase
 {
@@ -25,6 +26,7 @@ public sealed class ScoutingController(IScoutingService scoutingService) : Contr
     }
 
     [HttpPost("InstructScout")]
+    [HttpPost("Instruct")]
     public async Task<ActionResult<ResponseObject>> InstructScout([FromBody] ScoutInstructionRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();

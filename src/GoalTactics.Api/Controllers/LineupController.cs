@@ -35,7 +35,7 @@ public sealed class LineupController(ILineupService lineupService) : ControllerB
             return Unauthorized(new MatchLineupResponse { Success = false, Message = "Invalid token context" });
         }
 
-        return Ok(await lineupService.GetMatchLineupAsync(userId, request.MatchId, cancellationToken));
+        return Ok(await lineupService.GetMatchLineupAsync(userId, request.ResolvedMatchId, cancellationToken));
     }
 
     [HttpPost("SaveLineup")]

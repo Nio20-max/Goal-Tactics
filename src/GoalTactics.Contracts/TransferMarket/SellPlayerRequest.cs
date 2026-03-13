@@ -14,6 +14,7 @@ public sealed class SellPlayerRequest : RequestObject
     // Legacy aliases used by older clients.
     public int? StartingBid { get; init; }
     public decimal? SellPrice { get; init; }
+    public decimal? Offer { get; init; }
     public int? Hours { get; init; }
 
     /// <summary>Duration in hours (1–24). Defaults to 4.</summary>
@@ -38,6 +39,11 @@ public sealed class SellPlayerRequest : RequestObject
             if (SellPrice.HasValue && SellPrice.Value > 0)
             {
                 return (int)Math.Round(SellPrice.Value, MidpointRounding.AwayFromZero);
+            }
+
+            if (Offer.HasValue && Offer.Value > 0)
+            {
+                return (int)Math.Round(Offer.Value, MidpointRounding.AwayFromZero);
             }
 
             return 0;

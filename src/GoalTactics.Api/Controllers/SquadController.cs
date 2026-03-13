@@ -1,8 +1,10 @@
 using GoalTactics.Api.Extensions;
 using GoalTactics.Application.Common;
 using GoalTactics.Application.Squad;
+using GoalTactics.Application.TransferMarket;
 using GoalTactics.Contracts.Common;
 using GoalTactics.Contracts.Squad;
+using GoalTactics.Contracts.TransferMarket;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,7 +14,7 @@ namespace GoalTactics.Api.Controllers;
 [Route("api")]
 [Route("api/Squad")]
 [Authorize]
-public sealed class SquadController(ISquadService squadService, ICountryCatalog countryCatalog) : ControllerBase
+public sealed class SquadController(ISquadService squadService, ICountryCatalog countryCatalog, ITransferMarketService transferMarketService) : ControllerBase
 {
     [HttpPost("GetSquad")]
     [HttpPost("GetPlayers")]
@@ -162,6 +164,19 @@ public sealed class SquadController(ISquadService squadService, ICountryCatalog 
         }
 
         return Ok(await squadService.GetSkillCardsAsync(userId, cancellationToken));
+    }
+
+    [HttpPost("SendToTransfermarket")]
+    public async Task<ActionResult<ResponseObject>> SendToTransfermarket([FromBody] SellPlayerRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+        }
+
+        var auctionId = await transferMarketService.ListPlayerForSaleAsync(userId, request, cancellationToken);
+        return Ok(new ResponseObject { Success = true, Message = $"Player listed with auction {auctionId}" });
     }
 
     private async Task<ActionResult<ResponseObject>> ExecuteMutation(
