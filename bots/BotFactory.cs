@@ -137,6 +137,14 @@ public sealed class BotFactory
 
     private string PickUniqueName(List<string> pool, HashSet<string> used)
     {
+        if (pool.Count == 0)
+        {
+            // No names loaded (gamertags file missing/empty) – generate a GUID-based name
+            string fallback = $"Bot_{Guid.NewGuid():N}"[..20];
+            used.Add(fallback);
+            return fallback;
+        }
+
         // Try to find an unused name from the pool
         var available = pool.Where(n => !used.Contains(n)).ToList();
         if (available.Count > 0)
@@ -154,9 +162,9 @@ public sealed class BotFactory
                 return candidate;
         }
 
-        string fallback = $"Bot_{Guid.NewGuid():N}"[..20];
-        used.Add(fallback);
-        return fallback;
+        string fallback2 = $"Bot_{Guid.NewGuid():N}"[..20];
+        used.Add(fallback2);
+        return fallback2;
     }
 
     /// <summary>

@@ -12,4 +12,9 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.6" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="gamertags.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="premium_gamertags.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
