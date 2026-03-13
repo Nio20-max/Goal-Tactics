@@ -99,7 +99,7 @@ public sealed class BotFactory
 
         var record = new BotRecord
         {
-            BotId = registerResult.UserId ?? Guid.NewGuid().ToString(),
+            BotId = registerResult.UserId ?? throw new InvalidOperationException("Registration succeeded but returned no UserId"),
             Password = password,
             ValidationToken = token,
             TeamName = teamName,

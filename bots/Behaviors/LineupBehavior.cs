@@ -94,7 +94,7 @@ public sealed class LineupBehavior
 
         // Select players for the lineup
         var selected = new List<string>();
-        var used = new HashSet<string>(StringComparer.Ordinal);
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // 1 keeper
         AddBest(selected, used, keepers, 1);
