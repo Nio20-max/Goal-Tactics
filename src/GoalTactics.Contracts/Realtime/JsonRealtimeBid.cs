@@ -2,11 +2,17 @@ namespace GoalTactics.Contracts.Realtime;
 
 public sealed class JsonRealtimeBid
 {
-    public Guid AuctionId { get; init; }
+    public Guid AuctionID { get; init; }
 
-    public Guid TeamId { get; init; }
+    public string EndDate { get; init; } = string.Empty;
 
-    public int Bid { get; init; }
+    public Guid BidTeamId { get; init; }
 
-    public string? CreatedAt { get; init; }
+    public string BidTeamName { get; init; } = string.Empty;
+
+    public string BidTeamLogo { get; init; } = string.Empty;
+
+    public decimal Bid { get; init; }
+
+    public decimal BidIncrement { get; init; }
 }

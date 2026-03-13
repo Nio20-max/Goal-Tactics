@@ -74,6 +74,8 @@ public interface ITeamStore
 
     Task<bool> TrySpendStarsAsync(string userId, decimal stars, CancellationToken cancellationToken = default);
 
+    Task<bool> TrySpendMedipacksAsync(string userId, decimal medipacks, CancellationToken cancellationToken = default);
+
     Task<Guid> GetLeagueIdForTeamAsync(string teamId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<OwnedEquipmentRecord>> GetOwnedEquipmentAsync(string userId, CancellationToken cancellationToken = default);
@@ -118,7 +120,7 @@ public sealed record SeasonInfoRecord(int SeasonNumber, int Matchday, int DaysLe
 
 public sealed record OwnedEquipmentRecord(string Id, string Image, string EquipmentType, bool IsActive);
 
-public sealed record TeamRecord(string TeamId, string UserId, string Name, string Country, string CountryName, string LeagueName, decimal MarketValue, int Mood, string TeamMood, int Wins, int Losses, int Fans, int Members, int Strength, string MatchTrend, string ManagerName, string UserEmail, DateTime UserCreatedAtUtc, DateTime? UserLastActivityAtUtc);
+public sealed record TeamRecord(string TeamId, string UserId, string Name, string Country, string CountryName, string LeagueName, decimal MarketValue, int Mood, string TeamMood, int Wins, int Losses, int Fans, int Members, int Strength, string MatchTrend, string ManagerName, string UserEmail, DateTime UserCreatedAtUtc, DateTime? UserLastActivityAtUtc, string? SelectedShirt, string? SelectedEmblem);
 
 public sealed record TeamResourcesRecord(decimal Money, decimal Medipacks, decimal GTStars);
 
@@ -137,6 +139,7 @@ public sealed record AccomplishmentRecord(string Name, string Image);
 public sealed record StadiumStateRecord(
     string Name,
     int GrassQuality,
+    int LeagueTier,
     int Capacity,
     int EarningsAverage,
     long VisitorsLastMatch,

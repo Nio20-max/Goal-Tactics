@@ -128,7 +128,7 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
         botSlot.IsOnline = true;
         botSlot.Strength = team.Strength;
         botSlot.Country = team.Country;
-        botSlot.Logo = LegacyAppCompatibility.BuildLogoId(team.Id);
+        botSlot.Logo = team.SelectedEmblem ?? LegacyAppCompatibility.BuildLogoId(team.Id);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

@@ -9,5 +9,5 @@ public sealed class EquipmentData
     // Xamarin fields
     public string? Image { get; init; }
     public int Cost { get; init; }
-    public bool InUse { get; init; }
+    public int InUse { get; init; }
 }

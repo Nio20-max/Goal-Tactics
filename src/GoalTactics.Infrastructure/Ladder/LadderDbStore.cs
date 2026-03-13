@@ -235,7 +235,7 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
                 LadderId = ladder.Id,
                 TeamId = team.Id,
                 TeamName = team.Name,
-                TeamLogo = LegacyAppCompatibility.BuildLogoId(team.Id),
+                TeamLogo = team.SelectedEmblem ?? LegacyAppCompatibility.BuildLogoId(team.Id),
                 Points = 0,
                 Rank = LadderSize,
                 Stamina = StaminaMax,
@@ -251,7 +251,7 @@ public sealed class LadderDbStore(GoalTacticsDbContext dbContext) : ILadderStore
             slot.IsBot = false;
             slot.TeamId = team.Id;
             slot.TeamName = team.Name;
-            slot.TeamLogo = LegacyAppCompatibility.BuildLogoId(team.Id);
+            slot.TeamLogo = team.SelectedEmblem ?? LegacyAppCompatibility.BuildLogoId(team.Id);
             slot.Strength = team.Strength;
             slot.Stamina = StaminaMax;
             slot.UpdatedAtUtc = DateTime.UtcNow;

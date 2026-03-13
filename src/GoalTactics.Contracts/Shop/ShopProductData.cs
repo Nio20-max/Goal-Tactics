@@ -8,6 +8,9 @@ public sealed class ShopProductData
     public int Price { get; init; }
 
     // Xamarin fields
+    public decimal Cost { get; init; }
+    public string? Action { get; init; }
+    public int Section { get; init; }
     public string? Identifier { get; init; }
     public string? Image { get; init; }
     public long Money { get; init; }

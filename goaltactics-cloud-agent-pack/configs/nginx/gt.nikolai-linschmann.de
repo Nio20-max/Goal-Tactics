@@ -17,6 +17,8 @@ server {
     location /api/ {
         # Strip Refit ServiceName prefix from legacy APK calls: /api/{ServiceName}/{Action} -> /api/{Action}
         # Specific endpoint name translations for ambiguous/mismatched app calls
+        rewrite ^/api/Sponsor/Accept$ /api/AcceptSponsor break;
+        rewrite ^/api/Friends/Accept$ /api/Accept break;
         rewrite ^/api/Squad/GetPlayers$ /api/GetSquad break;
         rewrite ^/api/Squad/GetSkillCards$ /api/GetSkillCards break;
         rewrite ^/api/Scouting/GetPlayers$ /api/GetScoutedPlayers break;

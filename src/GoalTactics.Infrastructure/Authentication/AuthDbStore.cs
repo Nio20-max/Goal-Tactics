@@ -519,7 +519,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         targetSlot.Slot.TeamName = team.Name;
         targetSlot.Slot.Strength = team.Strength;
         targetSlot.Slot.Country = team.Country;
-        targetSlot.Slot.Logo = LegacyAppCompatibility.BuildLogoId(team.Id);
+        targetSlot.Slot.Logo = team.SelectedEmblem ?? LegacyAppCompatibility.BuildLogoId(team.Id);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

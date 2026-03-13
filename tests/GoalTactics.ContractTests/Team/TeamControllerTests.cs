@@ -107,8 +107,8 @@ public sealed class TeamControllerTests : IClassFixture<WebApplicationFactory<Pr
         var vipBuilding = stadiumBody.Buildings?.FirstOrDefault(b => b.Name == "VIP-Sitze");
         if (vipBuilding is not null)
         {
-            // flat cost per VIP block = 20_000
-            var expected = 20_000m;
+            // legacy payload cost display for VIP seat block
+            var expected = 5_000m;
             Assert.Equal(expected, vipBuilding.UpgradeCost);
         }
 

@@ -12,10 +12,24 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
     [
         "01_head-A01", "01_head-A02", "01_head-A03", "01_head-A04", "01_head-A05",
         "01_head-A06", "01_head-A07", "01_head-A08", "01_head-A09", "01_head-A10",
-        "01_head-A11", "01_head-A12", "01_head-A13", "01_head-A14",
+        "01_head-A11", "01_head-A12", "01_head-A13",
         "01_head-B01", "01_head-B02", "01_head-B03",
         "01_head-C01", "01_head-C02", "01_head-C03"
     ];
+
+    private static readonly HashSet<string> SafeCountryCodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "de", "at", "ch", "fr", "es", "it", "gb", "us", "br", "pt", "nl", "be"
+    };
+
+    private static readonly HashSet<string> SafeHeads = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "01_head-A01", "01_head-A02", "01_head-A03", "01_head-A04", "01_head-A05",
+        "01_head-A06", "01_head-A07", "01_head-A08", "01_head-A09", "01_head-A10",
+        "01_head-A11", "01_head-A12", "01_head-A13",
+        "01_head-B01", "01_head-B02", "01_head-B03",
+        "01_head-C01", "01_head-C02", "01_head-C03"
+    };
 
     private static readonly string[] Countries =
     [
@@ -400,24 +414,57 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
     private static TransferPlayerData ToTransferPlayerData(AuctionEntity a)
     {
         var auctionGuid = Guid.TryParse(a.Id, out var g) ? g : Guid.Empty;
+        var country = "de";
+        var head = "01_head-A01";
+
         return new TransferPlayerData
         {
             Id = auctionGuid,
             AuctionId = auctionGuid,
-            Name = a.PlayerName,
-            Country = a.PlayerCountry,
-            Head = a.PlayerHead,
-            Position = a.PlayerPosition,
+            Name = a.PlayerName ?? string.Empty,
+            Country = country,
+            Head = head,
+            Position = NormalizePosition(a.PlayerPosition),
             Strength = a.PlayerStrength,
             Talent = a.PlayerTalent,
             Age = a.PlayerAge,
             Bid = a.CurrentBid > 0 ? a.CurrentBid : a.MinimumBid,
             EndDate = a.EndDateUtc.ToString("O"),
             IsFrozen = a.Status != "Active",
-            BidTeamName = a.CurrentBidderTeamName,
-            BidTeamLogo = a.CurrentBidderTeamLogo
+            BidTeamName = a.CurrentBidderTeamName ?? string.Empty,
+            BidTeamLogo = a.CurrentBidderTeamLogo ?? string.Empty
         };
     }
+
+    private static string NormalizeCountry(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "de";
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        return SafeCountryCodes.Contains(normalized) ? normalized : "de";
+    }
+
+    private static string NormalizeHead(string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && SafeHeads.Contains(value))
+        {
+            return value;
+        }
+
+        return "01_head-A01";
+    }
+
+    private static int NormalizePosition(int value) => value switch
+    {
+        0 => 0,
+        2 => 2,
+        4 => 4,
+        6 => 6,
+        _ => 4
+    };
 
     private static int PositionCodeFromSkillIndex(int skillIndex) => skillIndex switch
     {

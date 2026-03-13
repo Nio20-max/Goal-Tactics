@@ -66,7 +66,8 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
         var leagueId = await teamStore.GetLeagueIdForTeamAsync(team.TeamId, cancellationToken);
         var leagueTable = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
         var leaguePosition = Array.FindIndex(leagueTable.Teams.ToArray(), x => x.IsMine) + 1;
-        var (selectedShirt, _) = await teamStore.GetSelectedEquipmentAsync(userId, cancellationToken);
+        var selectedShirt = team.SelectedShirt;
+        var selectedEmblem = team.SelectedEmblem;
 
         var seasonInfo = await teamStore.GetSeasonInfoAsync(cancellationToken);
 
@@ -77,13 +78,13 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
             {
                 Id = team.TeamId,
                 Name = team.Name,
-                Logo = LegacyAppCompatibility.BuildLogoId(team.TeamId),
+                Logo = selectedEmblem ?? EquipmentCatalog.Emblems[0],
                 Country = LegacyAppCompatibility.NormalizeCountryCode(team.Country),
                 CountryName = team.CountryName,
                 LeagueId = leagueId,
                 LeagueName = team.LeagueName,
-                HomeTrikot = selectedShirt ?? LegacyAppCompatibility.BuildShirtId(team.TeamId, "home"),
-                AwayTrikot = LegacyAppCompatibility.BuildShirtId(team.TeamId, "away"),
+                HomeTrikot = selectedShirt ?? EquipmentCatalog.Shirts[0],
+                AwayTrikot = selectedShirt ?? EquipmentCatalog.Shirts[0],
                 MarketValue = team.MarketValue,
                 Mood = team.Mood,
                 TeamMood = team.TeamMood,
@@ -107,8 +108,8 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
             Season = $"#{seasonInfo.SeasonNumber}",
             SeasonStartDate = seasonInfo.SeasonStartDateUtc.AddHours(18).ToString("O"),
             Matchday = seasonInfo.Matchday,
-            LastMatch = BuildExtendedMatch(leagueTable, team.TeamId, isNextMatch: false),
-            NextMatch = BuildExtendedMatch(leagueTable, team.TeamId, isNextMatch: true),
+            LastMatch = BuildExtendedMatch(leagueTable, selectedEmblem ?? EquipmentCatalog.Emblems[0], isNextMatch: false),
+            NextMatch = BuildExtendedMatch(leagueTable, selectedEmblem ?? EquipmentCatalog.Emblems[0], isNextMatch: true),
             RenameTeamCost = 500
         };
     }
@@ -221,17 +222,20 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
 
     private static TeamData BuildTeamData(TeamRecord team, Guid leagueId, bool socialTarget)
     {
+        var selectedShirt = team.SelectedShirt ?? EquipmentCatalog.Shirts[0];
+        var selectedEmblem = team.SelectedEmblem ?? EquipmentCatalog.Emblems[0];
+
         return new TeamData
         {
             Id = team.TeamId,
             Name = team.Name,
-            Logo = LegacyAppCompatibility.BuildLogoId(team.TeamId),
+            Logo = selectedEmblem,
             Country = LegacyAppCompatibility.NormalizeCountryCode(team.Country),
             CountryName = team.CountryName,
             LeagueId = leagueId,
             LeagueName = team.LeagueName,
-            HomeTrikot = LegacyAppCompatibility.BuildShirtId(team.TeamId, "home"),
-            AwayTrikot = LegacyAppCompatibility.BuildShirtId(team.TeamId, "away"),
+            HomeTrikot = selectedShirt,
+            AwayTrikot = selectedShirt,
             MarketValue = team.MarketValue,
             Mood = team.Mood,
             TeamMood = team.TeamMood,
@@ -265,7 +269,7 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
         };
     }
 
-    private static MatchData? BuildExtendedMatch(LeagueTableRecord leagueTable, string teamId, bool isNextMatch)
+    private static MatchData? BuildExtendedMatch(LeagueTableRecord leagueTable, string myLogo, bool isNextMatch)
     {
         var teams = leagueTable.Teams.ToArray();
         var myIndex = Array.FindIndex(teams, entry => entry.IsMine);
@@ -290,8 +294,8 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
         {
             Id = Guid.NewGuid(),
             Date = date.ToString("O"),
-            HomeLogo = isHome ? LegacyAppCompatibility.BuildLogoId(teamId) : opponent.Logo,
-            AwayLogo = isHome ? opponent.Logo : LegacyAppCompatibility.BuildLogoId(teamId),
+            HomeLogo = isHome ? myLogo : opponent.Logo,
+            AwayLogo = isHome ? opponent.Logo : myLogo,
             HomeName = isHome ? mine.Name : opponent.Name,
             AwayName = isHome ? opponent.Name : mine.Name,
             MyTeam = isHome ? 1 : 2,

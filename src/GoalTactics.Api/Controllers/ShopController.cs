@@ -52,7 +52,7 @@ public sealed class ShopController(IShopService shopService) : ControllerBase
     }
 
     [HttpPost("BuyProduct")]
-    public async Task<ActionResult<ResponseObject>> BuyProduct([FromBody] IdRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ResponseObject>> BuyProduct([FromBody] ShopBuyProductRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
@@ -60,12 +60,39 @@ public sealed class ShopController(IShopService shopService) : ControllerBase
             return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
         }
 
-        await shopService.BuyProductAsync(userId, request.Id, cancellationToken);
+        var success = request.Id != Guid.Empty
+            ? await shopService.BuyProductAsync(userId, request.Id, cancellationToken)
+            : !string.IsNullOrWhiteSpace(request.Identifier)
+                && await shopService.BuyProductByIdentifierAsync(userId, request.Identifier, cancellationToken);
+
+        if (!success)
+        {
+            return Ok(new ResponseObject { Success = false, Message = "Purchase failed" });
+        }
+
+        return Ok(new ResponseObject { Success = true, Message = "Purchased" });
+    }
+
+    [HttpPost("BuyEquipment")]
+    public async Task<ActionResult<ResponseObject>> BuyEquipment([FromBody] ShopEquipmentRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+        }
+
+        var success = await shopService.BuyEquipmentAsync(userId, request.Id, request.Equipment, request.Cost, cancellationToken);
+        if (!success)
+        {
+            return Ok(new ResponseObject { Success = false, Message = "Purchase failed" });
+        }
+
         return Ok(new ResponseObject { Success = true, Message = "Purchased" });
     }
 
     [HttpPost("UseEquipment")]
-    public async Task<ActionResult<ResponseObject>> UseEquipment([FromBody] IdRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ResponseObject>> UseEquipment([FromBody] ShopEquipmentRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))

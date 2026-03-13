@@ -1,6 +1,7 @@
 using GoalTactics.Application.Team;
 using GoalTactics.Application.Mechanics;
 using GoalTactics.Application.Stadium;
+using GoalTactics.Application.Common;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,8 @@ public sealed class TeamDbStore(
     private const int TransferBidStarsCost = 200;
     private const int StartingMoney = 10_000_000;
     private const int StartingGtStars = 5_000;
+    private static readonly string DefaultShirt = EquipmentCatalog.Shirts[0];
+    private static readonly string DefaultEmblem = EquipmentCatalog.Emblems[0];
     private static readonly string[] InitialSquadPositions = ["GK", "GK", "DEF", "DEF", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "MID", "MID", "FWD", "FWD", "FWD", "FWD"];
     private static readonly string[] FirstNames = ["Ehrmut", "Dragoljub", "Manuel", "Hendrik", "Calvin", "Nikolai", "Lukas", "Jonas", "David", "Mika", "Tobias", "Felix", "Marco", "Adrian", "Dominik", "Sebastian", "Florian", "Jan", "Leon", "Patrick"];
     private static readonly string[] LastNames = ["Hoschatt", "Kumer", "Neuer", "Haintzl", "Johnston", "Pfalz-Sulzbach", "Morante", "Raizgys", "Schneider", "Vogel", "Mertens", "Lindner", "Baumann", "Reiter", "Hartmann", "Keller", "Schuster", "Brandt", "Scholz", "Bergmann"];
@@ -55,9 +58,29 @@ public sealed class TeamDbStore(
                 Fans = 100,
                 Members = 100,
                 Strength = 50,
-                MatchTrend = "Stable"
+                MatchTrend = "Stable",
+                SelectedShirt = DefaultShirt,
+                SelectedEmblem = DefaultEmblem
             };
             dbContext.Teams.Add(team);
+
+            dbContext.TeamEquipment.Add(new TeamEquipmentEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                UserId = userId,
+                Image = DefaultShirt,
+                EquipmentType = "shirt",
+                IsActive = true
+            });
+
+            dbContext.TeamEquipment.Add(new TeamEquipmentEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                UserId = userId,
+                Image = DefaultEmblem,
+                EquipmentType = "emblem",
+                IsActive = true
+            });
 
             dbContext.TeamResources.Add(new TeamResourcesEntity
             {
@@ -118,6 +141,8 @@ public sealed class TeamDbStore(
 
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+
+        await EnsureDefaultEquipmentStateAsync(team, cancellationToken);
 
         var profile = await dbContext.Users.AsNoTracking().FirstAsync(x => x.Id == userId, cancellationToken);
         return ToRecord(team, profile.ManagerName, profile.Email, profile.CreatedAtUtc, profile.LastActivityAtUtc);
@@ -440,6 +465,7 @@ public sealed class TeamDbStore(
         return new StadiumStateRecord(
             teamEntity.StadiumName,
             teamEntity.GrassQuality,
+            teamEntity.LeagueTier,
             capacity,
             earningsAverage,
             resources.StadiumVisitorsLastMatch,
@@ -635,6 +661,21 @@ public sealed class TeamDbStore(
         }
 
         resources.GTStars -= stars;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> TrySpendMedipacksAsync(string userId, decimal medipacks, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
+        var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        if (resources.Medipacks < medipacks)
+        {
+            return false;
+        }
+
+        resources.Medipacks -= medipacks;
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -1369,10 +1410,10 @@ public sealed class TeamDbStore(
 
     private static decimal GetSeatUpgradeCost(Guid placeId)
     {
-        // Flat per-block costs: Stand 10k/100 seats, Sit 30k/100 seats, VIP 20k/10 seats
+        // Flat per-block costs: Stand 10k/100 seats, Sit 30k/100 seats, VIP 2k/10 seats (20k/100)
         if (placeId == StadiumBuildingCatalog.StadiumStands) return 10_000m;
         if (placeId == StadiumBuildingCatalog.StadiumSeats) return 30_000m;
-        if (placeId == StadiumBuildingCatalog.StadiumVips) return 20_000m;
+        if (placeId == StadiumBuildingCatalog.StadiumVips) return 2_000m;
         return 10_000m;
     }
 
@@ -1905,11 +1946,15 @@ public sealed class TeamDbStore(
             managerName,
             userEmail,
             userCreatedAtUtc,
-            userLastActivityAtUtc);
+            userLastActivityAtUtc,
+            team.SelectedShirt,
+            team.SelectedEmblem);
     }
 
     public async Task<IReadOnlyList<OwnedEquipmentRecord>> GetOwnedEquipmentAsync(string userId, CancellationToken cancellationToken = default)
     {
+        await GetOrCreateMyTeamAsync(userId, cancellationToken);
+
         var items = await dbContext.TeamEquipment.AsNoTracking()
             .Where(x => x.UserId == userId)
             .ToListAsync(cancellationToken);
@@ -1968,6 +2013,21 @@ public sealed class TeamDbStore(
                 team.SelectedShirt = item.Image;
             else if (item.EquipmentType == "emblem")
                 team.SelectedEmblem = item.Image;
+
+            if (item.EquipmentType == "emblem")
+            {
+                var leagueSlots = await dbContext.LeagueTeams.Where(x => x.TeamId == team.Id).ToListAsync(cancellationToken);
+                foreach (var slot in leagueSlots)
+                {
+                    slot.Logo = item.Image;
+                }
+
+                var ladderEntries = await dbContext.LadderEntries.Where(x => x.TeamId == team.Id).ToListAsync(cancellationToken);
+                foreach (var entry in ladderEntries)
+                {
+                    entry.TeamLogo = item.Image;
+                }
+            }
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -1976,8 +2036,110 @@ public sealed class TeamDbStore(
 
     public async Task<(string? Shirt, string? Emblem)> GetSelectedEquipmentAsync(string userId, CancellationToken cancellationToken = default)
     {
-        var team = await dbContext.Teams.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-        return (team?.SelectedShirt, team?.SelectedEmblem);
+        var team = await dbContext.Teams.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        if (team is null)
+        {
+            var created = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+            return (created.SelectedShirt, created.SelectedEmblem);
+        }
+
+        await EnsureDefaultEquipmentStateAsync(team, cancellationToken);
+        return (team.SelectedShirt, team.SelectedEmblem);
+    }
+
+    private async Task EnsureDefaultEquipmentStateAsync(TeamEntity team, CancellationToken cancellationToken)
+    {
+        var changed = false;
+
+        if (string.IsNullOrWhiteSpace(team.SelectedShirt) || !EquipmentCatalog.IsValidShirt(team.SelectedShirt))
+        {
+            team.SelectedShirt = DefaultShirt;
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(team.SelectedEmblem) || !EquipmentCatalog.IsValidEmblem(team.SelectedEmblem))
+        {
+            team.SelectedEmblem = DefaultEmblem;
+            changed = true;
+        }
+
+        var equipment = await dbContext.TeamEquipment.Where(x => x.UserId == team.UserId).ToListAsync(cancellationToken);
+
+        var shirtItems = equipment.Where(x => x.EquipmentType == "shirt").ToList();
+        var selectedShirtItem = shirtItems.FirstOrDefault(x => x.Image.Equals(team.SelectedShirt, StringComparison.OrdinalIgnoreCase));
+        if (selectedShirtItem is null)
+        {
+            selectedShirtItem = new TeamEquipmentEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                UserId = team.UserId,
+                Image = team.SelectedShirt!,
+                EquipmentType = "shirt",
+                IsActive = true
+            };
+            dbContext.TeamEquipment.Add(selectedShirtItem);
+            changed = true;
+        }
+
+        var emblemItems = equipment.Where(x => x.EquipmentType == "emblem").ToList();
+        var selectedEmblemItem = emblemItems.FirstOrDefault(x => x.Image.Equals(team.SelectedEmblem, StringComparison.OrdinalIgnoreCase));
+        if (selectedEmblemItem is null)
+        {
+            selectedEmblemItem = new TeamEquipmentEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                UserId = team.UserId,
+                Image = team.SelectedEmblem!,
+                EquipmentType = "emblem",
+                IsActive = true
+            };
+            dbContext.TeamEquipment.Add(selectedEmblemItem);
+            changed = true;
+        }
+
+        foreach (var shirt in shirtItems)
+        {
+            var shouldBeActive = shirt.Image.Equals(team.SelectedShirt, StringComparison.OrdinalIgnoreCase);
+            if (shirt.IsActive != shouldBeActive)
+            {
+                shirt.IsActive = shouldBeActive;
+                changed = true;
+            }
+        }
+
+        foreach (var emblem in emblemItems)
+        {
+            var shouldBeActive = emblem.Image.Equals(team.SelectedEmblem, StringComparison.OrdinalIgnoreCase);
+            if (emblem.IsActive != shouldBeActive)
+            {
+                emblem.IsActive = shouldBeActive;
+                changed = true;
+            }
+        }
+
+        var leagueSlots = await dbContext.LeagueTeams.Where(x => x.TeamId == team.Id).ToListAsync(cancellationToken);
+        foreach (var slot in leagueSlots)
+        {
+            if (!string.Equals(slot.Logo, team.SelectedEmblem, StringComparison.OrdinalIgnoreCase))
+            {
+                slot.Logo = team.SelectedEmblem!;
+                changed = true;
+            }
+        }
+
+        var ladderEntries = await dbContext.LadderEntries.Where(x => x.TeamId == team.Id).ToListAsync(cancellationToken);
+        foreach (var entry in ladderEntries)
+        {
+            if (!string.Equals(entry.TeamLogo, team.SelectedEmblem, StringComparison.OrdinalIgnoreCase))
+            {
+                entry.TeamLogo = team.SelectedEmblem!;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 }

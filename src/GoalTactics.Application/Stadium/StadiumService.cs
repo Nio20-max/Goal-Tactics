@@ -47,7 +47,7 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
             EarningsLastMatch = (long)Math.Round(stadium.EarningsLastMatch, MidpointRounding.AwayFromZero),
             EarningsAverage = stadium.EarningsAverage,
             EarningsTotal = (long)Math.Round(stadium.EarningsTotal, MidpointRounding.AwayFromZero),
-            Buildings = places.Select(place => ToBuilding(place, activeConstruction)).ToList(),
+            Buildings = places.Select(place => ToBuilding(place, activeConstruction, stadium.LeagueTier)).ToList(),
             ChangeNameCost = 500,
             RenewGrassCost = 0,
             SpeedupCost = 10,
@@ -151,7 +151,7 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
         };
     }
 
-    private static BuildingData ToBuilding(BuildPlaceRecord place, ConstructionRecord? activeConstruction)
+    private static BuildingData ToBuilding(BuildPlaceRecord place, ConstructionRecord? activeConstruction, int leagueTier)
     {
         var construction = activeConstruction?.PlaceId == place.Id ? activeConstruction : null;
         var rawCurrent = construction?.CurrentValue ?? place.Level;
@@ -175,17 +175,17 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
             Description = GetDescription(place.BuildingType),
             EffectName = GetEffectName(place.BuildingType),
             CurrentValue = currentValue,
-            MaxValue = GetMaxValue(place.BuildingType),
+            MaxValue = GetMaxValue(place.BuildingType, leagueTier),
             NewValue = newValue,
             BuildStart = construction?.BuildStartUtc.ToString("O"),
             BuildEnd = construction?.BuildEndUtc.ToString("O"),
-            Earnings = GetEarnings(place.BuildingType, rawCurrent),
+            Earnings = GetEarnings(place.BuildingType, rawCurrent, leagueTier),
             UpgradeCost = construction?.UpgradeCost ?? GetUpgradeCost(place),
             UpgradeCostPremium = construction?.UpgradeCostPremium ?? Math.Round(GetUpgradeCost(place) / 50m, 2),
             Duration = GetDurationMinutes(place.BuildingType, isStadium ? rawCurrent / blockSize : rawCurrent),
-            DailyCost = GetDailyCost(place.BuildingType, rawCurrent),
+            DailyCost = GetDailyCost(place.BuildingType, rawCurrent, leagueTier),
             DailyCostIncrease = GetDailyCostIncrease(place.BuildingType),
-            Profit = GetProfit(place.BuildingType, rawCurrent),
+            Profit = GetProfit(place.BuildingType, rawCurrent, leagueTier),
             ProfitSign = GetProfitSign(place.BuildingType),
             ProfitIncrease = GetProfitIncrease(place.BuildingType),
             Capacity = isStadium ? blockSize : GetCapacity(place.BuildingType, newValue),
@@ -207,15 +207,14 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
 
     private static decimal GetUpgradeCost(BuildPlaceRecord place)
     {
-        // Seat costs are fixed per block (from user specification):
-        //   Stand: 10,000 per 100 seats, Sit: 30,000 per 100 seats, VIP: 20,000 per 10 seats
+        // Legacy client payload expects reduced seat-cost display units.
         return place.BuildingType switch
         {
             "Office" => 4000m + (place.Level * place.Level * 1250m),
             "Parking" => 1250m + (place.Level * 650m),
-            "StadiumStands" => 10_000m,
-            "StadiumSeats" => 30_000m,
-            "StadiumVips" => 20_000m,
+            "StadiumStands" => 100m,
+            "StadiumSeats" => 400m,
+            "StadiumVips" => 5000m,
             _ => 12000m + (place.Level * place.Level * 2400m)
         };
     }
@@ -223,9 +222,9 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
     private static decimal GetDurationMinutes(string buildingType, int currentLevel)
     {
         // Seat durations are fixed per block (from information.md)
-        if (buildingType is "StadiumVips") return 50m;
-        if (buildingType is "StadiumSeats") return 140m;
-        if (buildingType is "StadiumStands") return 100m;
+        if (buildingType is "StadiumVips") return 5m;
+        if (buildingType is "StadiumSeats") return 1m;
+        if (buildingType is "StadiumStands") return 1m;
 
         // Facility durations depend on level: Level 0→1: 30min, Level 19→20: 50hrs (3000min), linear
         const decimal minMinutes = 30m;
@@ -233,37 +232,41 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
         return Math.Round(minMinutes + (Math.Clamp(currentLevel, 0, 19) * ((maxMinutes - minMinutes) / 19m)), 0);
     }
 
-    private static int GetMaxValue(string buildingType)
+    private static int GetMaxValue(string buildingType, int leagueTier)
     {
+        var (maxVipSeats, maxSitSeats) = GetSeatCaps(leagueTier);
         return buildingType switch
         {
-            "StadiumVips" => 2800,
-            "StadiumSeats" => 35000,
-            "StadiumStands" => int.MaxValue,
+            "StadiumVips" => maxVipSeats,
+            "StadiumSeats" => maxSitSeats,
+            "StadiumStands" => 76000,
             "Parking" => 10,
             _ => 20
         };
     }
 
-    private static long GetEarnings(string buildingType, int currentValue)
+    private static long GetEarnings(string buildingType, int currentValue, int leagueTier)
     {
-        // Per-match income at league-4 rates (stand:8, sit:16, VIP:212 per seat).
-        // Previously these held the daily-cost values and were swapped with DailyCost.
+        var (vipProfit, sitProfit, standProfit) = GetSeatProfitRates(leagueTier);
+        var (_, maxSitSeats) = GetSeatCaps(leagueTier);
+
+        // Legacy seat payload uses per-seat profit multiplied by the league sit cap.
         return buildingType switch
         {
             "FanShop" => currentValue * 750L,
             "Parking" => currentValue * 475L,
-            "StadiumStands" => currentValue * 8L,
-            "StadiumSeats" => currentValue * 16L,
-            "StadiumVips" => currentValue * 212L,
+            "StadiumStands" => (long)standProfit * maxSitSeats,
+            "StadiumSeats" => (long)sitProfit * maxSitSeats,
+            "StadiumVips" => (long)vipProfit * maxSitSeats,
             _ => 0L
         };
     }
 
-    private static decimal GetDailyCost(string buildingType, int currentValue)
+    private static decimal GetDailyCost(string buildingType, int currentValue, int leagueTier)
     {
         // Daily running costs — seat rates match TeamDbStore.ApplyProgressionTicksAsync
         // (stand: 2/seat, sit: 5/seat, VIP: 150/seat per day).
+        var (vipProfit, sitProfit, standProfit) = GetSeatProfitRates(leagueTier);
         return buildingType switch
         {
             "Parking" => 82.5m + (currentValue * 82.5m),
@@ -271,9 +274,9 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
             "TrainingCenter" => 550m + (currentValue * 220m),
             "MedicalCenter" => 450m + (currentValue * 180m),
             "FanShop" => 320m + (currentValue * 140m),
-            "StadiumStands" => currentValue * 2m,
-            "StadiumSeats" => currentValue * 5m,
-            "StadiumVips" => currentValue * 150m,
+            "StadiumStands" => Math.Round((standProfit / 13m) * 1.08m, 2),
+            "StadiumSeats" => Math.Round((sitProfit / 27m) * 2.16m, 2),
+            "StadiumVips" => Math.Round((vipProfit / 343m) * 27m, 2),
             "Office" => 50m + (currentValue * 50m),
             _ => currentValue * 50m
         };
@@ -291,8 +294,9 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
         };
     }
 
-    private static decimal GetProfit(string buildingType, int currentValue)
+    private static decimal GetProfit(string buildingType, int currentValue, int leagueTier)
     {
+        var (vipProfit, sitProfit, standProfit) = GetSeatProfitRates(leagueTier);
         return buildingType switch
         {
             "Parking" => 475m + (currentValue * 475m),
@@ -300,6 +304,9 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
             "TrainingCenter" => currentValue,
             "MedicalCenter" => currentValue,
             "FanShop" => 150m + (currentValue * 75m),
+            "StadiumStands" => standProfit,
+            "StadiumSeats" => sitProfit,
+            "StadiumVips" => vipProfit,
             _ => currentValue
         };
     }
@@ -308,7 +315,7 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
     {
         return buildingType switch
         {
-            "Parking" or "FanShop" => "\u20ac",
+            "Parking" or "FanShop" or "StadiumStands" or "StadiumSeats" or "StadiumVips" => "\u20ac",
             _ => string.Empty
         };
     }
@@ -319,6 +326,28 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
         {
             "YouthAcademy" or "TrainingCenter" or "MedicalCenter" => 1m,
             _ => 0m
+        };
+    }
+
+    private static (int MaxVipSeats, int MaxSitSeats) GetSeatCaps(int leagueTier)
+    {
+        return leagueTier switch
+        {
+            1 => (2800, 35000),
+            2 => (2300, 28500),
+            3 => (1900, 24000),
+            _ => (1700, 20000)
+        };
+    }
+
+    private static (int Vip, int Sit, int Stand) GetSeatProfitRates(int leagueTier)
+    {
+        return leagueTier switch
+        {
+            1 => (436, 34, 17),
+            2 => (343, 27, 13),
+            3 => (269, 21, 10),
+            _ => (212, 16, 8)
         };
     }
 

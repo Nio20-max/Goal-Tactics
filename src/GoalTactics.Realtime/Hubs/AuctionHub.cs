@@ -5,6 +5,8 @@ namespace GoalTactics.Realtime.Hubs;
 
 public sealed class AuctionHub : Hub
 {
+    public static string GroupName(Guid auctionId) => $"auc:{auctionId:N}";
+
     public Task Subscribe(Guid auctionId)
     {
         return Groups.AddToGroupAsync(Context.ConnectionId, GroupName(auctionId));
@@ -17,8 +19,6 @@ public sealed class AuctionHub : Hub
 
     public Task BroadcastBid(JsonRealtimeBid bid)
     {
-        return Clients.Group(GroupName(bid.AuctionId)).SendAsync("Bidded", bid);
+        return Clients.Group(GroupName(bid.AuctionID)).SendAsync("Bidded", bid);
     }
-
-    private static string GroupName(Guid auctionId) => $"auc:{auctionId:N}";
 }
