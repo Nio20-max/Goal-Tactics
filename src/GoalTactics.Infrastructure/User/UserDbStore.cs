@@ -129,4 +129,20 @@ public sealed class UserDbStore(GoalTacticsDbContext dbContext) : IUserStore
         user.DeletedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<bool> TryClaimDailyRewardAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is null) return false;
+
+        var todayUtc = DateTime.UtcNow.Date;
+        if (user.DailyRewardClaimedUtc is not null && user.DailyRewardClaimedUtc >= todayUtc)
+        {
+            return false; // Already claimed today
+        }
+
+        user.DailyRewardClaimedUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

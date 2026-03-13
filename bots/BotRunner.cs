@@ -36,10 +36,10 @@ public sealed class BotRunner : IDisposable
         _scheduler = new BotScheduler(_db);
         _factory = new BotFactory(config, _db, _api);
 
-        _transferMarket = new TransferMarketBehavior(_db);
+        _social = new SocialBehavior(_db, config);
+        _transferMarket = new TransferMarketBehavior(_db, _social);
         _stadium = new StadiumBehavior();
         _training = new TrainingBehavior();
-        _social = new SocialBehavior(_db, config);
         _dailyRoutine = new DailyRoutineBehavior();
         _lineup = new LineupBehavior();
     }

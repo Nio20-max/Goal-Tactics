@@ -84,6 +84,7 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.EmailVerificationTokenExpiresUtc).HasColumnName("email_verification_token_expires");
             entity.Property(x => x.PasswordResetToken).HasColumnName("password_reset_token").HasMaxLength(128);
             entity.Property(x => x.PasswordResetTokenExpiresUtc).HasColumnName("password_reset_token_expires");
+            entity.Property(x => x.DailyRewardClaimedUtc).HasColumnName("daily_reward_claimed_at");
             entity.HasIndex(x => x.Email).IsUnique();
         });
 
@@ -352,6 +353,9 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasColumnName("id").HasMaxLength(32);
             entity.Property(x => x.LastSeasonProcessed).HasColumnName("last_season_processed").IsRequired();
+            entity.Property(x => x.SeasonNumber).HasColumnName("season_number").IsRequired();
+            entity.Property(x => x.CurrentMatchday).HasColumnName("current_matchday").IsRequired();
+            entity.Property(x => x.StartedAtUtc).HasColumnName("started_at");
         });
 
         modelBuilder.Entity<LeagueEntity>(entity =>

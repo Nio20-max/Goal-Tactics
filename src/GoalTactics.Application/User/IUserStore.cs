@@ -13,6 +13,9 @@ public interface IUserStore
     Task UpdateUserAsync(string userId, UserProfileUpdateRecord update, CancellationToken cancellationToken = default);
 
     Task MarkAccountDeletedAsync(string userId, CancellationToken cancellationToken = default);
+
+    /// <summary>Try to claim the daily reward. Returns true if the reward was claimed, false if already claimed today.</summary>
+    Task<bool> TryClaimDailyRewardAsync(string userId, CancellationToken cancellationToken = default);
 }
 
 public sealed record UserProfileRecord(

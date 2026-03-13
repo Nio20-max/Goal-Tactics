@@ -1,6 +1,7 @@
 using GoalTactics.Application.Abstractions;
 using GoalTactics.Contracts.User;
 using GoalTactics.Application.Common;
+using GoalTactics.Application.Team;
 
 namespace GoalTactics.Application.User;
 
@@ -21,11 +22,18 @@ public interface IUserService
     Task DeleteAccountAsync(string userId, CancellationToken cancellationToken = default);
 }
 
-public sealed class UserService(IUserStore userStore, IPasswordHasher passwordHasher) : IUserService
+public sealed class UserService(IUserStore userStore, ITeamStore teamStore, IPasswordHasher passwordHasher) : IUserService
 {
-    public Task<decimal> ClaimDailyRewardAsync(string userId, CancellationToken cancellationToken = default)
+    private const decimal DailyRewardStars = 50m;
+
+    public async Task<decimal> ClaimDailyRewardAsync(string userId, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(50m);
+        var claimed = await userStore.TryClaimDailyRewardAsync(userId, cancellationToken);
+        if (!claimed) return 0m; // Already claimed today
+
+        // Credit GT Stars to the team (negative spend = credit)
+        await teamStore.TrySpendStarsAsync(userId, -DailyRewardStars, cancellationToken);
+        return DailyRewardStars;
     }
 
     public async Task<HelpshiftUserResponse> GetHelpshiftUserInfoAsync(string userId, CancellationToken cancellationToken = default)

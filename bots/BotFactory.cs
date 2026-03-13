@@ -17,6 +17,7 @@ public sealed class BotFactory
 
     private readonly List<string> _teamNames;
     private readonly List<string> _managerNames;
+    private readonly List<string> _premiumManagerNames;
     private readonly HashSet<string> _usedTeamNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _usedManagerNames = new(StringComparer.OrdinalIgnoreCase);
 
@@ -36,7 +37,8 @@ public sealed class BotFactory
         string premiumGamertags = FindFile("premium_gamertags.txt", botsDir);
 
         _teamNames = LoadNames(gamertags);
-        _managerNames = LoadNames(premiumGamertags);
+        _managerNames = LoadNames(gamertags);
+        _premiumManagerNames = LoadNames(premiumGamertags);
 
         // Mark existing names as used
         foreach (var bot in _db.GetAllBots())
@@ -51,11 +53,11 @@ public sealed class BotFactory
     /// </summary>
     public async Task<BotRecord?> CreateBotAsync(int? countryId = null)
     {
-        string teamName = PickUniqueName(_teamNames, _usedTeamNames);
-        string managerName = GenerateManagerName();
-        string password = GenerateSecurePassword();
-
         var personality = BotPersonality.GenerateRandom(_rng);
+
+        string teamName = PickUniqueName(_teamNames, _usedTeamNames);
+        string managerName = GenerateManagerName(personality);
+        string password = GenerateSecurePassword();
 
         // Fetch countries if no countryId provided
         if (countryId is null)
@@ -158,16 +160,22 @@ public sealed class BotFactory
     }
 
     /// <summary>
-    /// Generate manager name from premium gamertags (first + last style).
+    /// Generate manager name from gamertag lists.
+    /// Premium gamertags are used for bots with high activity, high social score, and many daily stars.
+    /// Regular gamertags are used for all other bots.
     /// </summary>
-    private string GenerateManagerName()
+    private string GenerateManagerName(BotPersonality personality)
     {
-        if (_managerNames.Count >= 2)
+        // Elite bots (high activity >= 70, high social >= 70, high daily stars >= 20000) get premium names
+        bool isElite = personality.Activity >= 70 && personality.SocialScore >= 70 && personality.StarsDaily >= 20000;
+        var namePool = isElite && _premiumManagerNames.Count >= 2 ? _premiumManagerNames : _managerNames;
+
+        if (namePool.Count >= 2)
         {
             for (int attempt = 0; attempt < 100; attempt++)
             {
-                string first = _managerNames[_rng.Next(_managerNames.Count)];
-                string last = _managerNames[_rng.Next(_managerNames.Count)];
+                string first = namePool[_rng.Next(namePool.Count)];
+                string last = namePool[_rng.Next(namePool.Count)];
                 string fullName = $"{first} {last}";
                 if (_usedManagerNames.Add(fullName))
                     return fullName;

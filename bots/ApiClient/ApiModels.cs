@@ -256,6 +256,9 @@ public sealed class AuctionDto
     [JsonPropertyName("highestBidderId")]
     public long HighestBidderId { get; set; }
 
+    [JsonPropertyName("sellerId")]
+    public long SellerId { get; set; }
+
     [JsonPropertyName("strength")]
     public int Strength { get; set; }
 

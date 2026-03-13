@@ -140,7 +140,7 @@ public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore
                 Players = squad.Take(11).Select((p, i) => new FormationPlayer
                 {
                     PlayerID = p.Id,
-                    MatchSystemFieldID = i < DefaultSystems[0].Fields!.Count ? DefaultSystems[0].Fields[i].Id : Guid.Empty,
+                    MatchSystemFieldID = DefaultSystems[0].Fields is { } fields && i < fields.Count ? fields[i].Id : Guid.Empty,
                     MatchPositionDirectionID = Guid.Empty
                 }).ToList()
             },
@@ -152,9 +152,40 @@ public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore
         };
     }
 
-    public Task SaveLineupAsync(string userId, SaveLineupRequest request, CancellationToken cancellationToken = default)
+    public async Task SaveLineupAsync(string userId, SaveLineupRequest request, CancellationToken cancellationToken = default)
     {
-        return Task.CompletedTask;
+        var teamInfo = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        // Validate the players belong to this team
+        var squad = await teamStore.GetSquadPlayersAsync(userId, cancellationToken);
+        var squadIds = squad.Select(p => p.Id).ToHashSet();
+
+        foreach (var pid in request.PlayerIds)
+        {
+            if (!squadIds.Contains(pid))
+            {
+                throw new InvalidOperationException($"Player {pid} not found in squad.");
+            }
+        }
+
+        // Persist the lineup by reordering shirt numbers.
+        // The ScheduledMatchResolutionJob and GetSquadPlayersAsync both use
+        // shirt-number ordering, so starters (positions 1-11) come first.
+        // Non-selected players retain their original shirt numbers shifted to 12+.
+        var selectedIds = request.PlayerIds;
+        var nonSelected = squad
+            .Where(p => !selectedIds.Contains(p.Id))
+            .Select(p => p.Id)
+            .ToList();
+
+        for (int i = 0; i < selectedIds.Count; i++)
+        {
+            await teamStore.UpdatePlayerShirtAsync(userId, selectedIds[i], i + 1, cancellationToken);
+        }
+
+        for (int i = 0; i < nonSelected.Count; i++)
+        {
+            await teamStore.UpdatePlayerShirtAsync(userId, nonSelected[i], selectedIds.Count + i + 1, cancellationToken);
+        }
     }
 
     private static MatchLineupPlayerData MapLineupPlayer(SquadPlayerRecord x)

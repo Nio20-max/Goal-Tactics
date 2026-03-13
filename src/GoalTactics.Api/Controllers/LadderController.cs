@@ -42,7 +42,7 @@ public sealed class LadderController(ILadderService ladderService) : ControllerB
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized();
+            return Unauthorized(new TextResponse { Text = "Invalid token context" });
         }
 
         await ladderService.RestoreStaminaAsync(userId, cancellationToken);
