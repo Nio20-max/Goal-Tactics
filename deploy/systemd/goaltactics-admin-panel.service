@@ -1,0 +1,23 @@
+[Unit]
+Description=GoalTactics Admin Panel Web Dashboard
+After=network.target goaltactics.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/goaltactics/admin-panel
+Environment=GT_DATA_ROOT=/mnt/website/goal_tactics
+ExecStart=/opt/goaltactics/admin-panel/venv/bin/gunicorn --bind 127.0.0.1:3000 --workers 2 --timeout 30 app:app
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadOnlyPaths=/mnt/website/goal_tactics/data /mnt/website/goal_tactics/logs /mnt/website/goal_tactics/backup /mnt/website/goal_tactics/saves
+UMask=0027
+StandardOutput=append:/mnt/website/goal_tactics/logs/admin-panel.log
+StandardError=append:/mnt/website/goal_tactics/logs/admin-panel.log
+
+[Install]
+WantedBy=multi-user.target

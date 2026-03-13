@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Analytics — GoalTactics Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Analytics</h1>
+</div>
+
+<!-- Stats cards -->
+<div class="card-grid">
+    <div class="card">
+        <div class="card-label">Users</div>
+        <div class="card-value">{{ game_stats.total_users }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Teams</div>
+        <div class="card-value">{{ game_stats.total_teams }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Players</div>
+        <div class="card-value">{{ game_stats.total_players }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Matches Played</div>
+        <div class="card-value">{{ game_stats.matches_played }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Active Auctions</div>
+        <div class="card-value">{{ game_stats.total_auctions }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Bots</div>
+        <div class="card-value">{{ bot_stats.total_bots }}</div>
+        <div class="card-sub">
+            <span style="color:var(--green)">{{ bot_stats.high_activity }} high</span> /
+            <span style="color:var(--yellow)">{{ bot_stats.mid_activity }} mid</span> /
+            <span style="color:var(--red)">{{ bot_stats.low_activity }} low</span>
+        </div>
+    </div>
+</div>
+
+<!-- League Standings -->
+{% if league_data %}
+<div class="table-wrapper">
+    <div class="table-header">
+        <h2>League Standings (Top 20)</h2>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Team</th>
+                <th>Pts</th>
+                <th>W</th>
+                <th>D</th>
+                <th>L</th>
+                <th>GF</th>
+                <th>GA</th>
+                <th>GD</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for team in league_data %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ team.TeamName }}</td>
+                <td><strong>{{ team.Points }}</strong></td>
+                <td>{{ team.Wins }}</td>
+                <td>{{ team.Draws }}</td>
+                <td>{{ team.Losses }}</td>
+                <td>{{ team.GoalsFor }}</td>
+                <td>{{ team.GoalsAgainst }}</td>
+                <td>{{ team.GoalsFor - team.GoalsAgainst }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Recent Matches -->
+{% if recent_matches %}
+<div class="table-wrapper">
+    <div class="table-header">
+        <h2>Recent Matches</h2>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Home</th>
+                <th>Score</th>
+                <th>Away</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in recent_matches %}
+            <tr>
+                <td style="color:var(--text-muted)">{{ m.ScheduledDateUtc }}</td>
+                <td>{{ m.HomeTeam }}</td>
+                <td style="text-align:center"><strong>{{ m.HomeGoals }} - {{ m.AwayGoals }}</strong></td>
+                <td>{{ m.AwayTeam }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Trend Chart -->
+{% if trend_data %}
+<div class="card" style="margin-bottom:1.5rem">
+    <h2 style="margin-bottom:1rem">User Growth Trend</h2>
+    <canvas id="trend-chart" height="200"></canvas>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if trend_data %}
+<script>
+(function() {
+    const data = {{ trend_data|safe }};
+    if (!data.length) return;
+
+    const canvas = document.getElementById('trend-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = 400;
+
+    const values = data.map(d => d.total_users || 0);
+    const labels = data.map(d => d.timestamp || '');
+    const maxVal = Math.max(...values, 1);
+    const padding = { top: 20, right: 20, bottom: 40, left: 60 };
+    const w = canvas.width - padding.left - padding.right;
+    const h = canvas.height - padding.top - padding.bottom;
+
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    values.forEach((v, i) => {
+        const x = padding.left + (i / Math.max(values.length - 1, 1)) * w;
+        const y = padding.top + h - (v / maxVal) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Axes
+    ctx.strokeStyle = '#2a2e3d';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, padding.top);
+    ctx.lineTo(padding.left, padding.top + h);
+    ctx.lineTo(padding.left + w, padding.top + h);
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '20px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(maxVal.toString(), padding.left - 8, padding.top + 6);
+    ctx.fillText('0', padding.left - 8, padding.top + h + 6);
+})();
+</script>
+{% endif %}
+{% endblock %}

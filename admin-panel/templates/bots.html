@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Bots — GoalTactics Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Bot Inspector</h1>
+    <span style="color:var(--text-muted)">{{ total }} bots total</span>
+</div>
+
+<!-- Search and filter -->
+<div class="toolbar">
+    <form method="get" action="/bots" style="display:flex;gap:0.5rem;align-items:center">
+        <input type="text" name="search" value="{{ search }}"
+               placeholder="Search by team or manager name..." style="width:300px">
+        <button type="submit">Search</button>
+        {% if search %}
+        <a href="/bots" class="btn" style="background:var(--border)">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Bot table -->
+<div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                {% for col in ['BotId', 'TeamName', 'ManagerName', 'Activity', 'Risk', 'YouthFocus', 'SocialScore', 'StarsDaily'] %}
+                <th>
+                    <a href="/bots?sort={{ col }}&dir={{ 'DESC' if sort_by == col and sort_dir == 'ASC' else 'ASC' }}&search={{ search }}"
+                       class="{{ 'sorted' if sort_by == col else '' }}">
+                        {{ col }}
+                        {% if sort_by == col %}{{ '▲' if sort_dir == 'ASC' else '▼' }}{% endif %}
+                    </a>
+                </th>
+                {% endfor %}
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bot in bots %}
+            <tr>
+                <td>{{ bot.BotId }}</td>
+                <td><a href="/bots/{{ bot.BotId }}" style="color:var(--accent);text-decoration:none">{{ bot.TeamName }}</a></td>
+                <td>{{ bot.ManagerName }}</td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:0.5rem">
+                        {{ bot.Activity }}
+                        <div class="activity-bar" style="width:60px">
+                            <div class="fill {{ 'fill-green' if bot.Activity >= 70 else ('fill-yellow' if bot.Activity >= 30 else 'fill-red') }}"
+                                 style="width:{{ bot.Activity }}%"></div>
+                        </div>
+                    </div>
+                </td>
+                <td>{{ bot.Risk }}</td>
+                <td>{{ bot.YouthFocus }}</td>
+                <td>{{ bot.SocialScore }}</td>
+                <td>{{ bot.StarsDaily }}</td>
+                <td><a href="/bots/{{ bot.BotId }}" class="btn btn-sm">Details</a></td>
+            </tr>
+            {% endfor %}
+            {% if not bots %}
+            <tr>
+                <td colspan="9" style="text-align:center;color:var(--text-muted);padding:2rem">
+                    No bots found{% if search %} matching "{{ search }}"{% endif %}.
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="/bots?page={{ page - 1 }}&sort={{ sort_by }}&dir={{ sort_dir }}&search={{ search }}">← Prev</a>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+            {% if p <= 3 or p > total_pages - 3 or (p >= page - 2 and p <= page + 2) %}
+                <a href="/bots?page={{ p }}&sort={{ sort_by }}&dir={{ sort_dir }}&search={{ search }}"
+                   class="{{ 'current' if p == page else '' }}">{{ p }}</a>
+            {% elif p == 4 or p == total_pages - 3 %}
+                <span style="color:var(--text-muted)">…</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if page < total_pages %}
+        <a href="/bots?page={{ page + 1 }}&sort={{ sort_by }}&dir={{ sort_dir }}&search={{ search }}">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

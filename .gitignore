@@ -10,8 +10,20 @@ tmp/*
 analysis/phase2_run_20260310_073203_20season_foreground/*
 __pycache__/*
 */__pycache__/*
+**/__pycache__/
+*.pyc
+venv/
+.venv/
 
 # .NET build artifacts
 **/bin/
 **/obj/
 **/TestResults/analysis/phase3_compat/apk_dec/build/resources.zip
+
+# SQLite database files (created at runtime)
+goaltactics.db
+goaltactics.db-shm
+goaltactics.db-wal
+bots.db
+bots.db-shm
+bots.db-wal

@@ -1,6 +1,6 @@
 /mnt/website/goal_tactics/logs/*.log {
     daily
-    rotate 7
+    rotate 30
     dateext
     compress
     delaycompress

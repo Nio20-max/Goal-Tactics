@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Logs — GoalTactics Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Log Viewer</h1>
+</div>
+
+<div class="two-col">
+    <!-- Sidebar: log file list -->
+    <div class="sidebar">
+        <h3>Log Files</h3>
+        {% for f in log_files %}
+        <a href="/logs?file={{ f.name }}"
+           class="{{ 'active' if f.name == selected else '' }}">
+            {{ f.name }}
+            <small style="display:block; font-size:0.7rem; opacity:0.6">{{ f.size_kb }} KB</small>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Main content: log viewer -->
+    <div>
+        {% if selected %}
+        <div class="toolbar">
+            <form method="get" action="/logs" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+                <input type="hidden" name="file" value="{{ selected }}">
+                <input type="text" name="search" value="{{ search }}"
+                       placeholder="Search pattern (regex)..." style="width:300px">
+                <select name="lines">
+                    <option value="100" {{ 'selected' if lines == 100 }}>100 lines</option>
+                    <option value="200" {{ 'selected' if lines == 200 }}>200 lines</option>
+                    <option value="500" {{ 'selected' if lines == 500 }}>500 lines</option>
+                    <option value="1000" {{ 'selected' if lines == 1000 }}>1000 lines</option>
+                    <option value="5000" {{ 'selected' if lines == 5000 }}>5000 lines</option>
+                </select>
+                <button type="submit">Search</button>
+                {% if search %}
+                <a href="/logs?file={{ selected }}&lines={{ lines }}" class="btn"
+                   style="background:var(--border)">Clear</a>
+                {% endif %}
+            </form>
+        </div>
+
+        <div class="log-container" id="log-content">{% for line in content.split('\n') %}<div class="log-line {{ 'error' if 'error' in line.lower() or 'fail' in line.lower() or 'exception' in line.lower() else ('warning' if 'warn' in line.lower() else ('info' if 'info' in line.lower() else '')) }} {{ 'highlight' if search and search.lower() in line.lower() else '' }}">{{ line }}</div>{% endfor %}</div>
+
+        <div class="toolbar" style="margin-top:0.5rem;justify-content:flex-end">
+            <button onclick="scrollLogToBottom()">↓ Scroll to Bottom</button>
+            <button onclick="scrollLogToTop()">↑ Scroll to Top</button>
+            <button onclick="refreshLog()">↻ Refresh</button>
+        </div>
+        {% else %}
+        <div class="card" style="text-align:center;padding:3rem">
+            <p style="color:var(--text-muted)">Select a log file from the sidebar to view its contents.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function scrollLogToBottom() {
+    const el = document.getElementById('log-content');
+    if (el) el.scrollTop = el.scrollHeight;
+}
+function scrollLogToTop() {
+    const el = document.getElementById('log-content');
+    if (el) el.scrollTop = 0;
+}
+function refreshLog() {
+    const params = new URLSearchParams(window.location.search);
+    const file = params.get('file');
+    if (!file) return;
+    const search = params.get('search') || '';
+    const lines = params.get('lines') || '200';
+    fetch(`/api/logs/${file}?search=${encodeURIComponent(search)}&lines=${lines}`)
+        .then(r => r.json())
+        .then(data => {
+            const el = document.getElementById('log-content');
+            if (el) {
+                const lines = data.content.split('\n');
+                el.innerHTML = lines.map(line => {
+                    let cls = 'log-line';
+                    const lower = line.toLowerCase();
+                    if (lower.includes('error') || lower.includes('fail') || lower.includes('exception'))
+                        cls += ' error';
+                    else if (lower.includes('warn'))
+                        cls += ' warning';
+                    else if (lower.includes('info'))
+                        cls += ' info';
+                    if (search && lower.includes(search.toLowerCase()))
+                        cls += ' highlight';
+                    return `<div class="${cls}">${escapeHtml(line)}</div>`;
+                }).join('');
+            }
+        });
+}
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Auto-scroll to bottom on initial load
+document.addEventListener('DOMContentLoaded', scrollLogToBottom);
+
+// Auto-refresh every 10 seconds when viewing a log
+{% if selected %}
+setInterval(refreshLog, 10000);
+{% endif %}
+</script>
+{% endblock %}

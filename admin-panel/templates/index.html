@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — GoalTactics Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <div>
+        <span class="status-badge {{ 'status-active' if service_status == 'active' else 'status-inactive' }}">
+            ● {{ service_status }}
+        </span>
+        <span class="refresh-indicator" id="refresh-time"></span>
+    </div>
+</div>
+
+<!-- Game Stats -->
+<div class="card-grid">
+    <div class="card">
+        <div class="card-label">Users</div>
+        <div class="card-value">{{ game_stats.total_users }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Teams</div>
+        <div class="card-value">{{ game_stats.total_teams }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Players</div>
+        <div class="card-value">{{ game_stats.total_players }}</div>
+        <div class="card-sub">{{ game_stats.scouted_players }} scouted</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Matches</div>
+        <div class="card-value">{{ game_stats.matches_played }}</div>
+        <div class="card-sub">{{ game_stats.matches_pending }} pending</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Auctions</div>
+        <div class="card-value">{{ game_stats.total_auctions }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Active Sessions</div>
+        <div class="card-value">{{ game_stats.active_sessions }}</div>
+    </div>
+</div>
+
+<!-- Bot Stats -->
+<div class="card-grid">
+    <div class="card">
+        <div class="card-label">Total Bots</div>
+        <div class="card-value">{{ bot_stats.total_bots }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">High Activity Bots</div>
+        <div class="card-value" style="color: var(--green)">{{ bot_stats.high_activity }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Mid Activity Bots</div>
+        <div class="card-value" style="color: var(--yellow)">{{ bot_stats.mid_activity }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Low Activity Bots</div>
+        <div class="card-value" style="color: var(--red)">{{ bot_stats.low_activity }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Backups</div>
+        <div class="card-value">{{ backup_count }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Chat Messages</div>
+        <div class="card-value">{{ game_stats.chat_messages }}</div>
+    </div>
+</div>
+
+<!-- Log Files Overview -->
+<div class="table-wrapper">
+    <div class="table-header">
+        <h2>Log Files</h2>
+        <a href="/logs" class="btn btn-sm">View All Logs →</a>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>File</th>
+                <th>Size</th>
+                <th>Last Modified</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in log_files %}
+            <tr>
+                <td>{{ f.name }}</td>
+                <td>{{ f.size_kb }} KB</td>
+                <td>{{ f.modified }}</td>
+                <td><a href="/logs?file={{ f.name }}" class="btn btn-sm">View</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh every 30 seconds
+setInterval(() => {
+    fetch('/api/stats').then(r => r.json()).then(data => {
+        document.getElementById('refresh-time').textContent =
+            'Updated: ' + new Date().toLocaleTimeString();
+    });
+}, 30000);
+</script>
+{% endblock %}
