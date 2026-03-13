@@ -1506,6 +1506,64 @@ public sealed class TeamDbStore(
         return true;
     }
 
+    public async Task<bool> RemovePlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var player = await dbContext.TeamPlayers.FirstOrDefaultAsync(
+            x => x.TeamId == team.TeamId && x.Id == playerId.ToString("N"),
+            cancellationToken);
+        if (player is null)
+            return false;
+
+        dbContext.TeamPlayers.Remove(player);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> UpgradePlayerStrengthAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        const int upgradeStarsCost = 200;
+        const decimal strengthBoost = 1m;
+
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        if (resources.GTStars < upgradeStarsCost)
+            return false;
+
+        var player = await dbContext.TeamPlayers.FirstOrDefaultAsync(
+            x => x.TeamId == team.TeamId && x.Id == playerId.ToString("N") && !x.IsScouted,
+            cancellationToken);
+        if (player is null)
+            return false;
+
+        if (player.Strength >= 700m)
+            return false;
+
+        resources.GTStars -= upgradeStarsCost;
+        player.Strength = Math.Min(700m, player.Strength + strengthBoost);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
+        if (resources.Medipacks < 1)
+            return false;
+
+        var player = await dbContext.TeamPlayers.FirstOrDefaultAsync(
+            x => x.TeamId == team.TeamId && x.Id == playerId.ToString("N") && !x.IsScouted,
+            cancellationToken);
+        if (player is null)
+            return false;
+
+        resources.Medipacks -= 1;
+        player.Fitness = 100;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private static IReadOnlyList<TeamPlayerEntity> BuildInitialPlayers(string teamId)
     {
         var seed = HashCode.Combine(teamId, "squad-seed");

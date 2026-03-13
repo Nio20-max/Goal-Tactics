@@ -169,7 +169,14 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
             cancellationToken);
     }
 
-    public Task FirePlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task FirePlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        var success = await teamStore.RemovePlayerAsync(userId, playerId, cancellationToken);
+        if (!success)
+        {
+            throw new InvalidOperationException("Player not found.");
+        }
+    }
 
     public async Task<PlayerContractResponse> GetPlayerContractCostAsync(string userId, Guid playerId, decimal salary, CancellationToken cancellationToken = default)
     {
@@ -200,11 +207,25 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
         };
     }
 
-    public Task UpgradePlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task UpgradePlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        var success = await teamStore.UpgradePlayerStrengthAsync(userId, playerId, cancellationToken);
+        if (!success)
+        {
+            throw new InvalidOperationException("Upgrade failed. Insufficient GT Stars or player not found.");
+        }
+    }
 
     public Task UseSkillCardAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-    public Task HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        var success = await teamStore.HealPlayerAsync(userId, playerId, cancellationToken);
+        if (!success)
+        {
+            throw new InvalidOperationException("Heal failed. No medipacks available or player not found.");
+        }
+    }
 
     public Task<SkillCardsResponse> GetSkillCardsAsync(string userId, CancellationToken cancellationToken = default)
         => Task.FromResult(new SkillCardsResponse

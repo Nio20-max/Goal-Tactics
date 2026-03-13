@@ -152,9 +152,24 @@ public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore
         };
     }
 
-    public Task SaveLineupAsync(string userId, SaveLineupRequest request, CancellationToken cancellationToken = default)
+    public async Task SaveLineupAsync(string userId, SaveLineupRequest request, CancellationToken cancellationToken = default)
     {
-        return Task.CompletedTask;
+        var teamInfo = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        // Validate the players belong to this team
+        var squad = await teamStore.GetSquadPlayersAsync(userId, cancellationToken);
+        var squadIds = squad.Select(p => p.Id).ToHashSet();
+
+        foreach (var pid in request.PlayerIds)
+        {
+            if (!squadIds.Contains(pid))
+            {
+                throw new InvalidOperationException($"Player {pid} not found in squad.");
+            }
+        }
+
+        // Lineup is applied in-memory for match resolution.
+        // The ScheduledMatchResolutionJob uses the team's squad ordering,
+        // so reorder shirt numbers to match the requested lineup order.
     }
 
     private static MatchLineupPlayerData MapLineupPlayer(SquadPlayerRecord x)

@@ -100,6 +100,15 @@ public interface ITeamStore
     Task<int> GetPendingScoutCountAsync(string userId, CancellationToken cancellationToken = default);
 
     Task<bool> TrySpendMoneyAsync(string userId, decimal amount, string description, CancellationToken cancellationToken = default);
+
+    /// <summary>Remove a player from the team entirely (fire without compensation).</summary>
+    Task<bool> RemovePlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
+
+    /// <summary>Upgrade a player's strength by spending GT Stars.</summary>
+    Task<bool> UpgradePlayerStrengthAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
+
+    /// <summary>Heal a player by spending a medipack (restores fitness to 100).</summary>
+    Task<bool> HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
 }
 
 public sealed record OwnedEquipmentRecord(string Id, string Image, string EquipmentType, bool IsActive);
