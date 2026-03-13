@@ -10,13 +10,15 @@ namespace GoalTactics.Bots.Client.Behaviors;
 public sealed class TransferMarketBehavior
 {
     private readonly BotDatabase _db;
+    private readonly SocialBehavior _social;
     private readonly Random _rng = new();
 
     private const long MinStarsReserve = 1000;
 
-    public TransferMarketBehavior(BotDatabase db)
+    public TransferMarketBehavior(BotDatabase db, SocialBehavior social)
     {
         _db = db;
+        _social = social;
     }
 
     public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot)
@@ -37,15 +39,19 @@ public sealed class TransferMarketBehavior
         {
             if (auction.SecondsLeft <= 0) continue;
 
+            // Spite-bidding: if the seller is an enemy, bid to drive up the price
+            bool isSpiteBid = _social.ShouldSpiteBid(bot.BotId, auction.SellerId);
+
             // Check friendship: should we skip this auction?
-            if (ShouldSkipDueToFriendship(bot.BotId, auction.HighestBidderId))
+            if (!isSpiteBid && ShouldSkipDueToFriendship(bot.BotId, auction.HighestBidderId))
                 continue;
 
             long maxBid = CalculateMaxBid(bot, availableMoney, availableStars);
             if (auction.CurrentBid >= maxBid) continue;
 
             // Bid timing: probability rises as countdown shrinks
-            if (!ShouldBidNow(bot.Risk, auction.SecondsLeft))
+            // Spite bids use a flat higher probability since they're motivated by enmity
+            if (!isSpiteBid && !ShouldBidNow(bot.Risk, auction.SecondsLeft))
                 continue;
 
             long bidAmount = CalculateBidAmount(auction.CurrentBid, maxBid);
