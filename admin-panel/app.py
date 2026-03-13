@@ -103,12 +103,15 @@ def read_log_tail(filename: str, lines: int = 500) -> str:
 
 
 def search_log(filename: str, pattern: str, lines: int = 200) -> str:
-    """Search a log file with grep."""
+    """Search a log file with grep. Pattern is treated as a fixed string."""
     filepath = os.path.join(LOG_DIR, os.path.basename(filename))
     if not os.path.exists(filepath):
         return ""
+    # Limit pattern length to prevent abuse
+    pattern = pattern[:200]
     try:
-        result = subprocess.run(["grep", "-i", "--color=never", "-m", str(lines), pattern, filepath],
+        # Use -F (fixed string) to avoid regex injection / ReDoS
+        result = subprocess.run(["grep", "-i", "-F", "--color=never", "-m", str(lines), pattern, filepath],
                                 capture_output=True, text=True, timeout=10)
         return result.stdout
     except Exception:
@@ -258,15 +261,20 @@ def bot_detail(bot_id: int):
     groups = db_query(BOT_DB_PATH,
         "SELECT * FROM BotGroups WHERE BotId = ?", (bot_id,))
 
-    # Search for this bot in logs
+    # Search for this bot in logs using Python (avoids subprocess for user-derived input)
     bot_logs = ""
     log_file = os.path.join(LOG_DIR, "bots.log")
     if os.path.exists(log_file):
         try:
-            result = subprocess.run(
-                ["grep", "-i", f"Bot {bot_id}", log_file, "--color=never", "-m", "100"],
-                capture_output=True, text=True, timeout=10)
-            bot_logs = result.stdout
+            needle = f"Bot {bot_id}"
+            matches = []
+            with open(log_file, encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    if needle in line:
+                        matches.append(line.rstrip("\n"))
+                        if len(matches) >= 100:
+                            break
+            bot_logs = "\n".join(matches)
         except Exception:
             pass
 

@@ -235,13 +235,14 @@ def add_bots():
         return
 
     # Run the bot client with the new count target — it will register additional bots
+    # A very high poll interval ensures it exits after registration instead of entering the main loop
     print(f"  Starting bot registration process for {count} new bots...")
     result = run_cmd([
         "/usr/bin/dotnet", f"{INSTALL_ROOT}/bots/GoalTacticsBots.dll",
         f"--api-url=http://127.0.0.1:5195",
         f"--db-path={BOT_DB_PATH}",
         f"--bot-count={new_target}",
-        "--poll-interval=999999"  # Don't enter main loop, just register
+        "--poll-interval=999999"
     ], check=False, capture=True)
 
     if result.stdout:
@@ -645,7 +646,8 @@ MENU = """
 
 
 def main():
-    no_bots = "--no-bots" in sys.argv
+    # Parse CLI flags (e.g., --no-bots to change default reset behavior)
+    create_bots_default = "--no-bots" not in sys.argv
 
     while True:
         print(MENU)
@@ -662,7 +664,7 @@ def main():
             "3":  stop_service,
             "4":  start_service,
             "5":  health_check,
-            "10": lambda: reset_database(create_bots=True),
+            "10": lambda: reset_database(create_bots=create_bots_default),
             "11": lambda: reset_database(create_bots=False),
             "12": show_analytics,
             "13": view_saves,

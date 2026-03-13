@@ -9,10 +9,4 @@
     copytruncate
     create 0640 www-data www-data
     su www-data www-data
-    postrotate
-        # Keep rotated logs as additional backup on mounted storage
-        for f in /mnt/website/goal_tactics/logs/*.log-*.gz; do
-            [ -f "$f" ] && cp -n "$f" /mnt/website/goal_tactics/backup/ 2>/dev/null || true
-        done
-    endscript
 }

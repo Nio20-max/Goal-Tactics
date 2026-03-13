@@ -13,6 +13,7 @@ BACKUP_DIR="${DATA_ROOT}/backup"
 DB_PATH="${DATA_ROOT}/data/goaltactics.db"
 BOT_DB_PATH="${DATA_ROOT}/data/bots.db"
 BACKUP_INTERVAL=300  # 5 minutes
+API_HEALTH_TIMEOUT=60  # seconds to wait for API startup
 
 # Ensure directories exist
 mkdir -p "${DATA_ROOT}/data" "${DATA_ROOT}/data-protection" "${LOG_DIR}" \
@@ -62,7 +63,7 @@ log "API started (PID ${API_PID})"
 
 # Wait for API to become healthy
 log "Waiting for API to become healthy..."
-for i in $(seq 1 60); do
+for i in $(seq 1 "${API_HEALTH_TIMEOUT}"); do
     if curl -sf http://127.0.0.1:5195/health >/dev/null 2>&1; then
         log "API is healthy after ${i}s"
         break
