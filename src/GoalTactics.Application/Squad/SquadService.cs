@@ -1,6 +1,7 @@
 using GoalTactics.Application.Common;
 using GoalTactics.Application.Mechanics;
 using GoalTactics.Application.Team;
+using GoalTactics.Application.TransferMarket;
 using GoalTactics.Contracts.Squad;
 
 namespace GoalTactics.Application.Squad;
@@ -38,7 +39,7 @@ public interface ISquadService
     Task<SkillCardsResponse> GetSkillCardsAsync(string userId, CancellationToken cancellationToken = default);
 }
 
-public sealed class SquadService(ITeamStore teamStore, ContractCostService contractCostService) : ISquadService
+public sealed class SquadService(ITeamStore teamStore, ContractCostService contractCostService, IAuctionStore auctionStore) : ISquadService
 {
     public async Task<SquadResponse> GetSquadAsync(string userId, CancellationToken cancellationToken = default)
     {
@@ -148,7 +149,25 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
         }
     }
 
-    public Task SellPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task SellPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var player = await teamStore.GetSquadPlayerAsync(userId, playerId, cancellationToken);
+        if (player is null)
+        {
+            throw new InvalidOperationException("Player not found.");
+        }
+
+        // Legacy squad sell action does not provide bid/duration in the request,
+        // so use compatibility defaults derived from the player.
+        var minimumBid = (long)Math.Round(Math.Max(1_000m, player.Strength * 14m), MidpointRounding.AwayFromZero);
+        await auctionStore.ListPlayerAsync(
+            team.TeamId,
+            playerId.ToString("N"),
+            minimumBid,
+            TimeSpan.FromHours(4),
+            cancellationToken);
+    }
 
     public Task FirePlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 

@@ -1,0 +1,12 @@
+/mnt/website/goal_tactics/logs/*.log {
+    daily
+    rotate 7
+    dateext
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    create 0640 www-data www-data
+    su www-data www-data
+}

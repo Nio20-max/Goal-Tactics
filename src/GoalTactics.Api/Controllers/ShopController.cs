@@ -9,6 +9,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Shop")]
 [Authorize]
 public sealed class ShopController(IShopService shopService) : ControllerBase
 {

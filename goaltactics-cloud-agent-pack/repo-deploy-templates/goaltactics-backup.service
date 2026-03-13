@@ -1,0 +1,15 @@
+[Unit]
+Description=GoalTactics SQLite backup snapshot
+After=goaltactics-api.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/mnt/website/goal_tactics
+ExecStart=/opt/goaltactics/bin/backup-goaltactics.sh
+User=www-data
+Group=www-data
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/mnt/website/goal_tactics/data /mnt/website/goal_tactics/data-protection /mnt/website/goal_tactics/backup /mnt/website/goal_tactics/tmp

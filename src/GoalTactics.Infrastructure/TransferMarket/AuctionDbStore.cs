@@ -300,6 +300,13 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
     public async Task<Guid> ListPlayerAsync(string sellerTeamId, string playerId, long minimumBid,
         TimeSpan duration, CancellationToken ct = default)
     {
+        var alreadyListed = await dbContext.Auctions.AsNoTracking()
+            .AnyAsync(a => a.PlayerId == playerId && a.Status == "Active", ct);
+        if (alreadyListed)
+        {
+            throw new InvalidOperationException("Player is already listed on the transfer market.");
+        }
+
         var player = await dbContext.TeamPlayers
             .FirstOrDefaultAsync(p => p.Id == playerId && p.TeamId == sellerTeamId && !p.IsScouted, ct)
             ?? throw new InvalidOperationException("Player not found or not owned by team.");

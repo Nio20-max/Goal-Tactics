@@ -1,0 +1,181 @@
+server {
+    server_name gt.nikolai-linschmann.de;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api/ {
+        # Strip Refit ServiceName prefix from legacy APK calls: /api/{ServiceName}/{Action} -> /api/{Action}
+        # Specific endpoint name translations for ambiguous/mismatched app calls
+        rewrite ^/api/Squad/GetPlayers$ /api/GetSquad break;
+        rewrite ^/api/Squad/GetSkillCards$ /api/GetSkillCards break;
+        rewrite ^/api/Scouting/GetPlayers$ /api/GetScoutedPlayers break;
+        rewrite ^/api/Training/GetTraining$ /api/GetTeamTraining break;
+        rewrite ^/api/Transfermarket/Search$ /api/SearchTransfermarket break;
+        rewrite ^/api/Transfermarket/GetDetails$ /api/GetTransferDetails break;
+        rewrite ^/api/Scouting/Instruct$ /api/InstructScout break;
+
+        rewrite ^/api/(Authentication|Chat|Common|Friends|Ladder|League|Lineup|Live|Transfermarket|Stadium|Team|Scouting|Purchase|Sponsor|Squad|Training|Tutorial|User)/(.+)$ /api/$2 break;
+        proxy_pass http://127.0.0.1:5195;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+
+    # Legacy mobile client compatibility: forward old GameEngine routes to /api/*.
+    location ^~ /GameEngine/ {
+        # Endpoint name translations for legacy APK calls.
+        rewrite ^/GameEngine/GetCurrentAppVersion$ /api/GetVersion break;
+        rewrite ^/GameEngine/CheckPunishments$ /api/Me break;
+        rewrite ^/GameEngine/GetLeagueGoalGetter$ /api/GetGoalGetters break;
+        rewrite ^/GameEngine/GetLeagueMatches$ /api/GetMatches break;
+        rewrite ^/GameEngine/GetLineupStatus$ /api/GetLineups break;
+        rewrite ^/GameEngine/GetMatchFormation$ /api/GetMatchLineup break;
+        rewrite ^/GameEngine/SetMatchFormation$ /api/SaveLineup break;
+        rewrite ^/GameEngine/GetPlayers/GetTeamPlayers$ /api/GetSquad break;
+        rewrite ^/GameEngine/ChangePlayerOriginStars$ /api/ChangePlayerOrigin break;
+        rewrite ^/GameEngine/ChangePlayerShirtNr.*$ /api/ChangePlayerShirt break;
+        rewrite ^/GameEngine/SellPlayerToBank$ /api/SellPlayer break;
+        rewrite ^/GameEngine/UpgradePlayer2$ /api/UpgradePlayer break;
+        rewrite ^/GameEngine/GetTraining$ /api/GetTeamTraining break;
+        rewrite ^/GameEngine/SaveTraining$ /api/SaveTacticTraining break;
+        rewrite ^/GameEngine/BookCamp$ /api/BookTrainingCamp break;
+        rewrite ^/GameEngine/SaveTrainingCamp$ /api/BookTrainingCamp break;
+        rewrite ^/GameEngine/SaveIndividualPlayerTraining$ /api/SaveIndividualTraining break;
+        rewrite ^/GameEngine/RenewIndividualPlayerTraining$ /api/RenewIndividualTraining break;
+        rewrite ^/GameEngine/RenewAllIndividualPlayerTraining$ /api/RenewAllIndividualTraining break;
+        rewrite ^/GameEngine/GetYouthPlayer$ /api/GetScoutedPlayers break;
+        rewrite ^/GameEngine/SpeedUpSpecialScout$ /api/SpeedupScout break;
+        rewrite ^/GameEngine/GetStadium2$ /api/GetStadium break;
+        rewrite ^/GameEngine/BuyStadiumBuilding$ /api/GetBuildPlaces break;
+        rewrite ^/GameEngine/BuyStadiumBuilding(2|3)$ /api/BuildStadium break;
+        rewrite ^/GameEngine/SpeedUpStadiumBuilding2$ /api/SpeedupBuilding break;
+        rewrite ^/GameEngine/ChangeStadiumName$ /api/RenameStadium break;
+        rewrite ^/GameEngine/GetSponsorOffer$ /api/GetSponsorOffers break;
+        rewrite ^/GameEngine/AcceptSponsorOffer$ /api/AcceptSponsor break;
+        rewrite ^/GameEngine/CreateNewSponsorOffer$ /api/NegotiateSponsor break;
+        rewrite ^/GameEngine/GetTransfermarketBids$ /api/GetTransferDetails break;
+
+        rewrite ^/GameEngine/(.*)$ /api/$1 break;
+        proxy_pass http://127.0.0.1:5195;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+
+    location = /GameEngine {
+        return 301 /api;
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:5195/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    location = /openapi.json {
+        proxy_pass http://127.0.0.1:5195/openapi/v1.json;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    location /docs {
+        proxy_pass http://127.0.0.1:5195/swagger;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    location /redoc {
+        proxy_pass http://127.0.0.1:5195/swagger;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    location /realtime {
+        proxy_pass http://127.0.0.1:5195;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api/v1/realtime {
+        proxy_pass http://127.0.0.1:5195;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # SignalR hubs used by legacy APK compatibility mode.
+    location ^~ /chat {
+        proxy_pass http://127.0.0.1:5195/chat;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+
+    location ^~ /auc {
+        proxy_pass http://127.0.0.1:5195/auc;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+
+    listen [::]:443 ssl ipv6only=on; # managed by Certbot
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/gt.nikolai-linschmann.de/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/gt.nikolai-linschmann.de/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+server {
+    if ($host = gt.nikolai-linschmann.de) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+
+    listen 80;
+    listen [::]:80;
+    server_name gt.nikolai-linschmann.de;
+    return 404; # managed by Certbot
+
+
+}

@@ -9,6 +9,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[Route("api/Lineup")]
 [Authorize]
 public sealed class LineupController(ILineupService lineupService) : ControllerBase
 {

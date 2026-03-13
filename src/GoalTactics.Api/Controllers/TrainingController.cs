@@ -121,7 +121,7 @@ public sealed class TrainingController(ITrainingService trainingService) : Contr
             return Unauthorized(new IndividualTrainingData { Success = false, Message = "Invalid token context" });
         }
 
-        await trainingService.CancelIndividualTrainingAsync(userId, request.Id, cancellationToken);
+        await trainingService.CancelIndividualTrainingAsync(userId, request.ResolvedPlayerId, cancellationToken);
         var response = await trainingService.GetTeamTrainingAsync(userId, cancellationToken);
         return Ok(response.IndividualTraining ?? new IndividualTrainingData { Success = true, Message = "Canceled" });
     }

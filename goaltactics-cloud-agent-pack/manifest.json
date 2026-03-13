@@ -1,0 +1,40 @@
+{
+  "project": "GoalTactics",
+  "repoPath": "/root/projekte/Goal-Tactics",
+  "build": {
+    "dotnetSdk": "10.x",
+    "apiProject": "src/GoalTactics.Api/GoalTactics.Api.csproj",
+    "workerProject": "src/GoalTactics.Worker/GoalTactics.Worker.csproj",
+    "apiPublishDir": "/opt/goaltactics/api",
+    "workerPublishDir": "/opt/goaltactics/worker"
+  },
+  "runtime": {
+    "installRoot": "/opt/goaltactics",
+    "scriptsRoot": "/opt/goaltactics/bin",
+    "dataRoot": "/mnt/website/goal_tactics",
+    "dbPath": "/mnt/website/goal_tactics/data/goaltactics.db",
+    "logsRoot": "/mnt/website/goal_tactics/logs",
+    "backupRoot": "/mnt/website/goal_tactics/backup",
+    "tmpRoot": "/mnt/website/goal_tactics/tmp",
+    "keyRingRoot": "/mnt/website/goal_tactics/data-protection"
+  },
+  "systemd": {
+    "apiService": "/etc/systemd/system/goaltactics-api.service",
+    "workerService": "/etc/systemd/system/goaltactics-worker.service",
+    "backupService": "/etc/systemd/system/goaltactics-backup.service",
+    "backupTimer": "/etc/systemd/system/goaltactics-backup.timer"
+  },
+  "nginx": {
+    "mainConfig": "/etc/nginx/nginx.conf",
+    "siteConfig": "/etc/nginx/sites-enabled/gt.nikolai-linschmann.de",
+    "serverName": "gt.nikolai-linschmann.de"
+  },
+  "logrotate": {
+    "file": "/etc/logrotate.d/goaltactics"
+  },
+  "verification": {
+    "health": "https://gt.nikolai-linschmann.de/health",
+    "apiLoginProbe": "https://gt.nikolai-linschmann.de/api/Login",
+    "legacyLoginProbe": "https://gt.nikolai-linschmann.de/GameEngine/Login"
+  }
+}

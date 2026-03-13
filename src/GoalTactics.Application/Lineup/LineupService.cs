@@ -73,10 +73,10 @@ public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore
     private static int PositionToInt(string pos) => pos switch
     {
         "GK" => 0,
-        "DEF" => 1,
-        "MID" => 2,
-        "FWD" => 3,
-        _ => 2
+        "DEF" => 2,
+        "MID" => 4,
+        "FWD" => 6,
+        _ => 4
     };
 
     public async Task<LineupsResponse> GetLineupsAsync(string userId, CancellationToken cancellationToken = default)
@@ -101,7 +101,7 @@ public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore
                 AwayLogo = m.AwayLogo,
                 HomeName = m.HomeName,
                 AwayName = m.AwayName,
-                MyTeam = isHome ? 1 : 2,
+                MyTeam = isHome ? 0 : 1,
                 HomeCountry = m.HomeCountry,
                 AwayCountry = m.AwayCountry,
                 HomeScore = -1,

@@ -157,10 +157,9 @@ The following discrepancies were identified between the legacy Xamarin client an
 
 | Gap | Description | Effort |
 |-----|-------------|--------|
-| **Email verification** | Bots don't verify email (flow not implemented) | Low — may not be needed if server allows unverified |
 | **Ladder match testing** | RunMatch endpoint implemented but not extensively tested | Medium |
 | **Multi-server deployment** | Bot database is local SQLite; needs migration path for distributed setup | High |
-| **Bot monitoring dashboard** | No UI for monitoring bot behavior | High |
+| **Bot monitoring dashboard** | No UI for monitoring bot behavior 8should be under gt.nikolai-linschmann.de | High |
 
 ### Low Priority
 
@@ -168,7 +167,6 @@ The following discrepancies were identified between the legacy Xamarin client an
 |-----|-------------|--------|
 | **Group dynamics balancing** | Enemy group mechanics implemented but need balancing | Medium |
 | **Chat message variety** | Templates are basic; could use more diverse conversation patterns | Low |
-| **Password reset flow** | Not needed for bots | N/A |
 | **Behavior replay/audit** | No logging of individual bot decisions for replay | Medium |
 
 ---

@@ -116,16 +116,19 @@ public sealed class TransferMarketService(ITeamStore teamStore, IAuctionStore au
 
     public async Task<Guid> ListPlayerForSaleAsync(string userId, SellPlayerRequest request, CancellationToken cancellationToken = default)
     {
-        if (request.MinimumBid <= 0)
+        if (request.ResolvedPlayerId == Guid.Empty)
+            throw new InvalidOperationException("Player id is required.");
+
+        if (request.ResolvedMinimumBid <= 0)
             throw new InvalidOperationException("Minimum bid must be positive.");
 
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
 
-        var durationHours = Math.Clamp(request.DurationHours, 1, 24);
+        var durationHours = Math.Clamp(request.ResolvedDurationHours, 1, 24);
         var auctionId = await auctionStore.ListPlayerAsync(
             team.TeamId,
-            request.PlayerId.ToString("N"),
-            request.MinimumBid,
+            request.ResolvedPlayerId.ToString("N"),
+            request.ResolvedMinimumBid,
             TimeSpan.FromHours(durationHours),
             cancellationToken);
 

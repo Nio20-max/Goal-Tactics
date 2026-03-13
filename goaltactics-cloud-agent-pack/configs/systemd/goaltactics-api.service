@@ -1,0 +1,27 @@
+[Unit]
+Description=GoalTactics API Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/goaltactics/api
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5195
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment="ConnectionStrings__Default=Data Source=/mnt/website/goal_tactics/data/goaltactics.db"
+ExecStartPre=/usr/bin/install -d -o www-data -g www-data /mnt/website/goal_tactics/data /mnt/website/goal_tactics/data-protection /mnt/website/goal_tactics/logs /mnt/website/goal_tactics/backup /mnt/website/goal_tactics/tmp
+ExecStart=/usr/bin/dotnet /opt/goaltactics/api/GoalTactics.Api.dll
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/mnt/website/goal_tactics/data /mnt/website/goal_tactics/data-protection /mnt/website/goal_tactics/logs /mnt/website/goal_tactics/backup /mnt/website/goal_tactics/tmp
+UMask=0027
+StandardOutput=append:/mnt/website/goal_tactics/logs/api.log
+StandardError=append:/mnt/website/goal_tactics/logs/api.log
+
+[Install]
+WantedBy=multi-user.target

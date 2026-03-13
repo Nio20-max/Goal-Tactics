@@ -27,6 +27,7 @@ public sealed class SponsorController(ISponsorService sponsorService) : Controll
     }
 
     [HttpPost("NegotiateSponsor")]
+    [HttpPost("Negotiate")]
     public async Task<ActionResult<ResponseObject>> NegotiateSponsor([FromBody] IdRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
@@ -40,6 +41,7 @@ public sealed class SponsorController(ISponsorService sponsorService) : Controll
     }
 
     [HttpPost("AcceptSponsor")]
+    [HttpPost("Accept")]
     public async Task<ActionResult<ResponseObject>> AcceptSponsor([FromBody] IdRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
