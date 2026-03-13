@@ -6,4 +6,10 @@ public sealed class SeasonStateEntity
     public required string Id { get; set; }
 
     public int LastSeasonProcessed { get; set; }
+
+    public int SeasonNumber { get; set; }
+
+    public int CurrentMatchday { get; set; }
+
+    public DateTime? StartedAtUtc { get; set; }
 }

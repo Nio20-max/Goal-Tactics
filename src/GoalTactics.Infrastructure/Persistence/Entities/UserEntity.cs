@@ -32,5 +32,7 @@ public sealed class UserEntity
 
     public DateTime? PasswordResetTokenExpiresUtc { get; set; }
 
+    public DateTime? DailyRewardClaimedUtc { get; set; }
+
     public ICollection<UserSessionEntity> Sessions { get; set; } = new List<UserSessionEntity>();
 }
