@@ -216,7 +216,18 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
         }
     }
 
-    public Task UseSkillCardAsync(string userId, Guid playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task UseSkillCardAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    {
+        var player = await teamStore.GetSquadPlayerAsync(userId, playerId, cancellationToken)
+            ?? throw new InvalidOperationException("Player not found in squad.");
+
+        // Applying a skill card grants a small strength boost (equivalent to a training session).
+        var success = await teamStore.UpgradePlayerStrengthAsync(userId, playerId, cancellationToken);
+        if (!success)
+        {
+            throw new InvalidOperationException("Skill card could not be applied. Check GT Stars balance.");
+        }
+    }
 
     public async Task HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
     {
