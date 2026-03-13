@@ -1,0 +1,167 @@
+======================================================================================================================================================
+API ENDPOINTS SUMMARY
+======================================================================================================================================================
+
+Total Unique API Endpoints: 24
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Authentication
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Authentication/Login  (Occurrences: 1)
+  Request:  {"Login": "string", "Password": "string", "Signature": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"token": "string", "userId": "string", "level": "number", "isAdmin": "boolean", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Chat
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Chat/GetChatHistory  (Occurrences: 3)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: No JSON body
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Common
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+GET /api/Common/GetVersion  (Occurrences: 1)
+  Request:  No JSON body
+  Response: "number"
+
+POST /api/Common/GetCountries  (Occurrences: 1)
+  Request:  {"Signature": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"countries": "array<{...}>", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Friends
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Friends/GetChallenges  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"challenges": "array<{...}>", "friends": "array<{...}>", "matchDate": "string", "endDate": "string", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+POST /api/Friends/GetFriends  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"friends": "array<{...}>", "friendName": "null", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: League
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/League/GetLeagueTable  (Occurrences: 1)
+  Request:  {"Id": "string", "Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"teams": "array<{...}>", "leagueName": "string", "mount": "number", "dismount": "number", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Sponsor
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Sponsor/GetSponsors  (Occurrences: 4)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: No JSON body
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Squad
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Squad/GetPlayers  (Occurrences: 3)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"players": "array<{...}>", "playersOnTransfermarket": "array", "homeShirt": "string", "awayShirt": "string", "costRename": "number", "costShirt": "number", "costOrigin": "number", "costUpgrade": "number", "transfermarketMinHours": "number", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+POST /api/Squad/GetSkillCards  (Occurrences: 3)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"skillCards": "array<{...}>", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Stadium
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Stadium/GetStadium  (Occurrences: 3)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: No JSON body
+
+POST /api/Stadium/GetUnderConstruction  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"building": {"id": "string", "name": "string", "description": "null", "effectName": "null", "currentValue": "number", "maxValue": "number", "newValue": "number", "buildStart": "null", "buildEnd": "string", "earnings": "number", "utilization": "number", "upgradeCost": "number", "upgradeCostPremium": "number", "dailyCost": "number", "dailyCostIncrease": "number", "profit": "number", "profitSign": "null", "profitIncrease": "number", "duration": "number", "capacity": "number", "hasWarning": "boolean"}, "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Team
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Team/GetAccomplishments  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: No JSON body
+
+POST /api/Team/GetFinanceHistory  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"financeHistory": "array<{...}>", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+POST /api/Team/GetFinances  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"today": "number", "yesterday": "number", "todays": "array<{...}>", "yesterdays": "array<{...}>", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+POST /api/Team/GetMyMail  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: No JSON body
+
+POST /api/Team/GetMyResources  (Occurrences: 48)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"money": "number", "medipacks": "number", "gtStars": "number", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+POST /api/Team/GetMyTeamExtendedInfo  (Occurrences: 3)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: No JSON body
+
+POST /api/Team/GetMyTeamInfo  (Occurrences: 2)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"teamData": {"name": "string", "logo": "string", "country": "string", "countryName": "string", "leagueName": "string", "leagueId": "string", "homeTrikot": "string", "awayTrikot": "string", "marketValue": "number", "strength": "number", "mood": "number", "teamMood": "string", "wins": "number", "losses": "number", "fans": "number", "members": "number", "matchTrend": "string", "userData": "{...}", "myLike": "boolean", "likesMe": "boolean", "challengeStatus": "number"}, "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+POST /api/Team/GetTeamInfo  (Occurrences: 2)
+  Request:  {"Id": "string", "Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"teamData": {"name": "string", "logo": "string", "country": "string", "countryName": "string", "leagueName": "string", "leagueId": "string", "homeTrikot": "string", "awayTrikot": "string", "marketValue": "number", "strength": "number", "mood": "number", "teamMood": "string", "wins": "number", "losses": "number", "fans": "number", "members": "number", "matchTrend": "string", "userData": "{...}", "myLike": "boolean", "likesMe": "boolean", "challengeStatus": "number"}, "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Training
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Training/GetTraining  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: No JSON body
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Transfermarket
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Transfermarket/Search  (Occurrences: 1)
+  Request:  {"Talent": {"Min": "number", "Max": "number"}, "SkillIndex": "number", "Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"players": "array<{...}>", "favorites": "array<{...}>", "sellings": "array", "involved": "boolean", "myTeamId": "string", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: Tutorial
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/Tutorial/GetTutorial  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"currentStep": "null", "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Controller: User
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+POST /api/User/GetPreferences  (Occurrences: 1)
+  Request:  {"Signature": "string", "Token": "string", "Locale": "string", "UtcOffset": "string", "Culture": "string", "Platform": "number"}
+  Response: {"notificationSettings": {"auctionOverbid": "boolean", "matchResults": "boolean", "lineupIncomplete": "boolean", "friendInvite": "boolean", "ineffectiveTraining": "boolean", "friendlyMatch": "boolean", "system": "boolean", "auctionEnd": "boolean"}, "userData": {"name": "string", "score": "number", "created": "string", "lastActivity": "string", "facebookId": "string", "appleId": "null", "email": "string", "password": "null", "rank": "string"}, "errorMessage": "null", "status": "number", "message": "null", "punishment": "number"}

@@ -1,0 +1,150 @@
+================================================================================
+API ENDPOINTS EXTRACTION - QUICK SUMMARY
+================================================================================
+
+EXTRACTION DETAILS:
+- Source: /information/original_API_requests/logs/ 
+- Total Capture Files: 132 SSL/TLS traffic captures
+- Unique Endpoints Found: 24
+- Controllers Identified: 13
+- Time Period: June 30, 2023 captures
+
+================================================================================
+ENDPOINT DISTRIBUTION BY CONTROLLER
+================================================================================
+
+Authentication        → 1 endpoint  (Login)
+Chat                  → 1 endpoint  (GetChatHistory)
+Common                → 2 endpoints (GetVersion, GetCountries)
+Friends               → 2 endpoints (GetChallenges, GetFriends)
+League                → 1 endpoint  (GetLeagueTable)
+Sponsor               → 1 endpoint  (GetSponsors)
+Squad                 → 2 endpoints (GetPlayers, GetSkillCards)
+Stadium               → 2 endpoints (GetStadium, GetUnderConstruction)
+Team                  → 8 endpoints (GetAccomplishments, GetFinanceHistory, GetFinances,
+                                      GetMyMail, GetMyResources, GetMyTeamExtendedInfo,
+                                      GetMyTeamInfo, GetTeamInfo)
+Training              → 1 endpoint  (GetTraining)
+Transfermarket        → 1 endpoint  (Search)
+Tutorial              → 1 endpoint  (GetTutorial)
+User                  → 1 endpoint  (GetPreferences)
+
+================================================================================
+MOST FREQUENTLY CALLED ENDPOINTS
+================================================================================
+
+1. POST /api/Team/GetMyResources           - 48 occurrences ⭐ CRITICAL
+2. POST /api/Sponsor/GetSponsors           - 4 occurrences
+3. POST /api/Chat/GetChatHistory           - 3 occurrences
+4. POST /api/Squad/GetPlayers              - 3 occurrences
+5. POST /api/Squad/GetSkillCards           - 3 occurrences
+6. POST /api/Stadium/GetStadium            - 3 occurrences
+7. POST /api/Team/GetMyTeamInfo            - 2 occurrences
+8. POST /api/Team/GetTeamInfo              - 2 occurrences
+9. POST /api/Team/GetMyTeamExtendedInfo    - 3 occurrences
+
+================================================================================
+REQUEST/RESPONSE PATTERNS
+================================================================================
+
+STANDARD AUTHENTICATED REQUEST (Most Common):
+  {
+    "Signature": "md5_hash_string",
+    "Token": "uuid_string",
+    "Locale": "culture_code",
+    "UtcOffset": "offset_string",
+    "Culture": "culture_code",
+    "Platform": number
+  }
+
+STANDARD RESPONSE ENVELOPE:
+  {
+    // ... endpoint-specific data ...
+    "errorMessage": null | string,
+    "status": number,
+    "message": null | string,
+    "punishment": number
+  }
+
+================================================================================
+ENDPOINTS WITHOUT RESPONSE BODY
+================================================================================
+
+These endpoints return No JSON body (possibly streaming or file responses):
+- POST /api/Chat/GetChatHistory
+- POST /api/Sponsor/GetSponsors
+- POST /api/Stadium/GetStadium
+- POST /api/Team/GetAccomplishments
+- POST /api/Team/GetMyMail
+- POST /api/Team/GetMyTeamExtendedInfo
+- POST /api/Training/GetTraining
+
+================================================================================
+DATA TYPES USED IN RESPONSES
+================================================================================
+
+String:   team names, IDs, descriptions, timestamps, culture codes
+Number:   scores, amounts, counts, market values, costs, resources
+Boolean:  admin flags, preference settings, availability flags
+Array:    lists of players, teams, friends, finance records
+Object:   nested team data, building info, notification settings
+Null:     optional/unavailable data, error messages when no error
+
+================================================================================
+GENERATED FILES (in repository root)
+================================================================================
+
+1. API_ENDPOINTS_SUMMARY.txt
+   → Complete human-readable listing of all endpoints with schemas
+
+2. API_ENDPOINTS_REFERENCE.json
+   → Compact JSON format, perfect for automated schema validation
+
+3. API_ENDPOINTS_DETAILED.json
+   → Full JSON with metadata and complete sample data
+
+4. API_ENDPOINTS_CLEAN.json
+   → Raw extracted endpoint data in JSON format
+
+5. API_EXTRACTION_REPORT.md
+   → Comprehensive markdown report with all details
+
+6. API_EXTRACTION_SUMMARY.txt
+   → This file
+
+================================================================================
+USAGE RECOMMENDATIONS
+================================================================================
+
+For DTO Validation:
+  → Use API_ENDPOINTS_REFERENCE.json to validate current DTOs
+  → Compare field names and types exactly
+  → Check nested object structures
+
+For Documentation:
+  → API_EXTRACTION_REPORT.md is the definitive source
+  → Share with backend team for API implementation
+
+For Testing:
+  → Use sample data from API_ENDPOINTS_DETAILED.json
+  → Create test cases for each endpoint
+
+For Integration:
+  → Ensure all 24 endpoints are implemented
+  → Match request/response schemas exactly
+  → Handle null values properly
+
+================================================================================
+KEY INSIGHTS
+================================================================================
+
+✓ All endpoints use consistent authentication token pattern
+✓ Platform field is always included (mobile app version tracking)
+✓ Locale and Culture are always included (i18n support)
+✓ Most responses include error handling (status, errorMessage)
+✓ Team/Resource endpoints are heavily used (48 calls to GetMyResources)
+✓ Some endpoints return no JSON body (may use streaming/binary)
+✓ All POST endpoints return structured JSON envelopes
+✓ Only 1 GET endpoint (GetVersion) - returns plain number
+
+================================================================================
