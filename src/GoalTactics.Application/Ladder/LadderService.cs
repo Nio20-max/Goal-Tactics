@@ -49,14 +49,32 @@ public sealed class LadderService(ILadderStore ladderStore) : ILadderService
     public async Task<LadderMatchResponse> RunMatchAsync(string userId, Guid opponentTeamId, CancellationToken cancellationToken = default)
     {
         var result = await ladderStore.RunMatchAsync(userId, opponentTeamId, cancellationToken);
+
+        // Get the challenge data to populate real team info for the response
+        LadderChallengeRecord? challenge = null;
+        try
+        {
+            challenge = await ladderStore.GetLadderChallengeAsync(userId, opponentTeamId, cancellationToken);
+        }
+        catch
+        {
+            // If challenge lookup fails, fall back to minimal data
+        }
+
+        var homeTeamName = challenge?.HomeTeam.TeamName ?? "My Team";
+        var awayTeamName = challenge?.AwayTeam.TeamName ?? "Opponent";
+        var homeStrength = challenge?.HomeTeam.Strength ?? 50;
+        var awayStrength = challenge?.AwayTeam.Strength ?? 50;
+
         return new LadderMatchResponse
         {
             Success = true,
+            Message = result.MatchReport,
             MatchReport = new LadderMatchData
             {
                 Events = [],
-                Home = new MatchTeamData { TeamName = "My Team", Strength = 50 },
-                Away = new MatchTeamData { TeamName = "Opponent", Strength = 50 }
+                Home = new MatchTeamData { TeamName = homeTeamName, Strength = homeStrength },
+                Away = new MatchTeamData { TeamName = awayTeamName, Strength = awayStrength }
             },
             Stamina = result.Stamina.ToString()
         };
