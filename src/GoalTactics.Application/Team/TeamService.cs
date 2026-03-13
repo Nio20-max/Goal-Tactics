@@ -66,10 +66,9 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
         var leagueId = await teamStore.GetLeagueIdForTeamAsync(team.TeamId, cancellationToken);
         var leagueTable = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
         var leaguePosition = Array.FindIndex(leagueTable.Teams.ToArray(), x => x.IsMine) + 1;
-        var matchday = Math.Clamp(leagueTable.Teams.FirstOrDefault(x => x.IsMine) is { } mineTeam
-            ? mineTeam.MatchesHome + mineTeam.MatchesAway + 1
-            : 1, 1, 30);
         var (selectedShirt, _) = await teamStore.GetSelectedEquipmentAsync(userId, cancellationToken);
+
+        var seasonInfo = await teamStore.GetSeasonInfoAsync(cancellationToken);
 
         return new ExtendedTeamDataResponse
         {
@@ -100,14 +99,14 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
                 ChallengeStatus = 0,
                 LeaguePosition = Math.Max(1, leaguePosition),
                 PlayersCount = players.Count,
-                BestVictory = team.Wins > 0 ? "5:0" : "0:0",
-                WorstDefeat = team.Losses > 0 ? "5:1" : "0:0",
+                BestVictory = "0:0",
+                WorstDefeat = "0:0",
                 StadiumSize = stadium.Capacity
             },
             News = news.Select(x => new ClubNews { Date = x.Date, Title = x.Title, Text = x.Text }).ToArray(),
-            Season = "#1",
-            SeasonStartDate = DateTime.UtcNow.Date.AddDays(-(matchday - 1)).AddHours(18).ToString("O"),
-            Matchday = matchday,
+            Season = $"#{seasonInfo.SeasonNumber}",
+            SeasonStartDate = seasonInfo.SeasonStartDateUtc.AddHours(18).ToString("O"),
+            Matchday = seasonInfo.Matchday,
             LastMatch = BuildExtendedMatch(leagueTable, team.TeamId, isNextMatch: false),
             NextMatch = BuildExtendedMatch(leagueTable, team.TeamId, isNextMatch: true),
             RenameTeamCost = 500

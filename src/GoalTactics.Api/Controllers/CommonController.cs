@@ -1,4 +1,5 @@
 using GoalTactics.Application.Common;
+using GoalTactics.Application.Team;
 using GoalTactics.Contracts.Common;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,7 +7,7 @@ namespace GoalTactics.Api.Controllers;
 
 [ApiController]
 [Route("api")]
-public sealed class CommonController(ICountryCatalog countryCatalog, IConfiguration configuration) : ControllerBase
+public sealed class CommonController(ICountryCatalog countryCatalog, ITeamStore teamStore, IConfiguration configuration) : ControllerBase
 {
     [HttpGet("Ping")]
     public ActionResult<ResponseObject> Ping()
@@ -43,17 +44,13 @@ public sealed class CommonController(ICountryCatalog countryCatalog, IConfigurat
     }
 
     [HttpPost("GetSeasonInfo")]
-    public ActionResult<TextResponse> GetSeasonInfo([FromBody] RequestObject request)
+    public async Task<ActionResult<TextResponse>> GetSeasonInfo([FromBody] RequestObject request, CancellationToken cancellationToken)
     {
-        var seasonLengthDays = int.TryParse(configuration["App:SeasonLengthDays"], out var d) ? d : 30;
-        var startDate = DateTime.TryParse(configuration["App:SeasonStartDate"], out var sd) ? sd : new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var seasonInfo = await teamStore.GetSeasonInfoAsync(cancellationToken);
 
-        var elapsed = (DateTime.UtcNow - startDate).TotalDays;
-        var currentSeason = (int)(elapsed / seasonLengthDays) + 1;
-        var daysIntoSeason = (int)(elapsed % seasonLengthDays);
-        var daysLeft = seasonLengthDays - daysIntoSeason;
-        var matchday = daysIntoSeason + 1;
-
-        return Ok(new TextResponse { Text = $"Season {currentSeason} - Matchday {matchday} ({daysLeft} days left)" });
+        return Ok(new TextResponse
+        {
+            Text = $"Season {seasonInfo.SeasonNumber} - Matchday {seasonInfo.Matchday} ({seasonInfo.DaysLeft} days left)"
+        });
     }
 }
