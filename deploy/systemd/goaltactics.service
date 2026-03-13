@@ -1,0 +1,30 @@
+[Unit]
+Description=GoalTactics Game Server (API + Bots + Backup)
+After=network.target
+Documentation=https://github.com/Nio20-max/Goal-Tactics
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/goaltactics
+ExecStartPre=/usr/bin/install -d -o www-data -g www-data /mnt/website/goal_tactics/data /mnt/website/goal_tactics/data-protection /mnt/website/goal_tactics/logs /mnt/website/goal_tactics/backup /mnt/website/goal_tactics/saves /mnt/website/goal_tactics/tmp
+ExecStart=/opt/goaltactics/bin/goaltactics-wrapper.sh
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/mnt/website/goal_tactics/data /mnt/website/goal_tactics/data-protection /mnt/website/goal_tactics/logs /mnt/website/goal_tactics/backup /mnt/website/goal_tactics/saves /mnt/website/goal_tactics/tmp
+UMask=0027
+
+# Logging — wrapper logs go to journal AND to file (wrapper script tees to files)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=goaltactics
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Backups — GoalTactics Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Backups</h1>
+    <span style="color:var(--text-muted)">{{ total }} total backups</span>
+</div>
+
+<div class="table-wrapper">
+    <div class="table-header">
+        <h2>Database Backups</h2>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Filename</th>
+                <th>Size</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in backups %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td style="font-family:monospace;font-size:0.8rem">{{ b.name }}</td>
+                <td>{{ b.size_kb }} KB</td>
+                <td>{{ b.created }}</td>
+            </tr>
+            {% endfor %}
+            {% if not backups %}
+            <tr>
+                <td colspan="4" style="text-align:center;color:var(--text-muted);padding:2rem">
+                    No backups found. Backups are created every 5 minutes when the service is running.
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card" style="padding:1.5rem">
+    <h3 style="margin-bottom:0.5rem">Backup Information</h3>
+    <p style="color:var(--text-muted);font-size:0.875rem;line-height:1.6">
+        Backups are created automatically every 5 minutes by the GoalTactics service wrapper.
+        Both the main game database and the bot database are backed up.
+        The system retains the last 288 backups (approximately 24 hours at 5-minute intervals).
+    </p>
+    <p style="color:var(--text-muted);font-size:0.875rem;margin-top:0.5rem">
+        <strong>Backup location:</strong> <code>/mnt/website/goal_tactics/backup/</code><br>
+        <strong>State snapshots:</strong> <code>/mnt/website/goal_tactics/saves/</code>
+    </p>
+</div>
+{% endblock %}

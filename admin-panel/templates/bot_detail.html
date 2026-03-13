@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Bot {{ bot.TeamName }} — GoalTactics Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>
+        <a href="/bots" style="color:var(--text-muted);text-decoration:none">Bots</a>
+        &nbsp;/&nbsp; {{ bot.TeamName }}
+    </h1>
+    <span style="color:var(--text-muted)">Bot #{{ bot.BotId }}</span>
+</div>
+
+<!-- Bot properties -->
+<div class="detail-grid">
+    <div class="detail-item">
+        <div class="label">Team Name</div>
+        <div class="value">{{ bot.TeamName }}</div>
+    </div>
+    <div class="detail-item">
+        <div class="label">Manager Name</div>
+        <div class="value">{{ bot.ManagerName }}</div>
+    </div>
+    <div class="detail-item">
+        <div class="label">Activity</div>
+        <div class="value" style="color:{{ 'var(--green)' if bot.Activity >= 70 else ('var(--yellow)' if bot.Activity >= 30 else 'var(--red)') }}">
+            {{ bot.Activity }}
+        </div>
+        <div class="activity-bar" style="margin-top:0.3rem">
+            <div class="fill {{ 'fill-green' if bot.Activity >= 70 else ('fill-yellow' if bot.Activity >= 30 else 'fill-red') }}"
+                 style="width:{{ bot.Activity }}%"></div>
+        </div>
+    </div>
+    <div class="detail-item">
+        <div class="label">Risk</div>
+        <div class="value">{{ bot.Risk }}</div>
+        <div class="activity-bar" style="margin-top:0.3rem">
+            <div class="fill fill-red" style="width:{{ bot.Risk }}%"></div>
+        </div>
+    </div>
+    <div class="detail-item">
+        <div class="label">Youth Focus</div>
+        <div class="value">{{ bot.YouthFocus }}</div>
+        <div class="activity-bar" style="margin-top:0.3rem">
+            <div class="fill fill-blue" style="width:{{ bot.YouthFocus }}%"></div>
+        </div>
+    </div>
+    <div class="detail-item">
+        <div class="label">Social Score</div>
+        <div class="value">{{ bot.SocialScore }}</div>
+    </div>
+    <div class="detail-item">
+        <div class="label">Daily Stars</div>
+        <div class="value">{{ bot.StarsDaily }}</div>
+    </div>
+    <div class="detail-item">
+        <div class="label">Timezone</div>
+        <div class="value" style="font-size:0.9rem">{{ bot.Timezone or 'N/A' }}</div>
+    </div>
+    {% if bot.get('NextOnline') %}
+    <div class="detail-item">
+        <div class="label">Next Online</div>
+        <div class="value" style="font-size:0.9rem">{{ bot.NextOnline }}</div>
+    </div>
+    {% endif %}
+    {% if bot.get('LastOffline') %}
+    <div class="detail-item">
+        <div class="label">Last Offline</div>
+        <div class="value" style="font-size:0.9rem">{{ bot.LastOffline }}</div>
+    </div>
+    {% endif %}
+    {% if bot.get('CreatedAt') %}
+    <div class="detail-item">
+        <div class="label">Created</div>
+        <div class="value" style="font-size:0.9rem">{{ bot.CreatedAt }}</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Active Hours / Sleep Hours -->
+{% if bot.get('ActiveHours') or bot.get('SleepHours') %}
+<div class="table-wrapper">
+    <div class="table-header">
+        <h2>Schedule Configuration</h2>
+    </div>
+    <div style="padding:1rem">
+        {% if bot.get('ActiveHours') %}
+        <div style="margin-bottom:0.5rem">
+            <strong style="color:var(--green)">Active Hours:</strong>
+            <span style="font-family:monospace;font-size:0.85rem">{{ bot.ActiveHours }}</span>
+        </div>
+        {% endif %}
+        {% if bot.get('SleepHours') %}
+        <div>
+            <strong style="color:var(--text-muted)">Sleep Hours:</strong>
+            <span style="font-family:monospace;font-size:0.85rem">{{ bot.SleepHours }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Relationships -->
+{% if relationships %}
+<div class="table-wrapper">
+    <div class="table-header">
+        <h2>Relationships ({{ relationships|length }})</h2>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Target Bot</th>
+                <th>Target Team</th>
+                <th>Level</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rel in relationships %}
+            <tr>
+                <td><a href="/bots/{{ rel.TargetBotId }}" style="color:var(--accent);text-decoration:none">#{{ rel.TargetBotId }}</a></td>
+                <td>{{ rel.TargetTeamName or 'Unknown' }}</td>
+                <td>{{ rel.Level or rel.get('RelationshipLevel', 'N/A') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Groups -->
+{% if groups %}
+<div class="table-wrapper">
+    <div class="table-header">
+        <h2>Groups ({{ groups|length }})</h2>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Group ID</th>
+                <th>Group Name</th>
+                <th>Joined</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for g in groups %}
+            <tr>
+                <td>{{ g.GroupId or g.get('Id', 'N/A') }}</td>
+                <td>{{ g.GroupName or g.get('Name', 'N/A') }}</td>
+                <td>{{ g.JoinedAt or g.get('CreatedAt', 'N/A') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Bot Logs -->
+<div class="table-wrapper">
+    <div class="table-header">
+        <h2>Recent Bot Activity Log</h2>
+        <a href="/logs?file=bots.log&search=Bot+{{ bot.BotId }}" class="btn btn-sm">View in Log Viewer →</a>
+    </div>
+    <div class="log-container" style="max-height:400px">{% if bot_logs %}{% for line in bot_logs.split('\n') %}<div class="log-line {{ 'error' if 'error' in line.lower() or 'fail' in line.lower() else ('warning' if 'warn' in line.lower() else '') }}">{{ line }}</div>{% endfor %}{% else %}<div class="log-line" style="color:var(--text-muted)">No log entries found for this bot.</div>{% endif %}</div>
+</div>
+{% endblock %}
