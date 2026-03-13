@@ -53,10 +53,10 @@ public sealed class DailyRoutineBehavior
     /// </summary>
     private static async Task AcceptBestSponsorAsync(GoalTacticsApiClient api)
     {
-        var offers = await api.GetSponsorOffersAsync();
-        if (offers?.Sponsors is null || offers.Sponsors.Count == 0) return;
+        var response = await api.GetSponsorOffersAsync();
+        if (response?.Offers is null || response.Offers.Count == 0) return;
 
-        var best = offers.Sponsors.OrderByDescending(s => s.StarsPerDay).First();
+        var best = response.Offers.OrderByDescending(s => s.Stars).First();
         await api.AcceptSponsorAsync(best.Id);
     }
 }

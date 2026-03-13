@@ -114,7 +114,7 @@ public sealed class BotRunner : IDisposable
                 continue;
             }
 
-            foreach (long botId in dueBotIds)
+            foreach (string botId in dueBotIds)
             {
                 if (ct.IsCancellationRequested) break;
 

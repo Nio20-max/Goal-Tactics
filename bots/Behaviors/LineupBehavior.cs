@@ -20,6 +20,12 @@ public sealed class LineupBehavior
         ("3-4-3", 3, 4, 3)
     ];
 
+    // Position indices: 0=GK, 1=DEF, 2=MID, 3=FWD
+    private const int PositionGK = 0;
+    private const int PositionDEF = 1;
+    private const int PositionMID = 2;
+    private const int PositionFWD = 3;
+
     public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot)
     {
         var squad = await api.GetSquadAsync();
@@ -30,6 +36,8 @@ public sealed class LineupBehavior
 
         foreach (var lineup in lineups.Lineups)
         {
+            if (lineup.IsLocked) continue;
+
             var (formation, selectedIds) = ChooseFormation(squad.Players);
 
             await api.SaveLineupAsync(new SaveLineupRequest
@@ -45,13 +53,13 @@ public sealed class LineupBehavior
     /// <summary>
     /// Pick the best formation based on available player positions and select the 11 strongest.
     /// </summary>
-    private static (string Formation, List<long> PlayerIds) ChooseFormation(List<PlayerDto> players)
+    private static (string Formation, List<string> PlayerIds) ChooseFormation(List<PlayerDto> players)
     {
-        // Categorize players by position keyword
-        var keepers = players.Where(p => p.IsKeeper || IsPosition(p, "gk", "keeper")).OrderByDescending(p => p.Strength).ToList();
-        var defenders = players.Where(p => IsPosition(p, "def", "cb", "lb", "rb")).OrderByDescending(p => p.Strength).ToList();
-        var midfielders = players.Where(p => IsPosition(p, "mid", "cm", "lm", "rm", "dm", "am")).OrderByDescending(p => p.Strength).ToList();
-        var forwards = players.Where(p => IsPosition(p, "fwd", "st", "lw", "rw", "cf", "fw")).OrderByDescending(p => p.Strength).ToList();
+        // Categorize players by position index
+        var keepers = players.Where(p => p.Position == PositionGK).OrderByDescending(p => p.Strength).ToList();
+        var defenders = players.Where(p => p.Position == PositionDEF).OrderByDescending(p => p.Strength).ToList();
+        var midfielders = players.Where(p => p.Position == PositionMID).OrderByDescending(p => p.Strength).ToList();
+        var forwards = players.Where(p => p.Position == PositionFWD).OrderByDescending(p => p.Strength).ToList();
 
         // If position data is missing, fall back to strength-based selection
         if (keepers.Count == 0 && defenders.Count == 0 && midfielders.Count == 0 && forwards.Count == 0)
@@ -85,8 +93,8 @@ public sealed class LineupBehavior
         int fwdNeeded = int.Parse(parts[2]);
 
         // Select players for the lineup
-        var selected = new List<long>();
-        var used = new HashSet<long>();
+        var selected = new List<string>();
+        var used = new HashSet<string>(StringComparer.Ordinal);
 
         // 1 keeper
         AddBest(selected, used, keepers, 1);
@@ -114,7 +122,7 @@ public sealed class LineupBehavior
         return (bestFormation, selected.Take(11).ToList());
     }
 
-    private static void AddBest(List<long> selected, HashSet<long> used, List<PlayerDto> pool, int count)
+    private static void AddBest(List<string> selected, HashSet<string> used, List<PlayerDto> pool, int count)
     {
         int added = 0;
         foreach (var p in pool)
@@ -127,9 +135,6 @@ public sealed class LineupBehavior
             }
         }
     }
-
-    private static bool IsPosition(PlayerDto player, params string[] keywords)
-        => keywords.Any(k => player.Position.Contains(k, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Choose a tactic string based on the bot's personality.

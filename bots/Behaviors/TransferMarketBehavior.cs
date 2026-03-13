@@ -27,46 +27,37 @@ public sealed class TransferMarketBehavior
         var resources = await api.GetMyResourcesAsync();
         if (resources is null) return;
 
-        long availableMoney = resources.Money;
-        long availableStars = resources.Premium;
+        decimal availableMoney = resources.Money;
+        decimal availableStars = resources.GTStars;
 
         // Search for players that match team needs
         var searchRequest = BuildSearchRequest(bot);
         var market = await api.SearchTransfermarketAsync(searchRequest);
-        if (market?.Auctions is null || market.Auctions.Count == 0) return;
+        if (market?.Players is null || market.Players.Count == 0) return;
 
-        foreach (var auction in market.Auctions)
+        foreach (var player in market.Players)
         {
-            if (auction.SecondsLeft <= 0) continue;
-
-            // Spite-bidding: if the seller is an enemy, bid to drive up the price
-            bool isSpiteBid = _social.ShouldSpiteBid(bot.BotId, auction.SellerId);
+            if (player.IsFrozen) continue;
 
             // Check friendship: should we skip this auction?
-            if (!isSpiteBid && ShouldSkipDueToFriendship(bot.BotId, auction.HighestBidderId))
+            if (!string.IsNullOrEmpty(player.BidTeamName) &&
+                ShouldSkipDueToFriendship(bot.BotId, player.BidTeamName))
                 continue;
 
-            long maxBid = CalculateMaxBid(bot, availableMoney, availableStars);
-            if (auction.CurrentBid >= maxBid) continue;
+            int maxBid = CalculateMaxBid(bot, availableMoney, availableStars);
+            if (player.Bid >= maxBid) continue;
 
-            // Bid timing: probability rises as countdown shrinks
-            // Spite bids use a flat higher probability since they're motivated by enmity
-            if (!isSpiteBid && !ShouldBidNow(bot.Risk, auction.SecondsLeft))
-                continue;
-
-            long bidAmount = CalculateBidAmount(auction.CurrentBid, maxBid);
+            int bidAmount = CalculateBidAmount(player.Bid, maxBid);
 
             var result = await api.BidPlayerAsync(new BidRequest
             {
-                Id = auction.Id,
+                Id = player.AuctionId,
                 Bid = bidAmount
             });
 
             if (result?.Success == true)
             {
                 availableMoney -= bidAmount;
-                // Adjust relationship: overbidding lowers friendship
-                AdjustRelationshipForOverbid(bot.BotId, auction.HighestBidderId);
             }
         }
     }
@@ -96,71 +87,49 @@ public sealed class TransferMarketBehavior
     /// <summary>
     /// Maximum bid depends on risk, available resources, and a minimum stars reserve.
     /// </summary>
-    private long CalculateMaxBid(BotRecord bot, long money, long stars)
+    private int CalculateMaxBid(BotRecord bot, decimal money, decimal stars)
     {
         double riskFactor = bot.Risk / 99.0;
 
         // Stars budget: keep at least MinStarsReserve
-        long spendableStars = Math.Max(0, stars - MinStarsReserve);
+        decimal spendableStars = Math.Max(0, stars - MinStarsReserve);
 
         // Money budget: willing to spend proportionally to risk
-        long moneyBudget = (long)(money * (0.3 + riskFactor * 0.5));
-        long starsBudget = (long)(spendableStars * (0.2 + riskFactor * 0.3));
+        int moneyBudget = (int)(money * (decimal)(0.3 + riskFactor * 0.5));
+        int starsBudget = (int)(spendableStars * (decimal)(0.2 + riskFactor * 0.3));
 
         return moneyBudget + starsBudget;
     }
 
     /// <summary>
-    /// Determines if the bot should bid now based on seconds remaining and risk.
-    /// Higher risk → bids later (snipe style). Probability rises as time runs out.
-    /// </summary>
-    private bool ShouldBidNow(int risk, int secondsLeft)
-    {
-        // At 5 seconds: high probability; at 20 seconds: low probability
-        // Risk factor: higher risk means the bot waits longer
-        double urgency = Math.Max(0, 1.0 - (secondsLeft - 3) / 20.0);
-        double riskDelay = risk / 99.0 * 0.5; // high risk delays by up to 50 %
-        double probability = urgency * (1.0 - riskDelay);
-        probability = Math.Clamp(probability, 0.02, 0.95);
-
-        return _rng.NextDouble() < probability;
-    }
-
-    /// <summary>
     /// Calculate the actual bid: minimum increment above current bid, with some risk-based overshoot.
     /// </summary>
-    private long CalculateBidAmount(long currentBid, long maxBid)
+    private int CalculateBidAmount(long currentBid, int maxBid)
     {
         long minIncrement = Math.Max(100, currentBid / 20);
         long jitter = (long)(_rng.NextDouble() * Math.Min(minIncrement, 100_000));
         long bid = currentBid + minIncrement + jitter;
-        return Math.Min(bid, maxBid);
+        return (int)Math.Min(bid, maxBid);
     }
 
     /// <summary>
-    /// Check if the highest bidder is a friend (level ≥ 70 → never overbid, ≥ 30 → reduced chance).
+    /// Check if the highest bidder is a friend. We use the team name
+    /// to look up if any of our known bots match (since we only have team names from the market).
+    /// For now, skip if there's an existing high-friendship bot with that team name.
     /// </summary>
-    private bool ShouldSkipDueToFriendship(long botId, long highestBidderId)
+    private bool ShouldSkipDueToFriendship(string botId, string bidTeamName)
     {
-        if (highestBidderId <= 0) return false;
+        // Find if any bot with that team name is a friend
+        var allBots = _db.GetAllBots();
+        var matchingBot = allBots.FirstOrDefault(b =>
+            b.TeamName.Equals(bidTeamName, StringComparison.OrdinalIgnoreCase));
 
-        int level = _db.GetRelationshipLevel(botId, highestBidderId);
+        if (matchingBot is null) return false;
 
+        int level = _db.GetRelationshipLevel(botId, matchingBot.BotId);
         if (level >= 70) return true; // Never overbid a close friend
         if (level >= 30 && _rng.NextDouble() < 0.6) return true; // 60 % chance to skip
 
         return false;
-    }
-
-    /// <summary>
-    /// Overbidding someone lowers the friendship level.
-    /// </summary>
-    private void AdjustRelationshipForOverbid(long botId, long overbidUserId)
-    {
-        if (overbidUserId <= 0) return;
-
-        int current = _db.GetRelationshipLevel(botId, overbidUserId);
-        int adjusted = Math.Max(-100, current - 3);
-        _db.UpsertRelationship(botId, overbidUserId, adjusted);
     }
 }
