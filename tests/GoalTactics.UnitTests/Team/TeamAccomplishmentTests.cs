@@ -64,6 +64,10 @@ public class TeamAccomplishmentTests
         ctx.TeamPlayers.Add(new TeamPlayerEntity { Id = Guid.NewGuid().ToString("N"), TeamId = "t1", Name = "Lewandowski", Origin = "DE", Position = "FWD", ShirtNumber = 9, Age = 30, Talent = 90, Strength = 80, Fitness = 100, Matches = 20, Goals = 15, YellowCards = 0, RedCards = 0 });
         ctx.TeamPlayers.Add(new TeamPlayerEntity { Id = Guid.NewGuid().ToString("N"), TeamId = "t2", Name = "Rival", Origin = "DE", Position = "FWD", ShirtNumber = 10, Age = 28, Talent = 85, Strength = 75, Fitness = 100, Matches = 20, Goals = 5, YellowCards = 0, RedCards = 0 });
 
+        // Pre-seed season state: season started 31 days ago, last processed = 1 (season 1).
+        // With SeasonLengthDays=30, current season is now 2, so processing should run.
+        ctx.SeasonStates.Add(new SeasonStateEntity { Id = "singleton", LastSeasonProcessed = 1, SeasonNumber = 1, CurrentMatchday = 1, StartedAtUtc = DateTime.UtcNow.AddDays(-31) });
+
         await ctx.SaveChangesAsync();
 
         // trigger progression tick for team1

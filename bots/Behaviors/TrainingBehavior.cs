@@ -22,9 +22,13 @@ public sealed class TrainingBehavior
     {
         // All bots save team training; details depend on server-side options
         var training = await api.GetTeamTrainingAsync();
-        if (training is null) return;
+        if (training?.TeamTraining is null) return;
 
-        await api.SaveTeamTrainingAsync(new SaveTrainingRequest { Training = training.Training });
+        await api.SaveTeamTrainingAsync(new SaveTrainingRequest
+        {
+            MainSkillIndex = training.TeamTraining.MainSkillIndex,
+            SubSkillIndex = training.TeamTraining.SubSkillIndex
+        });
     }
 
     /// <summary>

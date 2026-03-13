@@ -105,7 +105,7 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task<FavouritesResponse?> GetTransfermarketFavouritesAsync()
         => PostAsync<FavouritesResponse>("/api/GetTransfermarketFavourites");
 
-    public Task UpdateTransfermarketFavouritesAsync(long auctionId)
+    public Task UpdateTransfermarketFavouritesAsync(string auctionId)
         => PostAsync("/api/UpdateTransfermarketFavourites", new IdRequest { Id = auctionId });
 
     // ── Training ────────────────────────────────────────────────
@@ -116,7 +116,7 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task SaveTeamTrainingAsync(SaveTrainingRequest request)
         => PostAsync("/api/SaveTeamTraining", request);
 
-    public Task SaveIndividualTrainingAsync(long playerId)
+    public Task SaveIndividualTrainingAsync(string playerId)
         => PostAsync("/api/SaveIndividualTraining", new IndividualTrainingRequest { Id = playerId });
 
     public Task BookTrainingCampAsync(BookTrainingCampRequest request)
@@ -130,7 +130,7 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task InstructScoutAsync(InstructScoutRequest request)
         => PostAsync("/api/InstructScout", request);
 
-    public Task RecruitScoutedPlayerAsync(long playerId)
+    public Task RecruitScoutedPlayerAsync(string playerId)
         => PostAsync("/api/RecruitScoutedPlayer", new RecruitScoutedPlayerRequest { Id = playerId });
 
     // ── Sponsors ────────────────────────────────────────────────
@@ -138,7 +138,7 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task<SponsorOffersResponse?> GetSponsorOffersAsync()
         => PostAsync<SponsorOffersResponse>("/api/GetSponsorOffers");
 
-    public Task AcceptSponsorAsync(long sponsorId)
+    public Task AcceptSponsorAsync(string sponsorId)
         => PostAsync("/api/AcceptSponsor", new IdRequest { Id = sponsorId });
 
     // ── Stadium ─────────────────────────────────────────────────
@@ -146,7 +146,7 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task<StadiumResponse?> GetStadiumAsync()
         => PostAsync<StadiumResponse>("/api/GetStadium");
 
-    public Task BuildStadiumAsync(long buildingId)
+    public Task BuildStadiumAsync(string buildingId)
         => PostAsync("/api/BuildStadium", new BuildStadiumRequest { Id = buildingId });
 
     public Task BuildPlacesAsync(BuildPlacesRequest request)
@@ -157,22 +157,21 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task<FriendsResponse?> GetFriendsAsync(string searchText = "")
         => PostAsync<FriendsResponse>("/api/GetFriends", new TextRequest { Text = searchText });
 
-    public Task LikeAsync(long userId)
+    public Task LikeAsync(string userId)
         => PostAsync("/api/Like", new IdRequest { Id = userId });
 
-    public Task AcceptFriendAsync(long userId)
+    public Task AcceptFriendAsync(string userId)
         => PostAsync("/api/Accept", new IdRequest { Id = userId });
 
-    public Task SendChallengeAsync(long userId)
+    public Task SendChallengeAsync(string userId)
         => PostAsync("/api/SendChallenge", new SendChallengeRequest { Id = userId });
 
     // ── Chat ────────────────────────────────────────────────────
 
-    public Task PostChatMessageAsync(string message, long recipientId)
+    public Task PostChatMessageAsync(string message)
         => PostAsync("/api/PostChatMessage", new PostChatMessageRequest
         {
-            Message = message,
-            RecipientId = recipientId
+            Message = message
         });
 
     public Task<ChatHistoryResponse?> GetChatHistoryAsync()
@@ -183,7 +182,7 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task<LadderResponse?> GetLadderAsync()
         => PostAsync<LadderResponse>("/api/GetLadder");
 
-    public Task RunMatchAsync(long teamId)
+    public Task RunMatchAsync(string teamId)
         => PostAsync("/api/RunMatch", new RunMatchRequest { TeamId = teamId });
 
     public Task RestoreStaminaAsync()

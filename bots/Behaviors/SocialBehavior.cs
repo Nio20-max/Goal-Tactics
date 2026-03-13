@@ -46,8 +46,8 @@ public sealed class SocialBehavior
 
         foreach (var friend in friends.Friends)
         {
-            // Accept pending friend requests
-            if (friend.Status.Equals("pending", StringComparison.OrdinalIgnoreCase))
+            // Accept pending incoming friend requests
+            if (friend.IsRequestIncoming)
             {
                 await api.AcceptFriendAsync(friend.Id);
                 _db.UpsertRelationship(bot.BotId, friend.Id, 1);
@@ -92,11 +92,9 @@ public sealed class SocialBehavior
 
         if (closeFriends.Count == 0) return;
 
-        // Send a chat message to a random close friend
-        var target = closeFriends[_rng.Next(closeFriends.Count)];
+        // Send a chat message to the global chat
         string message = FriendlyMessages[_rng.Next(FriendlyMessages.Length)];
-
-        await api.PostChatMessageAsync(message, target.OtherId);
+        await api.PostChatMessageAsync(message);
     }
 
     /// <summary>
@@ -114,7 +112,7 @@ public sealed class SocialBehavior
         if (bot.GroupId is null)
         {
             // Check if any high-friendship bots are in a group
-            foreach (long friendId in highFriends)
+            foreach (string friendId in highFriends)
             {
                 var friend = _db.GetBot(friendId);
                 if (friend?.GroupId is not null)
@@ -132,7 +130,7 @@ public sealed class SocialBehavior
                 _db.UpdateBotGroup(bot.BotId, newGroupId);
 
                 // Add the closest friends too
-                foreach (long friendId in highFriends.Take(3))
+                foreach (string friendId in highFriends.Take(3))
                 {
                     _db.UpdateBotGroup(friendId, newGroupId);
                 }
@@ -145,7 +143,7 @@ public sealed class SocialBehavior
     /// <summary>
     /// Check if the highest bidder is an enemy (level ≤ –30) for spite-bidding.
     /// </summary>
-    public bool ShouldSpiteBid(long botId, long targetUserId)
+    public bool ShouldSpiteBid(string botId, string targetUserId)
     {
         int level = _db.GetRelationshipLevel(botId, targetUserId);
         if (level <= -30)

@@ -18,7 +18,7 @@ public sealed class BotScheduler
     /// <summary>
     /// Returns bot IDs that are due to come online now.
     /// </summary>
-    public List<long> GetDueBots(int batchSize = 10)
+    public List<string> GetDueBots(int batchSize = 10)
         => _db.GetDueBots(batchSize);
 
     /// <summary>
@@ -34,7 +34,7 @@ public sealed class BotScheduler
     /// <summary>
     /// Schedule a bot for an immediate or near-immediate wake-up (e.g., for auction sniping).
     /// </summary>
-    public void ScheduleUrgent(long botId, DateTime wakeAt)
+    public void ScheduleUrgent(string botId, DateTime wakeAt)
     {
         _db.UpsertSchedule(botId, wakeAt);
     }

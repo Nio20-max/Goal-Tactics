@@ -10,24 +10,29 @@ namespace GoalTactics.Bots.Client.Behaviors;
 /// </summary>
 public sealed class StadiumBehavior
 {
-    // Known building types (names used to identify priorities)
+    // Known building name keywords (used to identify priorities)
     private static readonly string[] YouthBuildings = ["training", "scouting", "academy"];
     private static readonly string[] CoreBuildings = ["main", "seating", "vip"];
-    private const string ParkingType = "parking";
-    private const string StandingType = "standing";
+    private const string ParkingKeyword = "parking";
+    private const string StandingKeyword = "standing";
 
     public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot)
     {
-        var stadium = await api.GetStadiumAsync();
-        if (stadium is null) return;
+        var response = await api.GetStadiumAsync();
+        if (response is null) return;
 
-        var buildings = stadium.Buildings;
-        bool capacityFull = stadium.FilledPlaces >= stadium.Capacity;
+        var buildings = response.Buildings;
+        if (buildings is null || buildings.Count == 0) return;
+
+        // Determine if the stadium is at capacity using the embedded StadiumDataDto
+        int capacity = response.Stadium?.Capacity ?? 0;
+        int utilization = buildings.Sum(b => b.Utilization);
+        bool capacityFull = capacity > 0 && utilization >= capacity;
 
         // Build priority list based on youth focus
         var toBuild = DetermineBuildPriority(buildings, bot.YouthFocus, capacityFull);
 
-        foreach (long buildingId in toBuild)
+        foreach (string buildingId in toBuild)
         {
             await api.BuildStadiumAsync(buildingId);
         }
@@ -36,27 +41,23 @@ public sealed class StadiumBehavior
     /// <summary>
     /// Returns building IDs to upgrade, ordered by priority.
     /// </summary>
-    private static List<long> DetermineBuildPriority(
+    private static List<string> DetermineBuildPriority(
         List<BuildingDto> buildings, int youthFocus, bool capacityFull)
     {
-        var priority = new List<long>();
+        var priority = new List<string>();
 
-        // Separate buildings by type
+        // Separate buildings by name keywords
         var youth = buildings.Where(b => YouthBuildings.Any(y =>
-            b.Type.Contains(y, StringComparison.OrdinalIgnoreCase) ||
             b.Name.Contains(y, StringComparison.OrdinalIgnoreCase))).ToList();
 
         var core = buildings.Where(b => CoreBuildings.Any(c =>
-            b.Type.Contains(c, StringComparison.OrdinalIgnoreCase) ||
             b.Name.Contains(c, StringComparison.OrdinalIgnoreCase))).ToList();
 
         var standing = buildings.Where(b =>
-            b.Type.Contains(StandingType, StringComparison.OrdinalIgnoreCase) ||
-            b.Name.Contains(StandingType, StringComparison.OrdinalIgnoreCase)).ToList();
+            b.Name.Contains(StandingKeyword, StringComparison.OrdinalIgnoreCase)).ToList();
 
         var parking = buildings.Where(b =>
-            b.Type.Contains(ParkingType, StringComparison.OrdinalIgnoreCase) ||
-            b.Name.Contains(ParkingType, StringComparison.OrdinalIgnoreCase)).ToList();
+            b.Name.Contains(ParkingKeyword, StringComparison.OrdinalIgnoreCase)).ToList();
 
         // High youth focus → prioritize training/scouting
         if (youthFocus > 50)

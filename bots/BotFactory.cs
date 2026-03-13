@@ -51,7 +51,7 @@ public sealed class BotFactory
     /// <summary>
     /// Create and register a single bot, returning its database record.
     /// </summary>
-    public async Task<BotRecord?> CreateBotAsync(int? countryId = null)
+    public async Task<BotRecord?> CreateBotAsync(string? countryId = null)
     {
         var personality = BotPersonality.GenerateRandom(_rng);
 
@@ -66,7 +66,7 @@ public sealed class BotFactory
             if (countries?.Countries is not null && countries.Countries.Count > 0)
                 countryId = countries.Countries[_rng.Next(countries.Countries.Count)].Id;
             else
-                countryId = 1;
+                countryId = "1";
         }
 
         string email = SanitizeEmail(teamName);
@@ -79,7 +79,7 @@ public sealed class BotFactory
             Password = password,
             ManagerName = managerName,
             TeamName = teamName,
-            CountryId = countryId.Value
+            CountryId = countryId
         });
 
         if (registerResult is null || !registerResult.Success)
@@ -99,7 +99,7 @@ public sealed class BotFactory
 
         var record = new BotRecord
         {
-            BotId = registerResult.UserId,
+            BotId = registerResult.UserId ?? throw new InvalidOperationException("Registration succeeded but returned no UserId"),
             Password = password,
             ValidationToken = token,
             TeamName = teamName,
@@ -137,6 +137,14 @@ public sealed class BotFactory
 
     private string PickUniqueName(List<string> pool, HashSet<string> used)
     {
+        if (pool.Count == 0)
+        {
+            // No names loaded (gamertags file missing/empty) – generate a GUID-based name
+            string fallback = $"Bot_{Guid.NewGuid():N}"[..20];
+            used.Add(fallback);
+            return fallback;
+        }
+
         // Try to find an unused name from the pool
         var available = pool.Where(n => !used.Contains(n)).ToList();
         if (available.Count > 0)
@@ -154,9 +162,9 @@ public sealed class BotFactory
                 return candidate;
         }
 
-        string fallback = $"Bot_{Guid.NewGuid():N}"[..20];
-        used.Add(fallback);
-        return fallback;
+        string fallback2 = $"Bot_{Guid.NewGuid():N}"[..20];
+        used.Add(fallback2);
+        return fallback2;
     }
 
     /// <summary>

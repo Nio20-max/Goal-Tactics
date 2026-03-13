@@ -135,31 +135,11 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
             };
         }
 
-        // Fallback: if no goals have been scored yet, generate placeholder entries from the league table
-        var fallbackTable = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
+        // No goals scored yet — return an empty list instead of placeholder data
         return new GoalGettersResponse
         {
             Success = true,
-            Players = fallbackTable.Teams
-                .OrderByDescending(team => team.GoalsScoredHome + team.GoalsScoredAway)
-                .Take(10)
-                .Select((team, index) => new GoalGetterPlayerData
-                {
-                    Id = Guid.NewGuid(),
-                    Name = $"{team.Name} Striker",
-                    Country = team.Country,
-                    Head = $"01_head-A{index % 15:00}",
-                    Strength = Math.Clamp(60m + (team.GoalsScoredHome + team.GoalsScoredAway) * 0.5m, 55m, 95m),
-                    Talent = Math.Clamp(10 - (index / 2), 6, 10),
-                    Age = 18 + index,
-                    Position = 6,
-                    EndDate = DateTime.UtcNow.Date.AddDays(14).ToString("O"),
-                    TeamName = team.Name,
-                    TeamLogo = team.Logo,
-                    IsMine = team.IsMine,
-                    Goals = team.GoalsScoredHome + team.GoalsScoredAway
-                })
-                .ToArray()
+            Players = []
         };
     }
 }

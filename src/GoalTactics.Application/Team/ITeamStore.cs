@@ -109,7 +109,12 @@ public interface ITeamStore
 
     /// <summary>Heal a player by spending a medipack (restores fitness to 100).</summary>
     Task<bool> HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the current season info from the database (creates the season state row on fresh DB).</summary>
+    Task<SeasonInfoRecord> GetSeasonInfoAsync(CancellationToken cancellationToken = default);
 }
+
+public sealed record SeasonInfoRecord(int SeasonNumber, int Matchday, int DaysLeft, DateTime SeasonStartDateUtc);
 
 public sealed record OwnedEquipmentRecord(string Id, string Image, string EquipmentType, bool IsActive);
 

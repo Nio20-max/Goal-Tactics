@@ -273,26 +273,58 @@ public sealed class TeamDbStore(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private int ComputeCurrentSeasonNumber()
+    public async Task<SeasonInfoRecord> GetSeasonInfoAsync(CancellationToken cancellationToken = default)
     {
         var seasonLengthDays = int.TryParse(_configuration["App:SeasonLengthDays"], out var d) ? d : SeasonLengthDays;
-        var startDate = DateTime.TryParse(_configuration["App:SeasonStartDate"], out var sd)
-            ? sd
-            : new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        var elapsed = (DateTime.UtcNow - startDate).TotalDays;
-        return (int)(elapsed / seasonLengthDays) + 1;
+        var state = await dbContext.SeasonStates.FirstOrDefaultAsync(cancellationToken);
+        DateTime startDate;
+
+        if (state?.StartedAtUtc is not null)
+        {
+            startDate = state.StartedAtUtc.Value;
+        }
+        else
+        {
+            // Fresh database — season starts now
+            startDate = DateTime.UtcNow;
+        }
+
+        var elapsed = Math.Max(0, (DateTime.UtcNow - startDate).TotalDays);
+        var currentSeason = (int)(elapsed / seasonLengthDays) + 1;
+        var daysIntoSeason = (int)(elapsed % seasonLengthDays);
+        var matchday = daysIntoSeason + 1;
+        var daysLeft = seasonLengthDays - daysIntoSeason;
+
+        return new SeasonInfoRecord(currentSeason, matchday, daysLeft, startDate);
+    }
+
+    private async Task<int> ComputeCurrentSeasonNumberAsync(CancellationToken cancellationToken)
+    {
+        var info = await GetSeasonInfoAsync(cancellationToken);
+        return info.SeasonNumber;
     }
 
     private async Task EnsureSeasonTransitionAsync(CancellationToken cancellationToken)
     {
-        var currentSeason = ComputeCurrentSeasonNumber();
         var state = await dbContext.SeasonStates.FirstOrDefaultAsync(cancellationToken);
         if (state is null)
         {
-            state = new SeasonStateEntity { Id = "singleton", LastSeasonProcessed = 0 };
+            // Fresh database: initialise to season 1, matchday 1 starting now
+            state = new SeasonStateEntity
+            {
+                Id = "singleton",
+                LastSeasonProcessed = 1,
+                SeasonNumber = 1,
+                CurrentMatchday = 1,
+                StartedAtUtc = DateTime.UtcNow
+            };
             dbContext.SeasonStates.Add(state);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return; // Nothing to transition on a brand-new database
         }
+
+        var currentSeason = await ComputeCurrentSeasonNumberAsync(cancellationToken);
 
         if (state.LastSeasonProcessed >= currentSeason)
         {
@@ -301,6 +333,7 @@ public sealed class TeamDbStore(
 
         await ProcessSeasonEnd(currentSeason, cancellationToken);
         state.LastSeasonProcessed = currentSeason;
+        state.SeasonNumber = currentSeason;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

@@ -32,7 +32,7 @@ public sealed class BotDatabase : IDisposable
             );
 
             CREATE TABLE IF NOT EXISTS Bots (
-                BotId           INTEGER PRIMARY KEY,
+                BotId           TEXT    PRIMARY KEY,
                 Password        TEXT    NOT NULL,
                 ValidationToken TEXT    NOT NULL DEFAULT '',
                 TeamName        TEXT    NOT NULL,
@@ -53,15 +53,15 @@ public sealed class BotDatabase : IDisposable
             );
 
             CREATE TABLE IF NOT EXISTS BotRelationships (
-                BotId1  INTEGER NOT NULL REFERENCES Bots(BotId),
-                BotId2  INTEGER NOT NULL,
+                BotId1  TEXT    NOT NULL REFERENCES Bots(BotId),
+                BotId2  TEXT    NOT NULL,
                 Level   INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (BotId1, BotId2)
             );
 
             CREATE TABLE IF NOT EXISTS BotSchedule (
-                BotId       INTEGER PRIMARY KEY REFERENCES Bots(BotId),
-                NextOnline  TEXT    NOT NULL
+                BotId       TEXT PRIMARY KEY REFERENCES Bots(BotId),
+                NextOnline  TEXT NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS IX_BotSchedule_NextOnline
@@ -104,7 +104,7 @@ public sealed class BotDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
-    public BotRecord? GetBot(long botId)
+    public BotRecord? GetBot(string botId)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = "SELECT * FROM Bots WHERE BotId = @id";
@@ -124,7 +124,7 @@ public sealed class BotDatabase : IDisposable
         return bots;
     }
 
-    public void UpdateBotToken(long botId, string token)
+    public void UpdateBotToken(string botId, string token)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
@@ -136,7 +136,7 @@ public sealed class BotDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
-    public void UpdateBotSchedule(long botId, string? nextOnline, string? lastOffline)
+    public void UpdateBotSchedule(string botId, string? nextOnline, string? lastOffline)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
@@ -149,7 +149,7 @@ public sealed class BotDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
-    public void UpdateBotGroup(long botId, int? groupId)
+    public void UpdateBotGroup(string botId, int? groupId)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
@@ -170,7 +170,7 @@ public sealed class BotDatabase : IDisposable
 
     // ── BotSchedule CRUD ────────────────────────────────────────
 
-    public void UpsertSchedule(long botId, DateTime nextOnline)
+    public void UpsertSchedule(string botId, DateTime nextOnline)
     {
         string ts = nextOnline.ToString("o");
         using var cmd = _connection.CreateCommand();
@@ -189,7 +189,7 @@ public sealed class BotDatabase : IDisposable
     /// <summary>
     /// Retrieves up to <paramref name="limit"/> bots whose NextOnline is at or before now.
     /// </summary>
-    public List<long> GetDueBots(int limit = 10)
+    public List<string> GetDueBots(int limit = 10)
     {
         string now = DateTime.UtcNow.ToString("o");
         using var cmd = _connection.CreateCommand();
@@ -202,15 +202,15 @@ public sealed class BotDatabase : IDisposable
         cmd.Parameters.AddWithValue("@now", now);
         cmd.Parameters.AddWithValue("@limit", limit);
         using var reader = cmd.ExecuteReader();
-        var ids = new List<long>();
+        var ids = new List<string>();
         while (reader.Read())
-            ids.Add(reader.GetInt64(0));
+            ids.Add(reader.GetString(0));
         return ids;
     }
 
     // ── BotRelationships CRUD ───────────────────────────────────
 
-    public void UpsertRelationship(long botId1, long botId2, int level)
+    public void UpsertRelationship(string botId1, string botId2, int level)
     {
         level = Math.Clamp(level, -100, 100);
         using var cmd = _connection.CreateCommand();
@@ -224,7 +224,7 @@ public sealed class BotDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
-    public int GetRelationshipLevel(long botId1, long botId2)
+    public int GetRelationshipLevel(string botId1, string botId2)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = "SELECT Level FROM BotRelationships WHERE BotId1 = @b1 AND BotId2 = @b2";
@@ -234,7 +234,7 @@ public sealed class BotDatabase : IDisposable
         return result is null ? 0 : Convert.ToInt32(result);
     }
 
-    public List<(long OtherId, int Level)> GetRelationships(long botId)
+    public List<(string OtherId, int Level)> GetRelationships(string botId)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
@@ -244,9 +244,9 @@ public sealed class BotDatabase : IDisposable
             """;
         cmd.Parameters.AddWithValue("@id", botId);
         using var reader = cmd.ExecuteReader();
-        var results = new List<(long, int)>();
+        var results = new List<(string, int)>();
         while (reader.Read())
-            results.Add((reader.GetInt64(0), reader.GetInt32(1)));
+            results.Add((reader.GetString(0), reader.GetInt32(1)));
         return results;
     }
 
@@ -290,7 +290,7 @@ public sealed class BotDatabase : IDisposable
 
     private static BotRecord ReadBotRecord(SqliteDataReader reader) => new()
     {
-        BotId = reader.GetInt64(reader.GetOrdinal("BotId")),
+        BotId = reader.GetString(reader.GetOrdinal("BotId")),
         Password = reader.GetString(reader.GetOrdinal("Password")),
         ValidationToken = reader.GetString(reader.GetOrdinal("ValidationToken")),
         TeamName = reader.GetString(reader.GetOrdinal("TeamName")),
@@ -315,7 +315,7 @@ public sealed class BotDatabase : IDisposable
 
 public sealed class BotRecord
 {
-    public long BotId { get; set; }
+    public string BotId { get; set; } = "";
     public string Password { get; set; } = "";
     public string ValidationToken { get; set; } = "";
     public string TeamName { get; set; } = "";
