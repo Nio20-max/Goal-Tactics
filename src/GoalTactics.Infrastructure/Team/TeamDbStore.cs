@@ -1257,13 +1257,18 @@ public sealed class TeamDbStore(
             return 1;
         }
 
-        var startingLineupStrength = players
+        var starting = players
             .OrderBy(x => x.ShirtNumber)
             .ThenByDescending(x => x.Strength)
             .Take(11)
+            .ToList();
+
+        var startingLineupStrength = starting
             .Sum(x => (int)Math.Round(x.Strength, MidpointRounding.AwayFromZero));
 
-        return strengthCalculator.Calculate(startingLineupStrength, tacticBonus: 0, fitnessAverage: 0);
+        var fitnessAverage = (int)Math.Round(starting.Average(x => (double)x.Fitness), MidpointRounding.AwayFromZero);
+
+        return strengthCalculator.Calculate(startingLineupStrength, tacticBonus: 0, fitnessAverage: fitnessAverage);
     }
 
     private static decimal RecalculateTeamMarketValue(IReadOnlyList<TeamPlayerEntity> players)
