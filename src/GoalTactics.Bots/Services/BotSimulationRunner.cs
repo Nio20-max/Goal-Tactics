@@ -1,3 +1,4 @@
+using GoalTactics.Application.Mechanics;
 using GoalTactics.Bots.Config;
 using GoalTactics.Bots.Models;
 using GoalTactics.Bots.Runtime;
@@ -501,8 +502,8 @@ public sealed class BotSimulationRunner(
     private static double AverageFitnessFactor(List<BotPlayer> players)
     {
         if (players.Count == 0) return 1.0;
-        var avg = players.Average(p => p.Fitness);
-        return 0.8 + (avg / 500.0); // maps 0..100 -> 0.8..1.0
+        var avg = (int)Math.Round(players.Average(p => (double)p.Fitness));
+        return TeamStrengthCalculator.ComputeFitnessFactor(avg);
     }
 
     private static (int Vip, int Sit, int Stand) GetTicketPricesByTier(int tier)

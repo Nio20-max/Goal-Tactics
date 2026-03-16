@@ -6,6 +6,11 @@ namespace GoalTactics.Bots.Services;
 
 public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker cooldowns, BotMessageGenerator messageGenerator, BotMetricsCollector metricsCollector)
 {
+    private const decimal TrainingGainToSkillMultiplier = 0.1m;
+    private const decimal SkillCardBonus = 1.5m;
+    private const decimal MaxSkillValue = 20m;
+    private const int NumberOfSkills = 14;
+
     public async Task ExecuteAsync(
         BotClubProfile bot,
         BotIntent intent,
@@ -34,8 +39,8 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
                     var rng = new Random(HashCode.Combine(bot.Seed, nowUtc.DayOfYear, nowUtc.Hour));
                     foreach (var player in bot.Players)
                     {
-                        var skillIdx = rng.Next(0, 14);
-                        player.Skills[skillIdx] = Math.Min(player.Skills[skillIdx] + trainingGain * 0.1m, 20m);
+                        var skillIdx = rng.Next(0, NumberOfSkills);
+                        player.Skills[skillIdx] = Math.Min(player.Skills[skillIdx] + trainingGain * TrainingGainToSkillMultiplier, MaxSkillValue);
                         player.Strength = player.Skills.Sum();
                     }
                     bot.Strength = (int)Math.Round(bot.Players.Average(p => (double)p.Strength));
@@ -156,7 +161,7 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
                         if (weakest.Skills[s] < weakest.Skills[weakSkill])
                             weakSkill = s;
                     }
-                    weakest.Skills[weakSkill] = Math.Min(weakest.Skills[weakSkill] + 1.5m, 20m);
+                    weakest.Skills[weakSkill] = Math.Min(weakest.Skills[weakSkill] + SkillCardBonus, MaxSkillValue);
                     weakest.Strength = weakest.Skills.Sum();
                     bot.SkillCards--;
                     bot.Strength = (int)Math.Round(bot.Players.Average(p => (double)p.Strength));

@@ -87,6 +87,9 @@ public sealed class BotRegistry
     /// <summary>Creates 11 players with individual skills matching the bot's tier/strength.</summary>
     private static void InitializePlayers(BotClubProfile bot)
     {
+        const int numberOfSkills = 14;
+        const int minSkillVariation = -2;
+        const int maxSkillVariation = 3;
         var rng = new Random(HashCode.Combine(bot.Seed, bot.Strength, bot.Tier));
         var positions = new[] { "GK", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "FWD", "FWD", "FWD" };
         var firstNames = new[] { "Alex", "Max", "Leo", "Sam", "Kai", "Jan", "Tom", "Ben", "Nico", "Finn", "Luis" };
@@ -95,11 +98,10 @@ public sealed class BotRegistry
         bot.Players.Clear();
         for (var i = 0; i < 11; i++)
         {
-            var skills = new decimal[14];
-            for (var s = 0; s < 14; s++)
+            var skills = new decimal[numberOfSkills];
+            for (var s = 0; s < numberOfSkills; s++)
             {
-                // Base skill ≈ team strength / 14, with some variation per position
-                var baseSkill = bot.Strength / 14.0 + rng.Next(-2, 3);
+                var baseSkill = bot.Strength / (double)numberOfSkills + rng.Next(minSkillVariation, maxSkillVariation);
                 skills[s] = Math.Max(1m, (decimal)Math.Round(baseSkill, 1));
             }
 

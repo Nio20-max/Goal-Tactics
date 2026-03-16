@@ -119,7 +119,7 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
             }
             catch (JsonException)
             {
-                // Corrupted JSON — ignore and fall back to simple report
+                // Corrupted events JSON — gracefully degrade to simple report without events
             }
         }
 
