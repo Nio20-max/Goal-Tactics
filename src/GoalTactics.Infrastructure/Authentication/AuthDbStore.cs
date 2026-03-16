@@ -582,6 +582,14 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             };
 
             var playerId = Guid.NewGuid();
+            var age = i < 4 ? random.Next(18, 24) : random.Next(18, 33);
+            var talent = random.Next(4, 11);
+            var fitness = random.Next(86, 101);
+            var strength = Math.Clamp(baseStrength + random.Next(-6, 12) + random.Next(0, 6), 55m, 95m);
+            var skills = LegacyAppCompatibility.BuildSkills(strength, position, talent, age);
+            var calculatedStrength = PlayerValueCalculator.CalculateStrength(skills, position, fitness, age, talent);
+            var marketValue = PlayerValueCalculator.CalculateMarketValue(skills, position, fitness, age, talent);
+
             players.Add(new TeamPlayerEntity
             {
                 Id = playerId.ToString("N"),
@@ -590,10 +598,25 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
                 Origin = origins[(random.Next(origins.Length) + i) % origins.Length],
                 Position = position,
                 ShirtNumber = i + 1,
-                Age = i < 4 ? random.Next(18, 24) : random.Next(18, 33),
-                Talent = random.Next(4, 11),
-                Strength = Math.Clamp(baseStrength + random.Next(-6, 12) + random.Next(0, 6), 55, 95),
-                Fitness = random.Next(86, 101),
+                Age = age,
+                Talent = talent,
+                Strength = calculatedStrength,
+                MarketValue = marketValue,
+                Skill0 = skills[0],
+                Skill1 = skills[1],
+                Skill2 = skills[2],
+                Skill3 = skills[3],
+                Skill4 = skills[4],
+                Skill5 = skills[5],
+                Skill6 = skills[6],
+                Skill7 = skills[7],
+                Skill8 = skills[8],
+                Skill9 = skills[9],
+                Skill10 = skills[10],
+                Skill11 = skills[11],
+                Skill12 = skills[12],
+                Skill13 = skills[13],
+                Fitness = fitness,
                 Matches = random.Next(0, 30),
                 Goals = position == "FWD" ? random.Next(0, 20) : random.Next(0, 6),
                 YellowCards = random.Next(0, 6),
