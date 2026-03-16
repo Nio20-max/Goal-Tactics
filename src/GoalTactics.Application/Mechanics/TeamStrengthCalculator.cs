@@ -2,6 +2,9 @@ namespace GoalTactics.Application.Mechanics;
 
 public sealed class TeamStrengthCalculator
 {
+    /// <summary>Number of individual skills per player (skill_0 through skill_13).</summary>
+    public const int NumberOfSkills = 14;
+
     /// <summary>Minimum fitness scaling factor (at fitness 0).</summary>
     public const double MinFitnessFactor = 0.80;
 

@@ -45,7 +45,7 @@ public sealed class TrainingBehavior
         // Pick youngest players, preferring those with the weakest main skill
         var youngPlayers = squad.Players
             .Where(p => p.Age <= 22 && !p.HasIndividualTraining && !p.HasRedCard && p.Injured == 0)
-            .OrderBy(p => p.Skills is not null && p.Skills.Length > p.MainSkill
+            .OrderBy(p => p.Skills is not null && p.MainSkill >= 0 && p.MainSkill < p.Skills.Length
                         ? p.Skills[p.MainSkill]
                         : p.Strength)
             .ThenByDescending(p => p.Talent)

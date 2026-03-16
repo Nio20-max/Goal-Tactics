@@ -1992,7 +1992,7 @@ public sealed class TeamDbStore(
         EnsurePlayerSkillsInitialized(player);
 
         // Apply the card bonus to the card's target skill index
-        var skillIndex = Math.Clamp(card.Skill, 0, 13);
+        var skillIndex = Math.Clamp(card.Skill, 0, TeamStrengthCalculator.NumberOfSkills - 1);
         AddSkillGain(player, skillIndex, card.Bonus);
         RecalculatePlayerDerivedValues(player);
 
