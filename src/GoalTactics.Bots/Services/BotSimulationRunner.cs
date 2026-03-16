@@ -461,8 +461,16 @@ public sealed class BotSimulationRunner(
             var away = ordered[i + 1];
             var random = new Random(HashCode.Combine(home.Seed, away.Seed, clock.CurrentUtc.DayOfYear));
 
-            var homeScore = Math.Max(0, random.Next(0, 3) + (home.Strength - away.Strength) / 25);
-            var awayScore = Math.Max(0, random.Next(0, 3) + (away.Strength - home.Strength) / 25);
+            // Compute strength from per-player stats when available
+            var homeStrength = home.Players.Count > 0
+                ? (int)Math.Round(home.Players.Average(p => (double)p.Strength) * AverageFitnessFactor(home.Players))
+                : home.Strength;
+            var awayStrength = away.Players.Count > 0
+                ? (int)Math.Round(away.Players.Average(p => (double)p.Strength) * AverageFitnessFactor(away.Players))
+                : away.Strength;
+
+            var homeScore = Math.Max(0, random.Next(0, 3) + (homeStrength - awayStrength) / 25);
+            var awayScore = Math.Max(0, random.Next(0, 3) + (awayStrength - homeStrength) / 25);
 
             report.MatchesPlayed++;
             report.TotalGoals += homeScore + awayScore;
@@ -486,8 +494,15 @@ public sealed class BotSimulationRunner(
                 away.SeasonDraws++;
             }
 
-            await logWriter.WriteAsync("simulation-events.log", $"{clock.CurrentUtc:O}|league.match|home={home.TeamName}|away={away.TeamName}|score={homeScore}:{awayScore}|tier={home.Tier}");
+            await logWriter.WriteAsync("simulation-events.log", $"{clock.CurrentUtc:O}|league.match|home={home.TeamName}|away={away.TeamName}|score={homeScore}:{awayScore}|tier={home.Tier}|h_str={homeStrength}|a_str={awayStrength}");
         }
+    }
+
+    private static double AverageFitnessFactor(List<BotPlayer> players)
+    {
+        if (players.Count == 0) return 1.0;
+        var avg = players.Average(p => p.Fitness);
+        return 0.8 + (avg / 500.0); // maps 0..100 -> 0.8..1.0
     }
 
     private static (int Vip, int Sit, int Stand) GetTicketPricesByTier(int tier)

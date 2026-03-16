@@ -75,7 +75,51 @@ public sealed class BotRegistry
             r.StandSeats = 3_000 + (r.StadiumLevel * 2_200);
         }
 
+        // Initialize per-player skills for starting 11
+        foreach (var bot in result)
+        {
+            InitializePlayers(bot);
+        }
+
         return result;
+    }
+
+    /// <summary>Creates 11 players with individual skills matching the bot's tier/strength.</summary>
+    private static void InitializePlayers(BotClubProfile bot)
+    {
+        var rng = new Random(HashCode.Combine(bot.Seed, bot.Strength, bot.Tier));
+        var positions = new[] { "GK", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "FWD", "FWD", "FWD" };
+        var firstNames = new[] { "Alex", "Max", "Leo", "Sam", "Kai", "Jan", "Tom", "Ben", "Nico", "Finn", "Luis" };
+        var lastNames = new[] { "Müller", "Schmidt", "Fischer", "Weber", "Wagner", "Becker", "Schulz", "Koch", "Braun", "Meyer", "Richter" };
+
+        bot.Players.Clear();
+        for (var i = 0; i < 11; i++)
+        {
+            var skills = new decimal[14];
+            for (var s = 0; s < 14; s++)
+            {
+                // Base skill ≈ team strength / 14, with some variation per position
+                var baseSkill = bot.Strength / 14.0 + rng.Next(-2, 3);
+                skills[s] = Math.Max(1m, (decimal)Math.Round(baseSkill, 1));
+            }
+
+            var player = new BotPlayer
+            {
+                Name = $"{firstNames[i % firstNames.Length]} {lastNames[rng.Next(lastNames.Length)]}",
+                Position = positions[i],
+                Age = rng.Next(18, 34),
+                Talent = rng.Next(3, 10),
+                Fitness = rng.Next(70, 100),
+                Skills = skills
+            };
+
+            // Compute strength as sum of skills (matching PlayerValueCalculator formula)
+            player.Strength = skills.Sum();
+            bot.Players.Add(player);
+        }
+
+        // Give initial skill cards
+        bot.SkillCards = rng.Next(1, 5);
     }
 
     private static int ResolveTier(int index, int teamsPerLeague)

@@ -12,7 +12,8 @@ public sealed class BotActionScheduler(
     BotSponsorPlanner sponsorPlanner,
     BotLadderPlanner ladderPlanner,
     BotFriendlyPlanner friendlyPlanner,
-    BotChatPlanner chatPlanner)
+    BotChatPlanner chatPlanner,
+    BotSkillCardPlanner skillCardPlanner)
 {
     public IReadOnlyList<BotIntent> BuildIntents(BotClubProfile bot, BotPerceptionSnapshot perception, DateTime nowUtc)
     {
@@ -26,6 +27,7 @@ public sealed class BotActionScheduler(
         intents.AddRange(ladderPlanner.Plan(bot, perception, nowUtc));
         intents.AddRange(friendlyPlanner.Plan(bot, perception, nowUtc));
         intents.AddRange(chatPlanner.Plan(bot, perception, nowUtc));
+        intents.AddRange(skillCardPlanner.Plan(bot, perception, nowUtc));
 
         return intents
             .OrderByDescending(x => x.Score)

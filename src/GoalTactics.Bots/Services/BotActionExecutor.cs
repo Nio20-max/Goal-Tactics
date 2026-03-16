@@ -28,7 +28,22 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
 
             case "training.update":
                 var trainingGain = bot.TrainingCenterLevel >= 4 ? 2 : 1;
-                bot.Strength += trainingGain;
+                // Apply training to individual player skills
+                if (bot.Players.Count > 0)
+                {
+                    var rng = new Random(HashCode.Combine(bot.Seed, nowUtc.DayOfYear, nowUtc.Hour));
+                    foreach (var player in bot.Players)
+                    {
+                        var skillIdx = rng.Next(0, 14);
+                        player.Skills[skillIdx] = Math.Min(player.Skills[skillIdx] + trainingGain * 0.1m, 20m);
+                        player.Strength = player.Skills.Sum();
+                    }
+                    bot.Strength = (int)Math.Round(bot.Players.Average(p => (double)p.Strength));
+                }
+                else
+                {
+                    bot.Strength += trainingGain;
+                }
                 await logWriter.WriteAsync("simulation-events.log", $"{nowUtc:O}|training|bot={bot.BotId}|strength={bot.Strength}|gain={trainingGain}|center_lv={bot.TrainingCenterLevel}");
                 cooldowns.SetCooldown(bot.BotId, intent.IntentType, nowUtc, TimeSpan.FromHours(12));
                 break;
@@ -128,6 +143,26 @@ public sealed class BotActionExecutor(BotOptions options, BotCooldownTracker coo
                 report.ChatMessages++;
                 await logWriter.WriteAsync("social-chat.log", $"{nowUtc:O}|chat|bot={bot.BotId}|team={bot.TeamName}|text={message}");
                 cooldowns.SetCooldown(bot.BotId, intent.IntentType, nowUtc, TimeSpan.FromMinutes(30));
+                break;
+
+            case "skillcard.use":
+                if (bot.SkillCards > 0 && bot.Players.Count > 0)
+                {
+                    // Apply skill card to the weakest player's weakest skill
+                    var weakest = bot.Players.OrderBy(p => p.Strength).First();
+                    var weakSkill = 0;
+                    for (var s = 1; s < 14; s++)
+                    {
+                        if (weakest.Skills[s] < weakest.Skills[weakSkill])
+                            weakSkill = s;
+                    }
+                    weakest.Skills[weakSkill] = Math.Min(weakest.Skills[weakSkill] + 1.5m, 20m);
+                    weakest.Strength = weakest.Skills.Sum();
+                    bot.SkillCards--;
+                    bot.Strength = (int)Math.Round(bot.Players.Average(p => (double)p.Strength));
+                    await logWriter.WriteAsync("simulation-events.log", $"{nowUtc:O}|skillcard|bot={bot.BotId}|player={weakest.Name}|skill={weakSkill}|remaining={bot.SkillCards}");
+                }
+                cooldowns.SetCooldown(bot.BotId, intent.IntentType, nowUtc, TimeSpan.FromHours(6));
                 break;
 
             default:
