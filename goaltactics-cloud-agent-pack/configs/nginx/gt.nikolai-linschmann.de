@@ -22,6 +22,8 @@ server {
         rewrite ^/api/Squad/GetPlayers$ /api/GetSquad break;
         rewrite ^/api/Squad/GetSkillCards$ /api/GetSkillCards break;
         rewrite ^/api/Scouting/GetPlayers$ /api/GetScoutedPlayers break;
+        # Legacy clients may use different casing; match case-insensitively.
+        rewrite (?i)^/api/Scouting/Speedup$ /api/SpeedupScout break;
         rewrite ^/api/Scouting/Speedup$ /api/SpeedupScout break;
         rewrite ^/api/Training/GetTraining$ /api/GetTeamTraining break;
         rewrite ^/api/Transfermarket/Search$ /api/SearchTransfermarket break;

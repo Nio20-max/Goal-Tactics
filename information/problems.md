@@ -1,13 +1,9 @@
-max 240 accounts possible, bot accounts + human made accounts
+The lineup is still not working. Compare the traffic with what the app expects and fix the api. (working on it)
 
-The points every team has are still not 0. Even though it's day one of the season (propably fixed)
+Live game (worked on it)
 
-I can't use skill cards and there are random skill cards shown (working on it)
+Get 1000 stars
 
-The lineup is still not working. Compare the traffic with what the app expects and fix the api. 
+experience for games
 
-Scouted players don't appear after I scouted (working on it)
-
-Live game
-
-stats for players (working on it)
+All are friendly games

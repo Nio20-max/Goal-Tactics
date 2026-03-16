@@ -1,6 +1,8 @@
 using GoalTactics.Bots.Client.ApiClient;
 using GoalTactics.Bots.Client.Behaviors;
 using GoalTactics.Bots.Client.Database;
+using GoalTactics.Bots.Client.Humanization;
+using GoalTactics.Bots.Client.Neural;
 using GoalTactics.Bots.Client.Scheduling;
 
 namespace GoalTactics.Bots.Client;
@@ -16,6 +18,8 @@ public sealed class BotRunner : IDisposable
     private readonly GoalTacticsApiClient _api;
     private readonly BotScheduler _scheduler;
     private readonly BotFactory _factory;
+    private readonly BotNeuralDecisionEngine _neural;
+    private readonly BotHumanizationService _human;
 
     // Behaviors
     private readonly TransferMarketBehavior _transferMarket;
@@ -36,9 +40,11 @@ public sealed class BotRunner : IDisposable
         _api = new GoalTacticsApiClient(config.ApiBaseUrl);
         _scheduler = new BotScheduler(_db);
         _factory = new BotFactory(config, _db, _api);
+        _neural = new BotNeuralDecisionEngine(config, _db);
+        _human = new BotHumanizationService(config, _db);
 
-        _social = new SocialBehavior(_db, config);
-        _transferMarket = new TransferMarketBehavior(_db, _social);
+        _social = new SocialBehavior(_db, config, _human);
+        _transferMarket = new TransferMarketBehavior(_db, _social, _neural, _human, _config);
         _stadium = new StadiumBehavior();
         _training = new TrainingBehavior();
         _dailyRoutine = new DailyRoutineBehavior();
@@ -60,8 +66,8 @@ public sealed class BotRunner : IDisposable
         Console.WriteLine($"[BotRunner] Starting with {_config.BotCount} target bots...");
 
         // Verify API is reachable
-        var ping = await _api.PingAsync();
-        if (ping is null || !ping.Success)
+        var ping = await _api.ExecuteForBotAsync("Ping");
+        if (!ping.Success)
         {
             Console.Error.WriteLine("[BotRunner] API ping failed. Aborting.");
             return;
@@ -151,6 +157,9 @@ public sealed class BotRunner : IDisposable
     {
         Console.WriteLine($"[Bot {bot.BotId}] Waking up ({bot.TeamName})...");
 
+        var sessionPlan = _human.BuildSessionPlan(bot);
+        var emotion = _human.GetEmotionalState(bot);
+
         // Authenticate: reuse token or re-login
         if (!await EnsureAuthenticatedAsync(bot))
         {
@@ -160,17 +169,84 @@ public sealed class BotRunner : IDisposable
 
         _api.SetToken(bot.ValidationToken);
 
+        if (_human.ShouldRollbackToSafeMode(bot))
+        {
+            await ExecuteWithRateLimit("lineup", () => _lineup.ExecuteAsync(_api, bot, null));
+            await ExecuteWithRateLimit("daily", () => _dailyRoutine.ExecuteAsync(_api, bot, null));
+            _db.AddActionLog(bot.BotId, "rollback", "Safe mode active after repeated neural failures", true, bot.Risk);
+            _api.ClearToken();
+            Console.WriteLine($"[Bot {bot.BotId}] Safe-mode session complete.");
+            return;
+        }
+
+        var nightPlan = await _neural.GetOrCreateNightPlanAsync(_api, bot);
+        double confidence = (nightPlan.BidAggression + nightPlan.ScoutIntensity + emotion.Confidence) / 300.0;
+
+        if (IsNightTime(bot))
+        {
+            await ExecuteNightCycleIfDueAsync(bot, nightPlan);
+            _api.ClearToken();
+            Console.WriteLine($"[Bot {bot.BotId}] Night session complete.");
+            return;
+        }
+
+        if (!_human.ShouldExecuteByConfidence(bot, "session", confidence))
+        {
+            _api.ClearToken();
+            return;
+        }
+
+        if (_human.ShouldRunSelfAudit(bot))
+        {
+            _db.AddActionLog(bot.BotId, "self-audit", $"Session plan={sessionPlan.DurationMinutes}m interrupted={sessionPlan.Interrupted}", true, bot.Risk);
+        }
+
+        var resources = await _api.ExecuteForBotAsync("GetMyResources");
+        var squad = await _api.ExecuteForBotAsync("GetSquad");
+        if (resources.Success)
+        {
+            var money = BotApiTranslationReader.GetDecimal(resources.Output, "money");
+            var stars = BotApiTranslationReader.GetDecimal(resources.Output, "gtStars");
+            int squadSize = BotApiTranslationReader.GetObjectList(squad, "players").Count;
+            _human.UpdateKpisAndScenario(bot, money, stars, squadSize);
+        }
+
         // Execute behaviors in priority order with rate-limit checks
-        await ExecuteWithRateLimit("daily", () => _dailyRoutine.ExecuteAsync(_api, bot));
-        await ExecuteWithRateLimit("lineup", () => _lineup.ExecuteAsync(_api, bot));
-        await ExecuteWithRateLimit("training", () => _training.ExecuteAsync(_api, bot));
-        await ExecuteWithRateLimit("skillcard", () => _skillCard.ExecuteAsync(_api, bot));
-        await ExecuteWithRateLimit("stadium", () => _stadium.ExecuteAsync(_api, bot));
-        await ExecuteWithRateLimit("transfer", () => _transferMarket.ExecuteAsync(_api, bot));
-        await ExecuteWithRateLimit("social", () => _social.ExecuteAsync(_api, bot));
+        await ExecuteWithRateLimit("daily", () => _dailyRoutine.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("lineup", () => _lineup.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("training", () => _training.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("skillcard", () => _skillCard.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("stadium", () => _stadium.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("transfer", () => _transferMarket.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("social", () => _social.ExecuteAsync(_api, bot, nightPlan));
+
+        if (sessionPlan.Interrupted)
+        {
+            _db.AddActionLog(bot.BotId, "session", "Interrupted naturally to simulate human behavior", true, bot.Risk);
+        }
 
         _api.ClearToken();
         Console.WriteLine($"[Bot {bot.BotId}] Session complete.");
+    }
+
+    private async Task ExecuteNightCycleIfDueAsync(BotRecord bot, BotNightPlan nightPlan)
+    {
+        string localDate = GetLocalDate(bot);
+        if (_db.HasNightCycleRun(bot.BotId, localDate))
+        {
+            return;
+        }
+
+        Console.WriteLine($"[Bot {bot.BotId}] Running night cycle ({localDate})...");
+
+        // Night cycle focuses on strategic actions decided by the nightly plan.
+        await ExecuteWithRateLimit("night-lineup", () => _lineup.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("night-training", () => _training.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("night-skillcard", () => _skillCard.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("night-transfer", () => _transferMarket.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit("night-social", () => _social.ExecuteAsync(_api, bot, nightPlan));
+
+        _db.MarkNightCycleRun(bot.BotId, localDate);
     }
 
     private async Task<bool> EnsureAuthenticatedAsync(BotRecord bot)
@@ -181,8 +257,8 @@ public sealed class BotRunner : IDisposable
             _api.SetToken(bot.ValidationToken);
             try
             {
-                var resources = await _api.GetMyResourcesAsync();
-                if (resources is not null) return true;
+                var resources = await _api.ExecuteForBotAsync("GetMyResources");
+                if (resources.Success) return true;
             }
             catch
             {
@@ -192,17 +268,21 @@ public sealed class BotRunner : IDisposable
 
         // Re-login
         string email = BotFactory.SanitizeEmail(bot.TeamName);
-        var loginResult = await _api.LoginAsync(new LoginRequest
+        var loginResult = await _api.ExecuteForBotAsync("Login", new LoginRequest
         {
             Email = email,
             Password = bot.Password
         });
 
-        if (loginResult is null || !loginResult.Success)
+        if (!loginResult.Success)
             return false;
 
-        _db.UpdateBotToken(bot.BotId, loginResult.Token);
-        bot.ValidationToken = loginResult.Token;
+        var token = BotApiTranslationReader.GetString(loginResult.Output, "token");
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        _db.UpdateBotToken(bot.BotId, token);
+        bot.ValidationToken = token;
         return true;
     }
 
@@ -231,5 +311,52 @@ public sealed class BotRunner : IDisposable
         }
 
         _rateLimits[action] = DateTime.UtcNow;
+    }
+
+    private bool IsNightTime(BotRecord bot)
+    {
+        var localHour = GetLocalHour(bot);
+        int start = _config.NightPlanningStartHourLocal;
+        int end = _config.NightPlanningEndHourLocal;
+
+        if (start == end)
+        {
+            return true;
+        }
+
+        if (start < end)
+        {
+            return localHour >= start && localHour < end;
+        }
+
+        return localHour >= start || localHour < end;
+    }
+
+    private static int GetLocalHour(BotRecord bot)
+    {
+        var utcNow = DateTime.UtcNow;
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(bot.Timezone);
+            return TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz).Hour;
+        }
+        catch
+        {
+            return utcNow.Hour;
+        }
+    }
+
+    private static string GetLocalDate(BotRecord bot)
+    {
+        var utcNow = DateTime.UtcNow;
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(bot.Timezone);
+            return TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz).ToString("yyyy-MM-dd");
+        }
+        catch
+        {
+            return utcNow.ToString("yyyy-MM-dd");
+        }
     }
 }

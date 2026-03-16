@@ -1,0 +1,27 @@
+{
+  "summary": {
+    "runs": 1,
+    "contexts": [
+      512
+    ],
+    "avg_tokens_per_sec": 12.758916992600282,
+    "error_rate": 0.0,
+    "empty_rate": 0.0,
+    "rss_max": 9007104,
+    "rss_min": 9007104
+  },
+  "runs": [
+    {
+      "input_tokens": 62,
+      "output_tokens": 65,
+      "duration_s": 9.95382288901601,
+      "tokens_per_sec": 12.758916992600282,
+      "output": "<think> Okay, let's see what the user needs here. They want me to write a concise coaching email about preparation, focus, and teamwork. First, I need to make sure I understand the key points they want covered: preparation, staying focused, and teamwork. The email should be brief but effective.",
+      "output_is_empty": false,
+      "ctx": 512,
+      "run": 1,
+      "rss": 9007104,
+      "cpu_pct": 0.0
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 using GoalTactics.Bots.Client.ApiClient;
 using GoalTactics.Bots.Client.Database;
+using GoalTactics.Bots.Client.Humanization;
+using GoalTactics.Bots.Client.Neural;
 
 namespace GoalTactics.Bots.Client.Behaviors;
 
@@ -11,6 +13,7 @@ public sealed class SocialBehavior
 {
     private readonly BotDatabase _db;
     private readonly BotConfig _config;
+    private readonly BotHumanizationService _human;
     private readonly Random _rng = new();
 
     private static readonly string[] FriendlyMessages =
@@ -20,19 +23,40 @@ public sealed class SocialBehavior
         "Your squad looks strong!", "Great match!"
     ];
 
-    public SocialBehavior(BotDatabase db, BotConfig config)
+    private static readonly string[] CompetitiveMessages =
+    [
+        "We are pushing for the top spots.",
+        "Big moves tonight, watch the market.",
+        "Our squad is ready for stronger opponents.",
+        "Targeting upgrades before next matchday."
+    ];
+
+    public SocialBehavior(BotDatabase db, BotConfig config, BotHumanizationService human)
     {
         _db = db;
         _config = config;
+        _human = human;
     }
 
-    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot)
+    private sealed class FriendSnapshot
+    {
+        public string Id { get; init; } = "";
+        public bool IsRequestIncoming { get; init; }
+    }
+
+    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan = null)
     {
         // Social activity probability depends on SocialScore
-        if (_rng.Next(1, 101) > bot.SocialScore) return;
+        int socialScore = bot.SocialScore;
+        if (nightPlan is not null)
+        {
+            socialScore = Math.Clamp((socialScore + nightPlan.CoordinationLevel) / 2, 1, 100);
+        }
+
+        if (_rng.Next(1, 101) > socialScore) return;
 
         await ManageFriendshipsAsync(api, bot);
-        await HandleChatCooperationAsync(api, bot);
+        await HandleChatCooperationAsync(api, bot, nightPlan);
         await ManageGroupsAsync(bot);
     }
 
@@ -41,15 +65,20 @@ public sealed class SocialBehavior
     /// </summary>
     private async Task ManageFriendshipsAsync(GoalTacticsApiClient api, BotRecord bot)
     {
-        var friends = await api.GetFriendsAsync();
-        if (friends?.Friends is null) return;
+        var friendsResponse = await api.ExecuteForBotAsync("GetFriends", new TextRequest { Text = "" });
+        if (!friendsResponse.Success) return;
 
-        foreach (var friend in friends.Friends)
+        var friends = BotApiTranslationReader.GetObjectList(friendsResponse, "friends")
+            .Select(ToFriend)
+            .Where(f => !string.IsNullOrEmpty(f.Id))
+            .ToList();
+
+        foreach (var friend in friends)
         {
             // Accept pending incoming friend requests
             if (friend.IsRequestIncoming)
             {
-                await api.AcceptFriendAsync(friend.Id);
+                await api.ExecuteForBotAsync("Accept", new IdRequest { Id = friend.Id });
                 _db.UpsertRelationship(bot.BotId, friend.Id, 1);
                 continue;
             }
@@ -59,7 +88,7 @@ public sealed class SocialBehavior
             // Send friendlies to raise friendship (costs nothing, builds relationship)
             if (level > 0 && level < 70 && _rng.NextDouble() < 0.3)
             {
-                await api.SendChallengeAsync(friend.Id);
+                await api.ExecuteForBotAsync("SendChallenge", new IdRequest { Id = friend.Id });
                 _db.UpsertRelationship(bot.BotId, friend.Id, Math.Min(100, level + 2));
             }
         }
@@ -76,7 +105,7 @@ public sealed class SocialBehavior
 
             foreach (var candidate in candidates)
             {
-                await api.LikeAsync(candidate.BotId);
+                await api.ExecuteForBotAsync("Like", new IdRequest { Id = candidate.BotId });
             }
         }
     }
@@ -85,7 +114,7 @@ public sealed class SocialBehavior
     /// Chat cooperation kicks in at friendship level ≥ 70:
     /// bots coordinate on transfer market and send supportive messages.
     /// </summary>
-    private async Task HandleChatCooperationAsync(GoalTacticsApiClient api, BotRecord bot)
+    private async Task HandleChatCooperationAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan)
     {
         var relationships = _db.GetRelationships(bot.BotId);
         var closeFriends = relationships.Where(r => r.Level >= 70).ToList();
@@ -93,8 +122,14 @@ public sealed class SocialBehavior
         if (closeFriends.Count == 0) return;
 
         // Send a chat message to the global chat
-        string message = FriendlyMessages[_rng.Next(FriendlyMessages.Length)];
-        await api.PostChatMessageAsync(message);
+        string[] pool = nightPlan?.ChatTone == "competitive" ? CompetitiveMessages : FriendlyMessages;
+        string message = pool[_rng.Next(pool.Length)];
+
+        string contextTag = closeFriends.Count >= 4 ? "promotion" : "default";
+        message = _human.BuildStyledMessage(bot, message, contextTag);
+
+        await api.ExecuteForBotAsync("PostChatMessage", new PostChatMessageRequest { Message = message });
+        _db.AddActionLog(bot.BotId, "social", "Posted styled context-aware message", true, bot.Risk);
     }
 
     /// <summary>
@@ -154,4 +189,11 @@ public sealed class SocialBehavior
         }
         return false;
     }
+
+    private static FriendSnapshot ToFriend(Dictionary<string, object?> data)
+        => new()
+        {
+            Id = BotApiTranslationReader.GetString(data, "id"),
+            IsRequestIncoming = BotApiTranslationReader.GetBool(data, "incoming")
+        };
 }

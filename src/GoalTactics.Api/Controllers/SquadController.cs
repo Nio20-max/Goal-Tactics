@@ -147,8 +147,20 @@ public sealed class SquadController(ISquadService squadService, ICountryCatalog 
         ExecuteMutation(request.Id, cancellationToken, squadService.UpgradePlayerAsync, "Player upgraded");
 
     [HttpPost("UseSkillCard")]
-    public Task<ActionResult<ResponseObject>> UseSkillCard([FromBody] IdRequest request, CancellationToken cancellationToken) =>
-        ExecuteMutation(request.Id, cancellationToken, squadService.UseSkillCardAsync, "Skill card applied");
+    public Task<ActionResult<ResponseObject>> UseSkillCard([FromBody] GoalTactics.Contracts.Squad.UseSkillCardRequest request, CancellationToken cancellationToken)
+    {
+        GoalTactics.Application.Team.SkillCardRecord? card = null;
+        if (request.Card is not null)
+        {
+            card = new GoalTactics.Application.Team.SkillCardRecord(
+                request.Card.Skill,
+                request.Card.Rarity,
+                request.Card.Count,
+                request.Card.Bonus);
+        }
+
+        return ExecuteMutation(request.Id, cancellationToken, (userId, playerId, ct) => squadService.UseSkillCardAsync(userId, playerId, card, ct), "Skill card applied");
+    }
 
     [HttpPost("HealPlayer")]
     public Task<ActionResult<ResponseObject>> HealPlayer([FromBody] IdRequest request, CancellationToken cancellationToken) =>

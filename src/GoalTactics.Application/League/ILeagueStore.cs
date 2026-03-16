@@ -8,6 +8,12 @@ public interface ILeagueStore
     Task<IReadOnlyList<LeagueMatchRecord>> GetUpcomingMatchesForTeamAsync(string teamId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<GoalGetterRecord>> GetTopScorersAsync(Guid leagueId, int count, CancellationToken cancellationToken = default);
     Task ResolveMatchAsync(Guid matchId, int homeScore, int awayScore, IReadOnlyList<MatchScorerEvent> scorers, string? eventsJson, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Ensures the given league has a schedule of fixtures.
+    /// If no schedule exists, a full round-robin schedule is generated.
+    /// </summary>
+    Task EnsureScheduleForLeagueAsync(Guid leagueId, CancellationToken cancellationToken = default);
 }
 
 public sealed record LeagueTableRecord(string LeagueName, int Mount, int Dismount, IReadOnlyList<LeagueTableTeamRecord> Teams);

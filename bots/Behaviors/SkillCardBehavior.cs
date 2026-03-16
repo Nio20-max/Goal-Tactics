@@ -1,5 +1,6 @@
 using GoalTactics.Bots.Client.ApiClient;
 using GoalTactics.Bots.Client.Database;
+using GoalTactics.Bots.Client.Neural;
 
 namespace GoalTactics.Bots.Client.Behaviors;
 
@@ -9,27 +10,44 @@ namespace GoalTactics.Bots.Client.Behaviors;
 /// </summary>
 public sealed class SkillCardBehavior
 {
-    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot)
+    private sealed class PlayerSnapshot
     {
-        var cardsResponse = await api.GetSkillCardsAsync();
-        if (cardsResponse?.SkillCards is null || cardsResponse.SkillCards.Count == 0)
+        public string Id { get; init; } = "";
+        public decimal Strength { get; init; }
+        public int Talent { get; init; }
+        public bool HasRedCard { get; init; }
+        public int Injured { get; init; }
+    }
+
+    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan = null)
+    {
+        var cardsResponse = await api.ExecuteForBotAsync("GetSkillCards");
+        if (!cardsResponse.Success)
             return;
 
-        int availableCards = cardsResponse.SkillCards.Sum(c => c.Count);
+        int availableCards = BotApiTranslationReader.GetObjectList(cardsResponse, "cards")
+            .Sum(c => BotApiTranslationReader.GetInt(c, "count"));
         if (availableCards == 0) return;
 
-        var squad = await api.GetSquadAsync();
-        if (squad?.Players is null || squad.Players.Count == 0) return;
+        var squad = await api.ExecuteForBotAsync("GetSquad");
+        if (!squad.Success) return;
+
+        var players = BotApiTranslationReader.GetObjectList(squad, "players")
+            .Select(ToPlayer)
+            .Where(p => !string.IsNullOrEmpty(p.Id))
+            .ToList();
+        if (players.Count == 0) return;
 
         // Pick target players: weakest overall, optionally favouring youth
-        var candidates = squad.Players
+        var candidates = players
             .Where(p => !p.HasRedCard && p.Injured == 0)
             .OrderBy(p => p.Strength)
             .ThenByDescending(p => bot.YouthFocus >= 50 ? p.Talent : 0)
             .ToList();
 
         // Use up to 3 cards per session to avoid API spam
-        int maxUses = Math.Min(3, availableCards);
+        int plannedCap = nightPlan is null ? 3 : Math.Clamp(nightPlan.IndividualTrainingSlots + 1, 1, 3);
+        int maxUses = Math.Min(plannedCap, availableCards);
         int used = 0;
 
         foreach (var player in candidates)
@@ -38,7 +56,7 @@ public sealed class SkillCardBehavior
 
             try
             {
-                await api.UseSkillCardAsync(player.Id);
+                await api.ExecuteForBotAsync("UseSkillCard", new IdRequest { Id = player.Id });
                 used++;
             }
             catch (HttpRequestException)
@@ -48,4 +66,14 @@ public sealed class SkillCardBehavior
             }
         }
     }
+
+    private static PlayerSnapshot ToPlayer(Dictionary<string, object?> data)
+        => new()
+        {
+            Id = BotApiTranslationReader.GetString(data, "id"),
+            Strength = BotApiTranslationReader.GetDecimal(data, "strength"),
+            Talent = BotApiTranslationReader.GetInt(data, "talent"),
+            HasRedCard = BotApiTranslationReader.GetBool(data, "hasRedCard"),
+            Injured = BotApiTranslationReader.GetInt(data, "injured")
+        };
 }

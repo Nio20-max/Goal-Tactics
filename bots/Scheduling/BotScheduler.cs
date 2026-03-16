@@ -58,6 +58,17 @@ public sealed class BotScheduler
         double jitter = baseInterval * (_rng.NextDouble() * jitterRange - jitterOffset);
         double intervalMinutes = baseInterval + jitter;
 
+        // Real-life rhythm: weekends often allow longer sessions with slightly shorter wake gaps.
+        DateTime localCandidate = ToLocalDateTime(now, bot.Timezone);
+        if (localCandidate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        {
+            intervalMinutes *= 0.85;
+        }
+        else
+        {
+            intervalMinutes *= 1.05;
+        }
+
         // Inactivity recovery: if bot has been offline a long time, pull it online sooner
         if (bot.LastOffline is not null && DateTime.TryParse(bot.LastOffline, out var lastOff))
         {
@@ -176,6 +187,19 @@ public sealed class BotScheduler
         catch (TimeZoneNotFoundException)
         {
             return TimeOnly.FromDateTime(utcTime);
+        }
+    }
+
+    private static DateTime ToLocalDateTime(DateTime utcTime, string timezone)
+    {
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(timezone);
+            return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return utcTime;
         }
     }
 }

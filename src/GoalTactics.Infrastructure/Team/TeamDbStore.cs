@@ -2,6 +2,7 @@ using GoalTactics.Application.Team;
 using GoalTactics.Application.Mechanics;
 using GoalTactics.Application.Stadium;
 using GoalTactics.Application.Common;
+using GoalTactics.Application.League;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -14,9 +15,11 @@ public sealed class TeamDbStore(
     StadiumEconomyService stadiumEconomy,
     TrainingProgressService trainingProgress,
     TeamStrengthCalculator strengthCalculator,
-    IConfiguration configuration) : ITeamStore
+    IConfiguration configuration,
+    ILeagueStore leagueStore) : ITeamStore
 {
     private readonly IConfiguration _configuration = configuration;
+    private readonly ILeagueStore _leagueStore = leagueStore;
 
     private const int FacilityMaxLevel = 20;
     private const int SeasonLengthDays = 30;
@@ -26,11 +29,33 @@ public sealed class TeamDbStore(
     private const int TransferBidStarsCost = 200;
     private const int StartingMoney = 10_000_000;
     private const int StartingGtStars = 5_000;
+
+    private const int TeamsPerLeague = 16;
     private static readonly string DefaultShirt = EquipmentCatalog.Shirts[0];
     private static readonly string DefaultEmblem = EquipmentCatalog.Emblems[0];
     private static readonly string[] InitialSquadPositions = ["GK", "GK", "DEF", "DEF", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "MID", "MID", "FWD", "FWD", "FWD", "FWD"];
-    private static readonly string[] FirstNames = ["Ehrmut", "Dragoljub", "Manuel", "Hendrik", "Calvin", "Nikolai", "Lukas", "Jonas", "David", "Mika", "Tobias", "Felix", "Marco", "Adrian", "Dominik", "Sebastian", "Florian", "Jan", "Leon", "Patrick"];
-    private static readonly string[] LastNames = ["Hoschatt", "Kumer", "Neuer", "Haintzl", "Johnston", "Pfalz-Sulzbach", "Morante", "Raizgys", "Schneider", "Vogel", "Mertens", "Lindner", "Baumann", "Reiter", "Hartmann", "Keller", "Schuster", "Brandt", "Scholz", "Bergmann"];
+    private static readonly string[] FirstNames = [
+        "Ehrmut", "Dragoljub", "Manuel", "Hendrik", "Calvin", "Nikolai", "Lukas", "Jonas", "David", "Mika",
+        "Tobias", "Felix", "Marco", "Adrian", "Dominik", "Sebastian", "Florian", "Jan", "Leon", "Patrick",
+        "Simon", "Konrad", "Maximilian", "Philipp", "Julian", "Vincent", "Benjamin", "Moritz", "Fabian", "Nico",
+        "Samuel", "Luis", "Tom", "Mats", "Noah", "Finn", "Robin", "Pascal", "Levi", "Henrik",
+        "Malte", "Marius", "Dennis", "Jannik", "Oliver", "Anton", "Phil", "Alex", "Oliver", "Timo",
+        "Matteo", "Lennard", "Jonas", "Kai", "Nils", "Julius", "Jannik", "Robin", "Jonas", "Luca",
+        "Simon", "Mika", "Louis", "Fabio", "Emil", "Fabian", "Elias", "Janik", "Sven", "Philipp",
+        "Niklas", "Tobias", "Alexander", "Johannes", "Lennart", "Sören", "Dennis", "Alexander", "Lars", "Jakob",
+        "Rune", "Milan", "Rafael", "Victor", "Samuel", "Lukas", "Noah", "Finn", "Mats", "Tom"
+    ];
+    private static readonly string[] LastNames = [
+        "Hoschatt", "Kumer", "Neuer", "Haintzl", "Johnston", "Pfalz-Sulzbach", "Morante", "Raizgys", "Schneider", "Vogel",
+        "Mertens", "Lindner", "Baumann", "Reiter", "Hartmann", "Keller", "Schuster", "Brandt", "Scholz", "Bergmann",
+        "Fischer", "Müller", "Schulz", "Weber", "Meier", "Wagner", "Becker", "Hoffmann", "Schäfer", "Koch",
+        "Richter", "Klein", "Wolf", "Schröder", "Neumann", "Schmitt", "Zimmermann", "Jäger", "Kaiser", "Schwarz",
+        "Braun", "Krüger", "Hofmann", "Walter", "Kühne", "Lange", "Schubert", "Simon", "Bauer", "König",
+        "Busch", "Schmitt", "Friedrich", "Köhler", "Bauer", "Peters", "Meyer", "Schneider", "Weiss", "Graf",
+        "Köhler", "Brand", "Stein", "Vogel", "Hahn", "Krause", "Roth", "Schreiber", "Winter", "Winkler",
+        "Frank", "Voigt", "Graf", "Horn", "Fuchs", "Pohl", "Paul", "Schreiber", "Heinrich", "Bolz",
+        "Ludwig", "Schiller", "Baumann", "Ulrich", "Döring", "Bremer", "Buchholz", "Dietrich", "Schindler", "Mayr"
+    ];
     private static readonly string[] Origins = ["Deutschland", "\u00d6sterreich", "Schweiz", "Slowenien", "Irland", "Litauen", "Frankreich", "Spanien", "Italien", "Niederlande", "Belgien", "Portugal", "Schweden", "Brasilien", "Argentinien"];
 
     public async Task<TeamRecord> GetOrCreateMyTeamAsync(string userId, CancellationToken cancellationToken = default)
@@ -444,11 +469,403 @@ public sealed class TeamDbStore(
         // reset seasonal statistics: player goals
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE team_players SET goals = 0", cancellationToken);
 
+        // reset cards and suspensions on season change
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE team_players SET yellow_cards = 0, red_cards = 0, suspension_matches_remaining = 0", cancellationToken);
+
         // sync change tracker with the raw SQL update so tracked entities reflect the reset
         foreach (var entry in dbContext.ChangeTracker.Entries<TeamPlayerEntity>())
         {
             entry.Property(p => p.Goals).CurrentValue = 0;
+            entry.Property(p => p.YellowCards).CurrentValue = 0;
+            entry.Property(p => p.RedCards).CurrentValue = 0;
+            entry.Property(p => p.SuspensionMatchesRemaining).CurrentValue = 0;
         }
+
+        await ApplyLeaguePromotionRelegationAsync(cancellationToken);
+
+        // After promotions/relegations, invalidate old fixtures so the new league composition
+        // has a fresh schedule.
+        await RegenerateSchedulesAfterSeasonTransitionAsync(cancellationToken);
+    }
+
+    private async Task RegenerateSchedulesAfterSeasonTransitionAsync(CancellationToken cancellationToken)
+    {
+        // Wipe the current fixture list so a clean season schedule can be generated.
+        await dbContext.Database.ExecuteSqlRawAsync("DELETE FROM league_matches", cancellationToken);
+
+        var leagueIds = await dbContext.Leagues.Select(l => l.Id).ToListAsync(cancellationToken);
+        foreach (var leagueId in leagueIds)
+        {
+            await _leagueStore.EnsureScheduleForLeagueAsync(Guid.Parse(leagueId), cancellationToken);
+        }
+    }
+
+    private async Task ApplyLeaguePromotionRelegationAsync(CancellationToken cancellationToken)
+    {
+
+        // Ensure the current peak tier exists (and that required lower/upper tiers exist for promotions/relegations).
+        var existingTiers = await dbContext.Leagues.Select(x => x.Tier).Distinct().OrderBy(x => x).ToListAsync(cancellationToken);
+        if (!existingTiers.Any())
+        {
+            // No leagues exist yet; nothing to do.
+            return;
+        }
+
+        var maxTier = existingTiers.Max();
+
+        // Ensure all current tiers are fully built (groups exist). If they are missing, we cannot reliably move teams.
+        // The league creation logic is in LeagueDbStore; replicate minimal needed behavior here.
+        await EnsureAllLeaguesExistForTierRangeAsync(1, maxTier + 1, cancellationToken);
+
+        // Ensure we have enough tiers to accommodate relegations climbing upward.
+        // Some tiers (e.g. 2+) have dismount slots and may push teams into higher tiers.
+        var tierToCheck = maxTier + 1;
+        while (true)
+        {
+            var hasRelegations = await dbContext.Leagues
+                .Where(l => l.Tier == tierToCheck && l.Dismount > 0)
+                .AnyAsync(cancellationToken);
+            if (!hasRelegations)
+                break;
+
+            // Ensure the next tier exists so relegations have somewhere to go.
+            await EnsureAllLeaguesExistForTierRangeAsync(tierToCheck + 1, tierToCheck + 1, cancellationToken);
+            tierToCheck++;
+        }
+
+        var maxTierToLoad = tierToCheck;
+        var leagues = await dbContext.Leagues
+            .Include(l => l.Teams)
+            .Where(l => l.Tier >= 1 && l.Tier <= maxTierToLoad)
+            .ToListAsync(cancellationToken);
+
+        // Build standings and identify promotions/relegations.
+        var leagueGroups = leagues
+            .SelectMany(l => l.Teams.Select(t => (League: l, Team: t)))
+            .GroupBy(p => (p.League.Tier, p.League.GroupNumber))
+            .ToDictionary(g => g.Key, g => g.Select(p => p.Team).ToList());
+
+        // Determine the lowest tier that actually contains human teams (TeamId != null).
+        var lowestHumanTier = leagues
+            .Where(l => l.Teams.Any(t => t.TeamId != null))
+            .Select(l => l.Tier)
+            .DefaultIfEmpty(int.MaxValue)
+            .Min();
+
+        var promotionsByTier = new Dictionary<int, List<LeagueTeamEntity>>();
+        var relegationsByTier = new Dictionary<int, List<LeagueTeamEntity>>();
+
+        foreach (var league in leagues)
+        {
+            var teams = league.Teams
+                .OrderByDescending(t => t.PointsHome + t.PointsAway)
+                .ThenByDescending(t => (t.GoalsScoredHome + t.GoalsScoredAway) - (t.GoalsReceivedHome + t.GoalsReceivedAway))
+                .ThenByDescending(t => t.GoalsScoredHome + t.GoalsScoredAway)
+                .ThenBy(t => t.TeamName)
+                .ToList();
+
+            if (teams.Count != TeamsPerLeague)
+            {
+                // If the league is incomplete (e.g. missing teams), skip promotion/relegation for it.
+                continue;
+            }
+
+            if (league.Mount > 0)
+            {
+                if (!promotionsByTier.TryGetValue(league.Tier, out var list))
+                {
+                    list = new List<LeagueTeamEntity>();
+                    promotionsByTier[league.Tier] = list;
+                }
+                list.AddRange(teams.Take(league.Mount));
+            }
+
+            if (league.Dismount > 0)
+            {
+                // If the lowest tier that contains humans is above 1, do not relegate from that tier.
+                // This prevents Tier N from dismounting when there is no lower tier with human teams.
+                if (lowestHumanTier > 1 && league.Tier == lowestHumanTier)
+                {
+                    continue;
+                }
+
+                if (!relegationsByTier.TryGetValue(league.Tier, out var list))
+                {
+                    list = new List<LeagueTeamEntity>();
+                    relegationsByTier[league.Tier] = list;
+                }
+                list.AddRange(teams.Skip(TeamsPerLeague - league.Dismount).Take(league.Dismount));
+            }
+        }
+
+        // Build a lookup of all slots and tracking of which slots are being moved.
+        var movingSlots = new HashSet<string>();
+        foreach (var tier in promotionsByTier.Keys)
+        {
+            foreach (var slot in promotionsByTier[tier])
+                movingSlots.Add(slot.Id);
+        }
+        foreach (var tier in relegationsByTier.Keys)
+        {
+            foreach (var slot in relegationsByTier[tier])
+                movingSlots.Add(slot.Id);
+        }
+
+        // Prepare available destination slots (slots that are not moving) by tier/group.
+        var availableDestSlots = leagueGroups.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new Queue<LeagueTeamEntity>(kvp.Value.Where(s => !movingSlots.Contains(s.Id)).OrderBy(s => s.Id)));
+
+        var usedDestSlotIds = new HashSet<string>();
+
+        // Helper to pick a destination slot for a given target tier/group.
+        LeagueTeamEntity PickDestinationSlot(int tier, int group)
+        {
+            var key = (tier, group);
+            if (!availableDestSlots.TryGetValue(key, out var queue))
+            {
+                queue = new Queue<LeagueTeamEntity>();
+                availableDestSlots[key] = queue;
+            }
+
+            while (queue.Count > 0)
+            {
+                var candidate = queue.Dequeue();
+                if (!usedDestSlotIds.Contains(candidate.Id))
+                {
+                    usedDestSlotIds.Add(candidate.Id);
+                    return candidate;
+                }
+            }
+
+            // Fallback: use any slot in the group that hasn't been used as a destination yet.
+            if (leagueGroups.TryGetValue(key, out var list))
+            {
+                var candidate = list.FirstOrDefault(s => !usedDestSlotIds.Contains(s.Id));
+                if (candidate is not null)
+                {
+                    usedDestSlotIds.Add(candidate.Id);
+                    return candidate;
+                }
+            }
+
+            throw new InvalidOperationException($"No slots available for tier {tier} group {group}.");
+        }
+
+        // Apply promotions (tier N -> tier N-1)
+        var promotionalMoves = new List<(LeagueTeamEntity Source, int TargetTier, int TargetGroup)>();
+        foreach (var (sourceTier, promotedTeams) in promotionsByTier)
+        {
+            var targetTier = sourceTier - 1;
+            if (targetTier < 1) continue;
+
+            var targetGroupsCount = GetMaxGroupsForTier(targetTier);
+            var perGroup = Math.Max(1, promotedTeams.Count / targetGroupsCount);
+            for (var i = 0; i < promotedTeams.Count; i++)
+            {
+                var team = promotedTeams[i];
+                var targetGroup = 1 + Math.Min(targetGroupsCount - 1, i / perGroup);
+                promotionalMoves.Add((team, targetTier, targetGroup));
+            }
+        }
+
+        // Apply relegations (tier N -> tier N+1)
+        var relegationMoves = new List<(LeagueTeamEntity Source, int TargetTier, int TargetGroup)>();
+        foreach (var (sourceTier, relegatedTeams) in relegationsByTier)
+        {
+            var targetTier = sourceTier + 1;
+            var targetGroupsCount = GetMaxGroupsForTier(targetTier);
+            for (var i = 0; i < relegatedTeams.Count; i++)
+            {
+                var team = relegatedTeams[i];
+                var targetGroup = 1 + (i % targetGroupsCount);
+                relegationMoves.Add((team, targetTier, targetGroup));
+            }
+        }
+
+        // Execute moves (promotions first, then relegations)
+        foreach (var move in promotionalMoves.Concat(relegationMoves))
+        {
+            var destSlot = PickDestinationSlot(move.TargetTier, move.TargetGroup);
+            if (destSlot.Id == move.Source.Id)
+            {
+                // The team is staying in its own slot (can happen if no movement is needed).
+                continue;
+            }
+
+            // Copy team info into destination slot.
+            destSlot.TeamId = move.Source.TeamId;
+            destSlot.TeamName = move.Source.TeamName;
+            destSlot.IsBot = move.Source.IsBot;
+            destSlot.Strength = move.Source.Strength;
+            destSlot.Country = move.Source.Country;
+            destSlot.Logo = move.Source.Logo;
+            destSlot.IsOnline = move.Source.IsOnline;
+
+            // Clear the source slot.
+            move.Source.TeamId = null;
+            var srcIdSuffix = move.Source.Id.Length >= 8 ? move.Source.Id[..8] : move.Source.Id;
+            move.Source.TeamName = $"Bot FC {move.TargetTier}-{move.TargetGroup}-{srcIdSuffix}";
+            move.Source.IsBot = true;
+            move.Source.Country = "DE";
+            move.Source.IsOnline = false;
+        }
+
+        // Reset all league stats for new season and clear existing match schedule/results.
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE league_teams SET matches_home = 0, matches_away = 0, wins_home = 0, wins_away = 0, losses_home = 0, losses_away = 0, draws_home = 0, draws_away = 0, goals_scored_home = 0, goals_scored_away = 0, goals_received_home = 0, goals_received_away = 0, points_home = 0, points_away = 0", cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("DELETE FROM league_matches", cancellationToken);
+
+        // Update team entities' league tier to match their current slot.
+        var teamSlots = await dbContext.LeagueTeams.Where(x => x.TeamId != null).ToListAsync(cancellationToken);
+        foreach (var slot in teamSlots)
+        {
+            var teamEntity = await dbContext.Teams.FirstOrDefaultAsync(x => x.Id == slot.TeamId, cancellationToken);
+            if (teamEntity != null)
+            {
+                var league = leagues.FirstOrDefault(l => l.Id == slot.LeagueId);
+                if (league != null)
+                {
+                    teamEntity.LeagueTier = league.Tier;
+                }
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureAllLeaguesExistForTierRangeAsync(int minTier, int maxTier, CancellationToken cancellationToken)
+    {
+        for (var tier = minTier; tier <= maxTier; tier++)
+        {
+            var existingGroups = await dbContext.Leagues
+                .Where(x => x.Tier == tier)
+                .Select(x => x.GroupNumber)
+                .ToListAsync(cancellationToken);
+
+            var maxGroups = GetMaxGroupsForTier(tier);
+            var missingGroups = Enumerable.Range(1, maxGroups).Except(existingGroups).ToList();
+            if (!missingGroups.Any())
+                continue;
+
+            foreach (var group in missingGroups.OrderBy(x => x))
+            {
+                CreateLeagueAndTeams(tier, group);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private void CreateLeagueAndTeams(int tier, int groupNumber)
+    {
+        var league = new LeagueEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Tier = tier,
+            GroupNumber = groupNumber,
+            Name = $"League {tier}-{groupNumber}",
+            Mount = tier switch
+            {
+                1 => 0,
+                2 => 1,
+                3 => 2,
+                4 => 2,
+                _ => 0
+            },
+            Dismount = tier switch
+            {
+                1 => 5,
+                2 => 6,
+                3 => 6,
+                _ => 0
+            }
+        };
+
+        dbContext.Leagues.Add(league);
+
+        var seed = HashCode.Combine(tier, groupNumber);
+        var random = new Random(seed);
+        for (var i = 1; i <= TeamsPerLeague; i++)
+        {
+            dbContext.LeagueTeams.Add(new LeagueTeamEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                LeagueId = league.Id,
+                TeamId = null,
+                TeamName = $"Bot FC {tier}-{groupNumber}-{i}",
+                IsBot = true,
+                Strength = random.Next(40, 85),
+                Country = "DE",
+                Logo = LegacyAppCompatibility.BuildLogoId($"bot-{tier}-{groupNumber}-{i}"),
+                IsOnline = false,
+                MatchesHome = 0,
+                MatchesAway = 0,
+                WinsHome = 0,
+                WinsAway = 0,
+                LossesHome = 0,
+                LossesAway = 0,
+                DrawsHome = 0,
+                DrawsAway = 0,
+                GoalsScoredHome = 0,
+                GoalsScoredAway = 0,
+                GoalsReceivedHome = 0,
+                GoalsReceivedAway = 0,
+                PointsHome = 0,
+                PointsAway = 0
+            });
+        }
+    }
+
+    private static int GetMaxGroupsForTier(int tier) => tier switch
+    {
+        1 => 1,
+        2 => 5,
+        3 => 15,
+        _ => 15 * (1 << (tier - 3))
+    };
+
+    private async Task MoveTeamToTierGroupAsync(LeagueTeamEntity teamSlot, int targetTier, int targetGroup, CancellationToken cancellationToken)
+    {
+        // Ensure target league exists (should have been ensured already via EnsureAllLeaguesExistForTierRangeAsync)
+        var targetLeague = await dbContext.Leagues.FirstOrDefaultAsync(x => x.Tier == targetTier && x.GroupNumber == targetGroup, cancellationToken);
+        if (targetLeague is null)
+        {
+            throw new InvalidOperationException($"Target league tier {targetTier} group {targetGroup} does not exist.");
+        }
+
+        // Find a placeholder slot in the target league (a bot slot with no team assigned)
+        var targetSlot = await dbContext.LeagueTeams
+            .Where(x => x.LeagueId == targetLeague.Id && x.IsBot && x.TeamId == null)
+            .OrderBy(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (targetSlot is null)
+        {
+            // No empty slot available; pick any slot in the target league and overwrite it.
+            targetSlot = await dbContext.LeagueTeams
+                .Where(x => x.LeagueId == targetLeague.Id)
+                .OrderBy(x => x.Id)
+                .FirstAsync(cancellationToken);
+        }
+
+        // Move the team data into the target slot.
+        targetSlot.TeamId = teamSlot.TeamId;
+        targetSlot.TeamName = teamSlot.TeamName;
+        targetSlot.IsBot = teamSlot.IsBot;
+        targetSlot.Strength = teamSlot.Strength;
+        targetSlot.Country = teamSlot.Country;
+        targetSlot.Logo = teamSlot.Logo;
+        targetSlot.IsOnline = teamSlot.IsOnline;
+
+        // Reset source slot to an empty bot placeholder.
+        teamSlot.TeamId = null;
+        var slotIdSuffix = teamSlot.Id.Length >= 8 ? teamSlot.Id[..8] : teamSlot.Id;
+        teamSlot.TeamName = $"Bot FC {targetTier}-{targetGroup}-{slotIdSuffix}";
+        teamSlot.IsBot = true;
+        teamSlot.Country = "DE";
+        teamSlot.IsOnline = false;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task RenameTeamAsync(string userId, string teamId, string name, CancellationToken cancellationToken = default)
@@ -1903,27 +2320,7 @@ public sealed class TeamDbStore(
             .Where(x => x.TeamId == team.TeamId)
             .ToListAsync(cancellationToken);
 
-        if (cards.Count == 0)
-        {
-            // For legacy accounts created before we added skill cards, seed a starting set.
-            var initialCards = BuildInitialSkillCards(team.TeamId);
-            foreach (var card in initialCards)
-            {
-                dbContext.TeamSkillCards.Add(new TeamSkillCardEntity
-                {
-                    Id = Guid.NewGuid().ToString("N"),
-                    TeamId = team.TeamId,
-                    Skill = card.Skill,
-                    Rarity = card.Rarity,
-                    Count = card.Count,
-                    Bonus = card.Bonus
-                });
-            }
-
-            await dbContext.SaveChangesAsync(cancellationToken);
-            cards = await dbContext.TeamSkillCards.AsNoTracking().Where(x => x.TeamId == team.TeamId).ToListAsync(cancellationToken);
-        }
-
+        // Do not auto-seed cards here; allow teams to have 0 cards.
         return cards.Select(x => new SkillCardRecord(x.Skill, x.Rarity, x.Count, x.Bonus)).ToArray();
     }
 

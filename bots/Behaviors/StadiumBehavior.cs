@@ -1,5 +1,6 @@
 using GoalTactics.Bots.Client.ApiClient;
 using GoalTactics.Bots.Client.Database;
+using GoalTactics.Bots.Client.Neural;
 
 namespace GoalTactics.Bots.Client.Behaviors;
 
@@ -16,16 +17,32 @@ public sealed class StadiumBehavior
     private const string ParkingKeyword = "parking";
     private const string StandingKeyword = "standing";
 
-    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot)
+    private sealed class BuildingSnapshot
     {
-        var response = await api.GetStadiumAsync();
-        if (response is null) return;
+        public string Id { get; init; } = "";
+        public string Name { get; init; } = "";
+        public int Utilization { get; init; }
+    }
 
-        var buildings = response.Buildings;
+    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan = null)
+    {
+        var response = await api.ExecuteForBotAsync("GetStadium");
+        if (!response.Success) return;
+
+        var buildings = BotApiTranslationReader.GetObjectList(response, "buildings")
+            .Select(ToBuilding)
+            .Where(b => !string.IsNullOrEmpty(b.Id))
+            .ToList();
         if (buildings is null || buildings.Count == 0) return;
 
         // Determine if the stadium is at capacity using the embedded StadiumDataDto
-        int capacity = response.Stadium?.Capacity ?? 0;
+        int capacity = 0;
+        var stadium = BotApiTranslationReader.GetObject(response, "stadium");
+        if (stadium is not null)
+        {
+            capacity = BotApiTranslationReader.GetInt(stadium, "capacity");
+        }
+
         int utilization = buildings.Sum(b => b.Utilization);
         bool capacityFull = capacity > 0 && utilization >= capacity;
 
@@ -34,7 +51,7 @@ public sealed class StadiumBehavior
 
         foreach (string buildingId in toBuild)
         {
-            await api.BuildStadiumAsync(buildingId);
+            await api.ExecuteForBotAsync("BuildStadium", new IdRequest { Id = buildingId });
         }
     }
 
@@ -42,7 +59,7 @@ public sealed class StadiumBehavior
     /// Returns building IDs to upgrade, ordered by priority.
     /// </summary>
     private static List<string> DetermineBuildPriority(
-        List<BuildingDto> buildings, int youthFocus, bool capacityFull)
+        List<BuildingSnapshot> buildings, int youthFocus, bool capacityFull)
     {
         var priority = new List<string>();
 
@@ -85,4 +102,12 @@ public sealed class StadiumBehavior
 
         return priority;
     }
+
+    private static BuildingSnapshot ToBuilding(Dictionary<string, object?> data)
+        => new()
+        {
+            Id = BotApiTranslationReader.GetString(data, "id"),
+            Name = BotApiTranslationReader.GetString(data, "name"),
+            Utilization = BotApiTranslationReader.GetInt(data, "utilization")
+        };
 }

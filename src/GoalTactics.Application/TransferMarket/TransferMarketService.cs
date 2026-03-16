@@ -37,11 +37,11 @@ public sealed class TransferMarketService(ITeamStore teamStore, IAuctionStore au
 
         await auctionStore.EnsureSystemAuctionsAsync(MinimumSystemAuctions, cancellationToken);
 
+        // Return all matching auctions in one response. The old client API could page, but we now return everything in one go.
+        // Keep pagination metadata for compatibility, but always indicate a single page.
         var (players, totalCount) = await auctionStore.SearchAsync(request, cancellationToken);
         var favorites = await auctionStore.GetFavoritesAsync(userId, cancellationToken);
         var sellings = await auctionStore.GetSellingsAsync(team.TeamId, cancellationToken);
-
-        var pageSize = request.SafePageSize;
 
         return new TransferSearchResponse
         {
@@ -51,8 +51,8 @@ public sealed class TransferMarketService(ITeamStore teamStore, IAuctionStore au
             Sellings = sellings,
             MyTeamId = myTeamId,
             TotalCount = totalCount,
-            CurrentPage = request.SafePage,
-            TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+            CurrentPage = 1,
+            TotalPages = 1
         };
     }
 

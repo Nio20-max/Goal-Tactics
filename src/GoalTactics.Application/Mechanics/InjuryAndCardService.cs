@@ -9,11 +9,10 @@ public sealed class InjuryAndCardService
 
     public int CalculateSuspensionMatches(int yellowCards, bool redCard)
     {
+        // Standard football rule: one match suspension for a red card, or for a "3 yellows" accumulation.
         if (redCard)
-        {
-            return 2;
-        }
+            return 1;
 
-        return yellowCards >= 5 ? 1 : 0;
+        return yellowCards >= 3 ? 1 : 0;
     }
 }

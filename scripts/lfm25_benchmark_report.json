@@ -1,0 +1,27 @@
+{
+  "summary": {
+    "runs": 1,
+    "contexts": [
+      2048
+    ],
+    "avg_tokens_per_sec": 17.324602076936966,
+    "error_rate": 0.0,
+    "empty_rate": 0.0,
+    "rss_max": 768839680,
+    "rss_min": 768839680
+  },
+  "runs": [
+    {
+      "input_tokens": 77,
+      "output_tokens": 257,
+      "duration_s": 19.27894207998179,
+      "tokens_per_sec": 17.324602076936966,
+      "output": "<think> Okay, let's see what the user needs here. They want me to write an email to their team about preparing for the next match. The key points they mentioned are emphasizing preparation, focus, and teamwork, keeping it concise and professional. \n\nFirst, I need to start with a subject line that grabs attention but stays professional. Maybe something like \"Preparation for Upcoming Match\" or similar. Then the greeting should be straightforward, like \"Hi Team,\".\n\nThe body needs to highlight preparation first. I should mention that thorough preparation is key, maybe mention practice and review of strategies. Then transition into focus\u2014emphasize staying concentrated, avoiding distractions. Next, teamwork: stress collaboration, communication, supporting each other. End with a call to action, like confirming attendance or readiness, and a positive closing.\n\nWait, the user said concise and professional. So avoid fluff. Make sure each sentence serves a purpose. Start with a strong opening line about readiness. Then bullet points? Wait no, since it's an email, maybe short paragraphs. But user said concise, so perhaps one or two short paragraphs. \n\nWait, the user said \"keep it concise and professional,\" so maybe one paragraph? Or two",
+      "output_is_empty": false,
+      "ctx": 2048,
+      "run": 1,
+      "rss": 768839680,
+      "cpu_pct": 0.0
+    }
+  ]
+}

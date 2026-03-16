@@ -62,16 +62,24 @@ public sealed class BotFactory
         // Fetch countries if no countryId provided
         if (countryId is null)
         {
-            var countries = await _api.GetCountriesAsync();
-            if (countries?.Countries is not null && countries.Countries.Count > 0)
-                countryId = countries.Countries[_rng.Next(countries.Countries.Count)].Id;
+            var countries = await _api.ExecuteForBotAsync("GetCountries");
+            var countryList = countries.Success
+                ? BotApiTranslationReader.GetObjectList(countries, "countries")
+                : [];
+
+            if (countryList.Count > 0)
+            {
+                countryId = BotApiTranslationReader.GetString(countryList[_rng.Next(countryList.Count)], "id", "1");
+            }
             else
+            {
                 countryId = "1";
+            }
         }
 
         string email = SanitizeEmail(teamName);
 
-        var registerResult = await _api.RegisterAsync(new RegisterRequest
+        var registerResult = await _api.ExecuteForBotAsync("Register", new RegisterRequest
         {
             IsGuest = false,
             Email = email,
@@ -82,24 +90,37 @@ public sealed class BotFactory
             CountryId = countryId
         });
 
-        if (registerResult is null || !registerResult.Success)
+        if (!registerResult.Success)
         {
             Console.Error.WriteLine($"[BotFactory] Registration failed for {teamName}");
             return null;
         }
 
+        var registerUserId = BotApiTranslationReader.GetString(registerResult.Output, "userId");
+        if (string.IsNullOrEmpty(registerUserId))
+        {
+            Console.Error.WriteLine($"[BotFactory] Registration succeeded without userId for {teamName}");
+            return null;
+        }
+
         // Login to get JWT
-        var loginResult = await _api.LoginAsync(new LoginRequest
+        var loginResult = await _api.ExecuteForBotAsync("Login", new LoginRequest
         {
             Email = email,
             Password = password
         });
 
-        string token = loginResult?.Token ?? "";
+        if (!loginResult.Success)
+        {
+            Console.Error.WriteLine($"[BotFactory] Login failed for {teamName}");
+            return null;
+        }
+
+        string token = BotApiTranslationReader.GetString(loginResult.Output, "token");
 
         var record = new BotRecord
         {
-            BotId = registerResult.UserId ?? throw new InvalidOperationException("Registration succeeded but returned no UserId"),
+            BotId = registerUserId,
             Password = password,
             ValidationToken = token,
             TeamName = teamName,

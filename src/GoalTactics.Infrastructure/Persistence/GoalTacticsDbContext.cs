@@ -252,6 +252,7 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.Goals).HasColumnName("goals").IsRequired();
             entity.Property(x => x.YellowCards).HasColumnName("yellow_cards").IsRequired();
             entity.Property(x => x.RedCards).HasColumnName("red_cards").IsRequired();
+            entity.Property(x => x.SuspensionMatchesRemaining).HasColumnName("suspension_matches_remaining").IsRequired();
             entity.Property(x => x.IndividualTrainingSkill).HasColumnName("individual_training_skill").HasMaxLength(32);
             entity.Property(x => x.IndividualTrainingUntilUtc).HasColumnName("individual_training_until_utc");
             entity.Property(x => x.ContractEndUtc).HasColumnName("contract_end_utc");

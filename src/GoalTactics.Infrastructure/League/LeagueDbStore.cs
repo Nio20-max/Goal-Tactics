@@ -1,3 +1,4 @@
+using System.Linq;
 using GoalTactics.Application.League;
 using GoalTactics.Application.Common;
 using GoalTactics.Infrastructure.Persistence;
@@ -9,7 +10,6 @@ namespace GoalTactics.Infrastructure.League;
 public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
 {
     private const int ClubsPerLeague = 16;
-    private const int PreferredHumanTier = 3;
 
     public async Task<LeagueTableRecord> GetLeagueTableForUserAsync(string userId, Guid requestedLeagueId, CancellationToken cancellationToken = default)
     {
@@ -133,47 +133,157 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<LeagueEntity> FindOrCreateLeagueWithBotSlotAsync(CancellationToken cancellationToken)
+    private static int GetMaxGroupsForTier(int tier) => tier switch
     {
+        1 => 1,
+        2 => 5,
+        3 => 15,
+        _ => 15 * (1 << (tier - 3))
+    };
+
+    internal async Task<LeagueEntity> FindOrCreateLeagueWithBotSlotAsync(CancellationToken cancellationToken)
+    {
+        // Always prefer the highest leagues (lowest tier number) that still have an available bot slot.
         var leagueWithSlot = await dbContext.Leagues
             .Include(x => x.Teams)
-            .OrderBy(x => x.Tier == PreferredHumanTier ? 0 : 1)
-            .ThenBy(x => x.Tier)
+            .OrderBy(x => x.Tier)
             .ThenBy(x => x.GroupNumber)
             .FirstOrDefaultAsync(x => x.Teams.Any(t => t.IsBot), cancellationToken);
 
         if (leagueWithSlot is not null)
         {
-            return leagueWithSlot;
+            // If the lowest existing tier is higher than 1 (e.g. only tier 3 exists),
+            // create the missing lower tiers before assigning a user.
+            var minExistingTier = await dbContext.Leagues.MinAsync(x => x.Tier, cancellationToken);
+            if (minExistingTier > 1)
+            {
+                for (var missing = 1; missing < minExistingTier; missing++)
+                {
+                    await EnsureLeaguesExistForTierAsync(missing, cancellationToken);
+                }
+
+                // Re-evaluate which league has the earliest bot slot after filling in the missing tiers.
+                leagueWithSlot = await dbContext.Leagues
+                    .Include(x => x.Teams)
+                    .OrderBy(x => x.Tier)
+                    .ThenBy(x => x.GroupNumber)
+                    .FirstOrDefaultAsync(x => x.Teams.Any(t => t.IsBot), cancellationToken);
+            }
+
+            // Ensure that once a tier is in use, all its groups are created (filled with placeholder bots).
+            if (leagueWithSlot is not null)
+            {
+                await EnsureLeaguesExistForTierAsync(leagueWithSlot.Tier, cancellationToken);
+                return leagueWithSlot;
+            }
         }
 
-        var allLeagues = await dbContext.Leagues.AsNoTracking().ToListAsync(cancellationToken);
-        if (allLeagues.Count == 0)
+        // No existing league has a bot slot; create the next tier (or remaining groups in a tier) as needed.
+        // We create full tiers (all groups) as soon as the tier becomes active.
+        var existingLeagues = await dbContext.Leagues.AsNoTracking().ToListAsync(cancellationToken);
+
+        // If we have no leagues at all, start with tier 1.
+        if (existingLeagues.Count == 0)
         {
-            return await CreateLeagueAsync(PreferredHumanTier, 1, cancellationToken);
+            await EnsureLeaguesExistForTierAsync(1, cancellationToken);
+        }
+        else
+        {
+            // If the existing leagues start at a higher tier (e.g., only tier 3 exists),
+            // create missing lower tiers first so users always start at tier 1.
+            var tiersPresent = existingLeagues.Select(x => x.Tier).Distinct().OrderBy(t => t).ToList();
+            var minTier = tiersPresent.First();
+            if (minTier > 1)
+            {
+                for (var missingTier = 1; missingTier < minTier; missingTier++)
+                {
+                    await EnsureLeaguesExistForTierAsync(missingTier, cancellationToken);
+                }
+
+                // Refresh league list after creating the missing tiers.
+                existingLeagues = await dbContext.Leagues.AsNoTracking().ToListAsync(cancellationToken);
+                tiersPresent = existingLeagues.Select(x => x.Tier).Distinct().OrderBy(t => t).ToList();
+            }
+
+            // Determine the lowest tier that is not yet "full" (either missing groups or still has a bot slot).
+            int? tierToActivate = null;
+            foreach (var tier in tiersPresent)
+            {
+                var tierLeagues = existingLeagues.Where(x => x.Tier == tier).ToList();
+                var maxGroups = GetMaxGroupsForTier(tier);
+
+                // If the tier isn't fully created yet, create the missing groups and return the first available.
+                if (tierLeagues.Count < maxGroups)
+                {
+                    tierToActivate = tier;
+                    break;
+                }
+
+                // If tier is fully created but has no remaining bot slot, continue to next tier.
+                var tierHasBotSlot = await dbContext.Leagues
+                    .Include(x => x.Teams)
+                    .Where(x => x.Tier == tier)
+                    .AnyAsync(x => x.Teams.Any(t => t.IsBot), cancellationToken);
+                if (tierHasBotSlot)
+                {
+                    // This should have been caught earlier by the initial query, but keep defensive.
+                    leagueWithSlot = await dbContext.Leagues
+                        .Include(x => x.Teams)
+                        .Where(x => x.Tier == tier)
+                        .OrderBy(x => x.GroupNumber)
+                        .FirstAsync(x => x.Teams.Any(t => t.IsBot), cancellationToken);
+                    return leagueWithSlot;
+                }
+
+                // Otherwise, tier is full and all teams are humans; go to next tier.
+            }
+
+            if (tierToActivate is null)
+            {
+                // All existing tiers are completely filled with humans; start next tier.
+                var nextTier = tiersPresent.Max() + 1;
+                tierToActivate = nextTier;
+            }
+
+            await EnsureLeaguesExistForTierAsync(tierToActivate.Value, cancellationToken);
         }
 
-        var maxTier = allLeagues.Max(x => x.Tier);
-        var maxTierLeagues = allLeagues.Where(x => x.Tier == maxTier).OrderBy(x => x.GroupNumber).ToList();
-        // Allow enough groups per tier to match the real league pyramid (1, 5, 15, 30, 60, …)
-        var maxGroupsAllowedAtTier = maxTier switch
-        {
-            1 => 1,
-            2 => 5,
-            3 => 15,
-            _ => 15 * (1 << (maxTier - 3))
-        };
+        // At this point we should have at least one league with a bot slot.
+        leagueWithSlot = await dbContext.Leagues
+            .Include(x => x.Teams)
+            .OrderBy(x => x.Tier)
+            .ThenBy(x => x.GroupNumber)
+            .FirstOrDefaultAsync(x => x.Teams.Any(t => t.IsBot), cancellationToken);
 
-        if (maxTierLeagues.Count < maxGroupsAllowedAtTier)
-        {
-            var nextGroup = maxTierLeagues.Count + 1;
-            return await CreateLeagueAsync(maxTier, nextGroup, cancellationToken);
-        }
+        if (leagueWithSlot is null)
+            throw new InvalidOperationException("Failed to create a league with an available bot slot.");
 
-        return await CreateLeagueAsync(maxTier + 1, 1, cancellationToken);
+        return leagueWithSlot;
     }
 
-    private async Task<LeagueEntity> CreateLeagueAsync(int tier, int groupNumber, CancellationToken cancellationToken)
+    private async Task EnsureLeaguesExistForTierAsync(int tier, CancellationToken cancellationToken)
+    {
+        var maxGroups = GetMaxGroupsForTier(tier);
+
+        var existingGroups = await dbContext.Leagues
+            .AsNoTracking()
+            .Where(x => x.Tier == tier)
+            .Select(x => x.GroupNumber)
+            .ToListAsync(cancellationToken);
+
+        var missingGroups = Enumerable.Range(1, maxGroups).Except(existingGroups).ToList();
+        if (!missingGroups.Any())
+            return;
+
+        foreach (var groupNumber in missingGroups.OrderBy(x => x))
+        {
+            CreateLeagueEntities(tier, groupNumber);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private void CreateLeagueEntities(int tier, int groupNumber)
     {
         var league = new LeagueEntity
         {
@@ -186,15 +296,14 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
                 1 => 0,
                 2 => 1,
                 3 => 2,
-                4 => 2,
-                _ => 0
+                _ => 3
             },
             Dismount = tier switch
             {
                 1 => 5,
                 2 => 6,
                 3 => 6,
-                _ => 0
+                _ => 6
             }
         };
 
@@ -202,10 +311,9 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
 
         var seed = HashCode.Combine(tier, groupNumber);
         var random = new Random(seed);
-        var leagueTeams = new List<LeagueTeamEntity>();
         for (var i = 1; i <= ClubsPerLeague; i++)
         {
-            var lt = new LeagueTeamEntity
+            dbContext.LeagueTeams.Add(new LeagueTeamEntity
             {
                 Id = Guid.NewGuid().ToString("N"),
                 LeagueId = league.Id,
@@ -230,17 +338,17 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
                 GoalsReceivedAway = 0,
                 PointsHome = 0,
                 PointsAway = 0
-            };
-            leagueTeams.Add(lt);
-            dbContext.LeagueTeams.Add(lt);
+            });
         }
+    }
 
+    private async Task<LeagueEntity> CreateLeagueAsync(int tier, int groupNumber, CancellationToken cancellationToken)
+    {
+        CreateLeagueEntities(tier, groupNumber);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // Schedule generation is deferred until a client requests matches in this league.
-        // This keeps initial league creation fast and avoids bulk inserting thousands of match
-        // entities on the first launch of a fresh database.
-        return league;
+        return await dbContext.Leagues.AsNoTracking().FirstAsync(x => x.Tier == tier && x.GroupNumber == groupNumber, cancellationToken);
     }
 
     /// <summary>
@@ -250,37 +358,52 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
     private void GenerateRoundRobinSchedule(string leagueId, List<LeagueTeamEntity> teams)
     {
         var n = teams.Count; // 16
-        var seasonStart = DateTime.UtcNow.Date;
+        if (n < 2 || n % 2 != 0)
+            throw new InvalidOperationException("Round-robin scheduling requires an even number of teams.");
 
-        // Standard round-robin: fix team[0], rotate the rest
-        // First half: matchdays 1..15
-        var teamIds = teams.Select(t => t).ToArray();
+        // Schedule matchdays to happen once per day at a fixed UTC time.
+        // Ensures stable daily fixture times and avoids scheduling matches in the past.
+        var now = DateTime.UtcNow;
+        var firstMatchUtc = now.Date.AddHours(18);
+        if (now >= firstMatchUtc)
+        {
+            firstMatchUtc = firstMatchUtc.AddDays(1);
+        }
+
+        // Use a standard "circle method" (Berger tables) to generate a valid round-robin.
+        // This ensures:
+        //  - no team is paired with itself
+        //  - every pair meets exactly once per half
+        //  - home/away assignment is balanced across the season.
+        var allTeams = teams.ToArray();
+        var fixedTeam = allTeams[^1];
+        var rotating = allTeams.Take(n - 1).ToArray();
+
         var schedule = new List<(int matchday, LeagueTeamEntity home, LeagueTeamEntity away)>();
-
-        // Round-robin algorithm: fix first team, rotate rest
-        var rotating = new LeagueTeamEntity[n - 1];
-        for (var i = 0; i < n - 1; i++)
-            rotating[i] = teamIds[i + 1];
-
         for (var round = 0; round < n - 1; round++)
         {
             var matchday = round + 1;
-            // First match: team[0] vs rotating[0]
-            schedule.Add((matchday, teamIds[0], rotating[0]));
 
-            // Pair remaining: rotating[1] vs rotating[n-2], rotating[2] vs rotating[n-3], etc.
-            for (var j = 1; j < n / 2; j++)
+            // Pair the fixed team with one rotating team.
+            // Alternate home/away each round so the fixed team isn't always at home.
+            var rotatingIndex = round % (n - 1);
+            if (round % 2 == 0)
+                schedule.Add((matchday, rotating[rotatingIndex], fixedTeam));
+            else
+                schedule.Add((matchday, fixedTeam, rotating[rotatingIndex]));
+
+            // Pair the remaining rotating teams.
+            for (var i = 1; i < n / 2; i++)
             {
-                var home = rotating[j];
-                var away = rotating[n - 2 - j];
-                schedule.Add((matchday, home, away));
-            }
+                var first = rotating[(round + i) % (n - 1)];
+                var second = rotating[(round + (n - 1) - i) % (n - 1)];
 
-            // Rotate: move last element to position 0
-            var last = rotating[n - 2];
-            for (var j = n - 2; j > 0; j--)
-                rotating[j] = rotating[j - 1];
-            rotating[0] = last;
+                // Alternate home/away to keep balance.
+                if (i % 2 == 0)
+                    schedule.Add((matchday, first, second));
+                else
+                    schedule.Add((matchday, second, first));
+            }
         }
 
         // Second half: reverse home/away, matchdays 16..30
@@ -309,7 +432,7 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
                 HomeStrength = (int)home.Strength,
                 AwayStrength = (int)away.Strength,
                 IsPlayed = false,
-                ScheduledDateUtc = seasonStart.AddDays(matchday - 1).AddHours(18)
+                ScheduledDateUtc = firstMatchUtc.AddDays(matchday - 1)
             });
         }
     }
@@ -465,6 +588,19 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
                 AwayTeamId: at?.TeamId ?? m.AwayLeagueTeamId,
                 UserTeamId: teamId);
         }).ToArray();
+    }
+
+    public async Task EnsureScheduleForLeagueAsync(Guid leagueId, CancellationToken cancellationToken = default)
+    {
+        var leagueIdStr = leagueId.ToString("N");
+        var hasMatches = await dbContext.LeagueMatches.AnyAsync(x => x.LeagueId == leagueIdStr, cancellationToken);
+        if (hasMatches) return;
+
+        var leagueTeams = await dbContext.LeagueTeams.Where(x => x.LeagueId == leagueIdStr).ToListAsync(cancellationToken);
+        if (leagueTeams.Count < 2) return;
+
+        GenerateRoundRobinSchedule(leagueIdStr, leagueTeams);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<GoalGetterRecord>> GetTopScorersAsync(Guid leagueId, int count, CancellationToken cancellationToken = default)

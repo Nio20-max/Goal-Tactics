@@ -48,9 +48,6 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
         var matches = await leagueStore.GetMatchesForUserAsync(userId, leagueId, cancellationToken);
 
         var totalCount = matches.Count;
-        var safePage = Math.Max(1, page);
-        var safePageSize = Math.Clamp(pageSize, 1, 200);
-        var paged = matches.Skip((safePage - 1) * safePageSize).Take(safePageSize).ToArray();
 
         return new MatchesResponse
         {
@@ -58,9 +55,9 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
             HomeTrikot = "trikot0",
             AwayTrikot = "trikot0",
             TotalCount = totalCount,
-            CurrentPage = safePage,
-            TotalPages = (int)Math.Ceiling((double)totalCount / safePageSize),
-            Matches = paged.Select(m =>
+            CurrentPage = 1,
+            TotalPages = 1,
+            Matches = matches.Select(m =>
             {
                 var userTeamId = m.UserTeamId;
                 int myTeam = 0;

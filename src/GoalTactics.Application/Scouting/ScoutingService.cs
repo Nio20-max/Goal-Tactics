@@ -22,7 +22,8 @@ public interface IScoutingService
 public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
 {
     private const int NormalScoutCost = 10_000;
-    private const int PremiumScoutCostStars = 300;
+    private const int PremiumScoutCostStars = 1_000;
+    private const int LegacyPremiumScoutCostStars = 300; // preserved for legacy request-line detection
     private const int SpeedupCostStars = 300;
     private const int MaxSimultaneousScouts = 3;
     private static readonly TimeSpan NormalScoutDuration = TimeSpan.FromHours(12);
@@ -109,9 +110,9 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
             HasRedCard = p.RedCards > 0,
             Injured = 0,
             IsForSale = false,
-            SellPrice = Math.Max(10_000m, p.Strength * p.Strength),
+            SellPrice = p.MarketValue,
             TransfermarketFee = Math.Max(1_000m, p.Strength * 14m),
-            TransfermarketMaxOffer = Math.Max(10_000m, p.Strength * p.Strength * 11m / 10m),
+            TransfermarketMaxOffer = Math.Max(10_000m, p.MarketValue * 1.1m),
             TransfermarketMinOffer = Math.Max(1_000m, p.Strength * 14m),
             TransfermarketMaxHours = 48,
             IsUpgraded = false,
@@ -180,7 +181,7 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
         var lastName = LastNames[rng.Next(LastNames.Length)];
         var name = $"{firstName} {lastName}";
         var origin = Origins[rng.Next(Origins.Length)];
-        var age = rng.Next(16, 19); // 16-18 inclusive
+        var age = isPremium ? rng.Next(16, 18) : rng.Next(16, 19); // premium: 16-17, normal: 16-18
         var talent = isPremium ? rng.Next(6, 11) : rng.Next(3, 9);
         var baseStr = position switch
         {
@@ -191,7 +192,7 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
             _ => 60m
         };
         var strength = Math.Clamp(baseStr + rng.Next(-5, 15) + (talent >= 8 ? rng.Next(2, 8) : 0), 50m, 90m);
-        var fitness = rng.Next(0, 101);
+        var fitness = isPremium ? rng.Next(0, 51) : rng.Next(0, 101);
 
         // Set scouting ready time based on scout type
         var duration = isPremium ? PremiumScoutDuration : NormalScoutDuration;

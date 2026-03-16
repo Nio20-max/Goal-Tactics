@@ -1,4 +1,5 @@
 using GoalTactics.Contracts.Sponsors;
+using GoalTactics.Application.Mechanics;
 using GoalTactics.Application.Team;
 
 namespace GoalTactics.Application.Sponsors;
@@ -216,6 +217,9 @@ public sealed class SponsorService(ITeamStore teamStore, ISponsorStore sponsorSt
                 MainSponsorNames[mainIdx], MainSponsorDescriptions[mainIdx],
                 mainBaseMoney, mainBonusPerWin, mainBonusPerGoal, mainStars,
                 now, now.AddDays(MainContractDays), cancellationToken);
+
+            // Main sponsor signs with cards, too.
+            await teamStore.AddSkillCardsAsync(userId, GenerateSponsorSkillCards(team.TeamId, "Main", 3), cancellationToken);
         }
         else if (offerId == secondaryId)
         {
@@ -224,6 +228,9 @@ public sealed class SponsorService(ITeamStore teamStore, ISponsorStore sponsorSt
                 SecondarySponsorNames[secondaryIdx], SecondarySponsorDescriptions[secondaryIdx],
                 secondaryBaseMoney, secondaryBonusPerWin, secondaryBonusPerGoal, secondaryStars,
                 now, now.AddDays(SecondaryContractDays), cancellationToken);
+
+            // Secondary sponsor signs with cards, too.
+            await teamStore.AddSkillCardsAsync(userId, GenerateSponsorSkillCards(team.TeamId, "Secondary", 2), cancellationToken);
         }
         else
         {
@@ -241,4 +248,30 @@ public sealed class SponsorService(ITeamStore teamStore, ISponsorStore sponsorSt
         BitConverter.TryWriteBytes(bytes.AsSpan(12), daySeed);
         return new Guid(bytes);
     }
+
+    private static IReadOnlyList<SkillCardRecord> GenerateSponsorSkillCards(string teamId, string type, int count)
+    {
+        // Stable deterministic cards per team+type (useful for testing and avoiding surprises).
+        var seed = HashCode.Combine(teamId, "sponsor-cards", type);
+        var rng = new Random(seed);
+
+        var result = new List<SkillCardRecord>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var skill = rng.Next(0, TeamStrengthCalculator.NumberOfSkills);
+            var rarity = rng.Next(0, 3);
+            var bonus = rarity switch
+            {
+                0 => 0.5m,
+                1 => 1.25m,
+                2 => 2.5m,
+                _ => 0.5m
+            };
+
+            result.Add(new SkillCardRecord(skill, rarity, 1, bonus));
+        }
+
+        return result;
+    }
 }
+

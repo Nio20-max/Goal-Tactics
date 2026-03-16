@@ -4,6 +4,7 @@ public sealed class MatchData
 {
     public Guid Id { get; init; }
     public string? Date { get; init; }
+    public DateTime DateValue { get; init; }
     public string? HomeLogo { get; init; }
     public string? AwayLogo { get; init; }
     public string? HomeName { get; init; }
@@ -20,4 +21,5 @@ public sealed class MatchData
     public string? HomeTrikot { get; init; }
     public string? AwayTrikot { get; init; }
     public bool IsFriendly { get; init; }
+    public bool HasScore { get; init; }
 }

@@ -47,7 +47,15 @@ public sealed class LineupController(ILineupService lineupService) : ControllerB
             return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
         }
 
-        await lineupService.SaveLineupAsync(userId, request, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Saved" });
+        try
+        {
+            await lineupService.SaveLineupAsync(userId, request, cancellationToken);
+            return Ok(new ResponseObject { Success = true, Message = "Saved" });
+        }
+        catch (Exception ex)
+        {
+            // Prevent the app from crashing when saving a lineup fails (invalid input, missing players, etc.)
+            return Ok(new ResponseObject { Success = false, Message = ex.Message });
+        }
     }
 }

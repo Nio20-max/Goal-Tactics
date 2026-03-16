@@ -62,7 +62,7 @@ public sealed class ScheduledMatchResolutionJob(
             {
                 homePlayers = await dbContext.TeamPlayers
                     .AsNoTracking()
-                    .Where(p => p.TeamId == homeLeagueTeam.TeamId && !p.IsScouted)
+                    .Where(p => p.TeamId == homeLeagueTeam.TeamId && !p.IsScouted && p.SuspensionMatchesRemaining <= 0)
                     .Select(p => new SimulationPlayer(p.Id, p.Name, p.Position, p.Strength, p.TeamId))
                     .ToListAsync(cancellationToken);
 
@@ -82,7 +82,7 @@ public sealed class ScheduledMatchResolutionJob(
             {
                 awayPlayers = await dbContext.TeamPlayers
                     .AsNoTracking()
-                    .Where(p => p.TeamId == awayLeagueTeam.TeamId && !p.IsScouted)
+                    .Where(p => p.TeamId == awayLeagueTeam.TeamId && !p.IsScouted && p.SuspensionMatchesRemaining <= 0)
                     .Select(p => new SimulationPlayer(p.Id, p.Name, p.Position, p.Strength, p.TeamId))
                     .ToListAsync(cancellationToken);
 
@@ -122,6 +122,63 @@ public sealed class ScheduledMatchResolutionJob(
                     .FirstOrDefault() ?? "";
                 return new MatchScorerEvent(teamId, s.PlayerId, s.Minute);
             }).Where(s => !string.IsNullOrEmpty(s.TeamId)).ToList();
+
+            // Apply card suspensions (and reset cards after suspension) based on match events.
+            var cardEvents = result.Events.Where(e => e.Type is MatchEventType.YellowCard or MatchEventType.RedCard)
+                .Where(e => !string.IsNullOrEmpty(e.PlayerId))
+                .ToList();
+
+            if (cardEvents.Count > 0)
+            {
+                var playerIds = cardEvents.Select(e => e.PlayerId!).Distinct().ToArray();
+                var players = await dbContext.TeamPlayers
+                    .Where(p => playerIds.Contains(p.Id))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var player in players)
+                {
+                    var yellowCount = cardEvents.Count(e => e.PlayerId == player.Id && e.Type == MatchEventType.YellowCard);
+                    var redCount = cardEvents.Count(e => e.PlayerId == player.Id && e.Type == MatchEventType.RedCard);
+
+                    player.YellowCards += yellowCount;
+                    player.RedCards += redCount;
+
+                    // If the player receives a red card, or reaches 3 yellows, mark suspension for next match.
+                    if (redCount > 0 || player.YellowCards >= 3)
+                    {
+                        player.SuspensionMatchesRemaining = Math.Max(player.SuspensionMatchesRemaining, 1);
+                    }
+                }
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            // Decrement suspension counters for players on the involved teams; reset their cards once suspension is served.
+            if (homeLeagueTeam?.TeamId is not null || awayLeagueTeam?.TeamId is not null)
+            {
+                var affectedTeamIds = new List<string>();
+                if (homeLeagueTeam?.TeamId is not null) affectedTeamIds.Add(homeLeagueTeam.TeamId);
+                if (awayLeagueTeam?.TeamId is not null) affectedTeamIds.Add(awayLeagueTeam.TeamId);
+
+                var suspendedPlayers = await dbContext.TeamPlayers
+                    .Where(p => affectedTeamIds.Contains(p.TeamId) && p.SuspensionMatchesRemaining > 0)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var player in suspendedPlayers)
+                {
+                    player.SuspensionMatchesRemaining--;
+
+                    // When serving the suspension, reset card counts.
+                    if (player.SuspensionMatchesRemaining <= 0)
+                    {
+                        player.SuspensionMatchesRemaining = 0;
+                        player.YellowCards = 0;
+                        player.RedCards = 0;
+                    }
+                }
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
 
             // Serialize events for persistent storage and report generation
             var eventsJson = JsonSerializer.Serialize(result.Events.Select(e => new

@@ -67,7 +67,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await EnsureLeaguePyramidSeededAsync(cancellationToken);
-        await AssignUserToThirdLeagueBotTeamAsync(user.UserId, cancellationToken);
+        await AssignUserToNextAvailableBotSlotAsync(user.UserId, cancellationToken);
 
         await tx.CommitAsync(cancellationToken);
         return true;
@@ -239,7 +239,8 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             return;
         }
 
-        var tier = PreferredHumanTier;
+        // Seed the pyramid starting from tier 1 (highest), not tier 3.
+        var tier = 1;
         var groupNumber = 1;
 
         var league = new LeagueEntity
@@ -368,7 +369,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         }
     }
 
-    private async Task AssignUserToThirdLeagueBotTeamAsync(string userId, CancellationToken cancellationToken)
+    private async Task AssignUserToNextAvailableBotSlotAsync(string userId, CancellationToken cancellationToken)
     {
         var existingTeam = await dbContext.Teams.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
         if (existingTeam is not null)
@@ -376,55 +377,21 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             return;
         }
 
+        // Use the league store's assignment logic so we always start at tier 1 and fill tiers top-down.
+        var leagueStore = new GoalTactics.Infrastructure.League.LeagueDbStore(dbContext);
+        var league = await leagueStore.FindOrCreateLeagueWithBotSlotAsync(cancellationToken);
+
         var targetSlot = await dbContext.LeagueTeams
-            .Join(dbContext.Leagues, lt => lt.LeagueId, l => l.Id, (lt, l) => new { Slot = lt, League = l })
-            .Where(x => x.League.Tier == 3 && x.Slot.IsBot && x.Slot.TeamId != null)
-            .OrderBy(x => x.League.GroupNumber)
-            .ThenBy(x => x.Slot.TeamName)
+            .Where(x => x.LeagueId == league.Id && x.IsBot)
+            .OrderBy(x => x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (targetSlot is null)
-        {
-            var tierThreeGroupNumbers = await dbContext.Leagues
-                .Where(x => x.Tier == 3)
-                .Select(x => x.GroupNumber)
-                .ToListAsync(cancellationToken);
-
-            var nextGroupNumber = (tierThreeGroupNumbers.Count == 0 ? 0 : tierThreeGroupNumbers.Max()) + 1;
-
-            var league = new LeagueEntity
-            {
-                Id = Guid.NewGuid().ToString("N"),
-                Tier = 3,
-                GroupNumber = nextGroupNumber,
-                Name = BuildLeagueName(3, nextGroupNumber),
-                Mount = GetMountForTier(3),
-                Dismount = GetDismountForTier(3)
-            };
-
-            dbContext.Leagues.Add(league);
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            for (var slotIndex = 1; slotIndex <= ClubsPerLeague; slotIndex++)
-            {
-                await CreateBotLeagueSlotAsync(league, slotIndex, cancellationToken, saveChanges: false);
-            }
-
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            targetSlot = await dbContext.LeagueTeams
-                .Join(dbContext.Leagues, lt => lt.LeagueId, l => l.Id, (lt, l) => new { Slot = lt, League = l })
-                .Where(x => x.League.Id == league.Id && x.Slot.IsBot && x.Slot.TeamId != null)
-                .OrderBy(x => x.Slot.TeamName)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
-
-        if (targetSlot is null || string.IsNullOrWhiteSpace(targetSlot.Slot.TeamId))
+        if (targetSlot is null || string.IsNullOrWhiteSpace(targetSlot.TeamId))
         {
             return;
         }
 
-        var team = await dbContext.Teams.FirstOrDefaultAsync(x => x.Id == targetSlot.Slot.TeamId, cancellationToken);
+        var team = await dbContext.Teams.FirstOrDefaultAsync(x => x.Id == targetSlot.TeamId, cancellationToken);
         if (team is null)
         {
             return;
@@ -438,8 +405,8 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         team.UserId = userId;
         team.Name = user.ManagerName;
         team.Country = "DE";
-        team.LeagueName = targetSlot.League.Name;
-        team.LeagueTier = targetSlot.League.Tier;
+        team.LeagueName = league.Name;
+        team.LeagueTier = league.Tier;
         team.CountryName = "Deutschland";
         team.MarketValue = 100000;
         team.Mood = 50;
@@ -506,12 +473,12 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             .Take(11)
             .Sum(player => (int)Math.Round(player.Strength, MidpointRounding.AwayFromZero));
 
-        targetSlot.Slot.IsBot = false;
-        targetSlot.Slot.IsOnline = true;
-        targetSlot.Slot.TeamName = team.Name;
-        targetSlot.Slot.Strength = team.Strength;
-        targetSlot.Slot.Country = team.Country;
-        targetSlot.Slot.Logo = team.SelectedEmblem ?? LegacyAppCompatibility.BuildLogoId(team.Id);
+        targetSlot.IsBot = false;
+        targetSlot.IsOnline = true;
+        targetSlot.TeamName = team.Name;
+        targetSlot.Strength = team.Strength;
+        targetSlot.Country = team.Country;
+        targetSlot.Logo = team.SelectedEmblem ?? LegacyAppCompatibility.BuildLogoId(team.Id);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -619,8 +586,9 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
                 Fitness = fitness,
                 Matches = random.Next(0, 30),
                 Goals = position == "FWD" ? random.Next(0, 20) : random.Next(0, 6),
-                YellowCards = random.Next(0, 6),
-                RedCards = random.Next(0, 2),
+                YellowCards = 0,
+                RedCards = 0,
+                SuspensionMatchesRemaining = 0,
                 ContractEndUtc = DateTime.UtcNow.AddDays(random.Next(15, 90)),
                 Head = LegacyAppCompatibility.BuildHeadId(playerId),
                 Body = LegacyAppCompatibility.BuildBodyId(playerId),

@@ -1,8 +1,12 @@
+using System.IO;
+using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
 using GoalTactics.Application.League;
 using GoalTactics.Application.Mechanics;
 using GoalTactics.Application.Team;
 using GoalTactics.Contracts.Live;
+using GoalTactics.Contracts.League;
 
 namespace GoalTactics.Application.Live;
 
@@ -25,20 +29,22 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
             {
                 Success = true,
                 Report = report,
-                Match = new LiveMatchData
+                Match = new MatchData
                 {
-                    MatchId = matchId,
                     Id = matchId,
-                    HomeScore = -1,
-                    AwayScore = -1,
+                    HomeScore = 0,
+                    AwayScore = 0,
                     HomeStrength = -1,
                     AwayStrength = -1,
-                    Report = report
+                    HasScore = false,
+                    Date = DateTime.UtcNow.ToString("O"),
+                    DateValue = DateTime.UtcNow,
                 }
             };
         }
 
-        return BuildResponse(match);
+        var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        return BuildResponse(match, team.TeamId);
     }
 
     public async Task<LiveMatchResponse> GetMatchReportAsync(string userId, Guid matchId, CancellationToken cancellationToken = default)
@@ -51,20 +57,22 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
             {
                 Success = true,
                 Report = report,
-                Match = new LiveMatchData
+                Match = new MatchData
                 {
-                    MatchId = matchId,
                     Id = matchId,
-                    HomeScore = -1,
-                    AwayScore = -1,
+                    HomeScore = 0,
+                    AwayScore = 0,
                     HomeStrength = -1,
                     AwayStrength = -1,
-                    Report = report
+                    HasScore = false,
+                    Date = DateTime.UtcNow.ToString("O"),
+                    DateValue = DateTime.UtcNow,
                 }
             };
         }
 
-        return BuildResponse(match);
+        var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        return BuildResponse(match, team.TeamId);
     }
 
     private async Task<LeagueMatchRecord?> ResolveMatchAsync(string userId, Guid matchId, CancellationToken cancellationToken)
@@ -78,7 +86,7 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
         return upcoming.FirstOrDefault();
     }
 
-    private static LiveMatchResponse BuildResponse(LeagueMatchRecord match)
+    private static LiveMatchResponse BuildResponse(LeagueMatchRecord match, string? userTeamId)
     {
         // Parse stored events JSON if available
         List<LiveMatchEventData>? eventDataList = null;
@@ -123,12 +131,98 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
             }
         }
 
-        var report = match.IsPlayed
+        // Build the match report payload expected by the legacy client.
+        // It must be JSON that deserializes into the client's MatchReportData type.
+        var reportMessage = match.IsPlayed
             ? GenerateReport(match, matchEvents)
             : $"Upcoming match: {match.HomeName} vs {match.AwayName} on {match.ScheduledDateUtc:yyyy-MM-dd}";
 
-        var myTeam = match.UserTeamId == match.HomeTeamId ? 1
-                   : match.UserTeamId == match.AwayTeamId ? 2
+        var homeScore = match.IsPlayed ? match.HomeScore ?? -1 : -1;
+        var awayScore = match.IsPlayed ? match.AwayScore ?? -1 : -1;
+
+        var matchEventList = matchEvents?.Select(e => new MatchReportEntryData
+        {
+            EntrySeverity = Severity.Normal,
+            Type = e.Type switch
+            {
+                MatchEventType.Goal => EventType.Goal,
+                MatchEventType.YellowCard => EventType.FoulYellow,
+                MatchEventType.RedCard => EventType.FoulRed,
+                MatchEventType.Injury => EventType.Injury,
+                MatchEventType.Substitution => EventType.Replacement,
+                _ => EventType.MatchInfo,
+            },
+            IsAdditionalTime = false,
+            IsHomeTeamEvent = e.IsHome,
+            KeyPlayerName = e.PlayerName,
+            KeyPlayerName2 = null,
+            Minute = e.Minute,
+            Message = e.PlayerName ?? string.Empty,
+            HomeTeamGoals = homeScore,
+            AwayTeamGoals = awayScore,
+            HomeTeamGoalshots = 0,
+            AwayTeamGoalshots = 0,
+            HomeTeamCorners = 0,
+            AwayTeamCorners = 0,
+            HomeTeamOffside = 0,
+            AwayTeamOffside = 0,
+            HomeTeamActions = 0,
+            AwayTeamActions = 0,
+            HomeTeamFouls = 0,
+            AwayTeamFouls = 0,
+            HomeTeamYellowCards = 0,
+            AwayTeamYellowCards = 0,
+            HomeTeamRedCards = 0,
+            AwayTeamRedCards = 0,
+            Second = 0,
+            IsMinuteVisible = true
+        }).ToList() ?? new List<MatchReportEntryData>();
+
+        if (matchEventList.Count == 0)
+        {
+            matchEventList.Add(new MatchReportEntryData
+            {
+                EntrySeverity = Severity.Normal,
+                Type = EventType.MatchInfo,
+                IsAdditionalTime = false,
+                IsHomeTeamEvent = false,
+                KeyPlayerName = null,
+                KeyPlayerName2 = null,
+                Minute = 0,
+                Message = reportMessage,
+                HomeTeamGoals = homeScore,
+                AwayTeamGoals = awayScore,
+                HomeTeamGoalshots = 0,
+                AwayTeamGoalshots = 0,
+                HomeTeamCorners = 0,
+                AwayTeamCorners = 0,
+                HomeTeamOffside = 0,
+                AwayTeamOffside = 0,
+                HomeTeamActions = 0,
+                AwayTeamActions = 0,
+                HomeTeamFouls = 0,
+                AwayTeamFouls = 0,
+                HomeTeamYellowCards = 0,
+                AwayTeamYellowCards = 0,
+                HomeTeamRedCards = 0,
+                AwayTeamRedCards = 0,
+                Second = 0,
+                IsMinuteVisible = true
+            });
+        }
+
+        var matchReport = new MatchReportData
+        {
+            MatchEvents = matchEventList,
+            HomeLineUp = new List<LineUp>(),
+            AwayLineUp = new List<LineUp>()
+        };
+
+        var report = JsonSerializer.Serialize(matchReport);
+        report = CompressIfNeeded(report);
+
+        var myTeam = !string.IsNullOrEmpty(userTeamId) && userTeamId == match.HomeTeamId ? 1
+                   : !string.IsNullOrEmpty(userTeamId) && userTeamId == match.AwayTeamId ? 2
                    : 0;
 
         var opponentTeamId = myTeam == 1
@@ -139,33 +233,28 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
         {
             Success = true,
             Report = report,
-            Match = new LiveMatchData
+            Match = new MatchData
             {
-                // Android
-                MatchId = match.Id,
-                HomeTeam = match.HomeName,
-                AwayTeam = match.AwayName,
-                // Xamarin
                 Id = match.Id,
-                HomeName = match.HomeName,
-                AwayName = match.AwayName,
+                Date = match.ScheduledDateUtc.ToString("O"),
+                DateValue = match.ScheduledDateUtc,
                 HomeLogo = match.HomeLogo,
                 AwayLogo = match.AwayLogo,
+                HomeName = match.HomeName,
+                AwayName = match.AwayName,
+                MyTeam = myTeam,
                 HomeCountry = match.HomeCountry ?? "",
                 AwayCountry = match.AwayCountry ?? "",
-                HomeScore = match.HomeScore ?? -1,
-                AwayScore = match.AwayScore ?? -1,
+                HomeScore = homeScore,
+                AwayScore = awayScore,
+                OpponentTeamId = opponentTeamId,
                 HomeStrength = match.HomeStrength,
                 AwayStrength = match.AwayStrength,
                 HasLineup = false,
                 IsFriendly = false,
                 HomeTrikot = null,
                 AwayTrikot = null,
-                OpponentTeamId = opponentTeamId,
-                Date = match.ScheduledDateUtc.ToString("O"),
-                MyTeam = myTeam,
-                Report = report,
-                Events = eventDataList?.ToArray()
+                HasScore = match.IsPlayed,
             }
         };
     }
@@ -181,5 +270,23 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
         }
 
         return $"<b>{m.HomeName} {m.HomeScore} - {m.AwayScore} {m.AwayName}</b>";
+    }
+
+    private static string CompressIfNeeded(string payload)
+    {
+        if (string.IsNullOrEmpty(payload) || payload.Length < 170)
+            return payload;
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(payload);
+        using var memoryStream = new MemoryStream();
+        using (var gzip = new GZipStream(memoryStream, CompressionMode.Compress, leaveOpen: true))
+        {
+            gzip.Write(bytes, 0, bytes.Length);
+        }
+        memoryStream.Position = 0;
+        var compressedBytes = new byte[memoryStream.Length + 4];
+        Buffer.BlockCopy(BitConverter.GetBytes(bytes.Length), 0, compressedBytes, 0, 4);
+        memoryStream.Read(compressedBytes, 4, (int)memoryStream.Length);
+        return "#cmp#" + Convert.ToBase64String(compressedBytes);
     }
 }

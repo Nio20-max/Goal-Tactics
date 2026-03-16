@@ -32,7 +32,7 @@ public interface ISquadService
 
     Task UpgradePlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
 
-    Task UseSkillCardAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
+    Task UseSkillCardAsync(string userId, Guid playerId, Team.SkillCardRecord? selectedCard = null, CancellationToken cancellationToken = default);
 
     Task HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
 
@@ -225,13 +225,18 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
         }
     }
 
-    public async Task UseSkillCardAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
+    public async Task UseSkillCardAsync(string userId, Guid playerId, SkillCardRecord? selectedCard = null, CancellationToken cancellationToken = default)
     {
         var player = await teamStore.GetSquadPlayerAsync(userId, playerId, cancellationToken)
             ?? throw new InvalidOperationException("Player not found in squad.");
 
         var skillCards = await teamStore.GetSkillCardsAsync(userId, cancellationToken);
-        var cardToUse = skillCards.OrderByDescending(c => c.Bonus).ThenByDescending(c => c.Rarity).FirstOrDefault();
+
+        // If the client selected a card, try to use it; otherwise, pick the best available card.
+        var cardToUse = selectedCard is null
+            ? skillCards.OrderByDescending(c => c.Bonus).ThenByDescending(c => c.Rarity).FirstOrDefault()
+            : skillCards.FirstOrDefault(c => c.Skill == selectedCard.Skill && c.Rarity == selectedCard.Rarity && c.Bonus == selectedCard.Bonus);
+
         if (cardToUse is null)
         {
             throw new InvalidOperationException("No skill cards available.");
@@ -327,9 +332,12 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
             HasRedCard = x.RedCards > 0,
             Injured = 0,
             IsForSale = false,
-            SellPrice = Math.Max(10_000m, x.Strength * x.Strength),
+            // Legacy clients expected a fixed sell price, but it should reflect market value.
+            SellPrice = x.MarketValue,
             TransfermarketFee = Math.Max(1_000m, x.Strength * 14m),
-            TransfermarketMaxOffer = Math.Max(10_000m, x.Strength * x.Strength * 11m / 10m),
+            // Allow max offer to scale with market value (instead of being hard-capped at 10000)
+            // Keep a lower bound for very low-value players.
+            TransfermarketMaxOffer = Math.Max(10_000m, x.MarketValue * 1.1m),
             TransfermarketMinOffer = Math.Max(1_000m, x.Strength * 14m),
             TransfermarketMaxHours = 48,
             IsUpgraded = false,

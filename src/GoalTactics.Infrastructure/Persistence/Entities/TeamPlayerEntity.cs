@@ -60,6 +60,8 @@ public sealed class TeamPlayerEntity
 
     public int RedCards { get; set; }
 
+    public int SuspensionMatchesRemaining { get; set; }
+
     public string? IndividualTrainingSkill { get; set; }
 
     public DateTime? IndividualTrainingUntilUtc { get; set; }

@@ -1,5 +1,6 @@
 using GoalTactics.Bots.Client.ApiClient;
 using GoalTactics.Bots.Client.Database;
+using GoalTactics.Bots.Client.Neural;
 
 namespace GoalTactics.Bots.Client.Behaviors;
 
@@ -26,32 +27,62 @@ public sealed class LineupBehavior
     private const int PositionMID = 2;
     private const int PositionFWD = 3;
 
-    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot)
+    private sealed class PlayerSnapshot
     {
-        var squad = await api.GetSquadAsync();
-        if (squad?.Players is null || squad.Players.Count < 11) return;
+        public string Id { get; init; } = "";
+        public int Position { get; init; }
+        public decimal Strength { get; init; }
+        public bool HasRedCard { get; init; }
+        public int Injured { get; init; }
+    }
+
+    private sealed class LineupSnapshot
+    {
+        public string MatchId { get; init; } = "";
+        public bool IsLocked { get; init; }
+        public string OpponentName { get; init; } = "";
+    }
+
+    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan = null)
+    {
+        var squad = await api.ExecuteForBotAsync("GetSquad");
+        if (!squad.Success) return;
+
+        var players = BotApiTranslationReader.GetObjectList(squad, "players")
+            .Select(ToPlayer)
+            .Where(p => !string.IsNullOrEmpty(p.Id))
+            .ToList();
+        if (players.Count < 11) return;
 
         // Filter out unavailable players (injured or red-carded)
-        var available = squad.Players
+        var available = players
             .Where(p => !p.HasRedCard && p.Injured == 0)
             .ToList();
         if (available.Count < 11) return; // Not enough fit players
 
-        var lineups = await api.GetLineupsAsync();
-        if (lineups?.Lineups is null) return;
+        var lineupsResponse = await api.ExecuteForBotAsync("GetLineups");
+        if (!lineupsResponse.Success) return;
 
-        foreach (var lineup in lineups.Lineups)
+        var ladderResponse = await api.ExecuteForBotAsync("GetLadder");
+        var ladderTeams = BotApiTranslationReader.GetObjectList(ladderResponse, "teams");
+
+        var lineups = BotApiTranslationReader.GetObjectList(lineupsResponse, "lineups")
+            .Select(ToLineup)
+            .Where(l => !string.IsNullOrEmpty(l.MatchId))
+            .ToList();
+
+        foreach (var lineup in lineups)
         {
             if (lineup.IsLocked) continue;
 
             var (formation, selectedIds) = ChooseFormation(available);
 
-            await api.SaveLineupAsync(new SaveLineupRequest
+            await api.ExecuteForBotAsync("SaveLineup", new SaveLineupRequest
             {
                 MatchId = lineup.MatchId,
                 PlayerIds = selectedIds,
                 System = formation,
-                Tactic = ChooseTactic(bot)
+                Tactic = ChooseTactic(bot, lineup.OpponentName, ladderTeams)
             });
         }
     }
@@ -59,7 +90,7 @@ public sealed class LineupBehavior
     /// <summary>
     /// Pick the best formation based on available player positions and select the 11 strongest.
     /// </summary>
-    private static (string Formation, List<string> PlayerIds) ChooseFormation(List<PlayerDto> players)
+    private static (string Formation, List<string> PlayerIds) ChooseFormation(List<PlayerSnapshot> players)
     {
         // Categorize players by position index
         var keepers = players.Where(p => p.Position == PositionGK).OrderByDescending(p => p.Strength).ToList();
@@ -128,7 +159,7 @@ public sealed class LineupBehavior
         return (bestFormation, selected.Take(11).ToList());
     }
 
-    private static void AddBest(List<string> selected, HashSet<string> used, List<PlayerDto> pool, int count)
+    private static void AddBest(List<string> selected, HashSet<string> used, List<PlayerSnapshot> pool, int count)
     {
         int added = 0;
         foreach (var p in pool)
@@ -150,10 +181,49 @@ public sealed class LineupBehavior
     private const string TacticDefensive = "1";
     private const string TacticBalanced = "0";
 
-    private static string ChooseTactic(BotRecord bot)
+    private static string ChooseTactic(BotRecord bot, string opponentName, IReadOnlyList<Dictionary<string, object?>> ladderTeams)
     {
+        if (!string.IsNullOrWhiteSpace(opponentName))
+        {
+            var opponent = ladderTeams.FirstOrDefault(t =>
+                string.Equals(BotApiTranslationReader.GetString(t, "teamName"), opponentName, StringComparison.OrdinalIgnoreCase));
+
+            if (opponent is null)
+            {
+                goto FallbackByRisk;
+            }
+
+            int oppStrength = BotApiTranslationReader.GetInt(opponent, "teamStrength");
+            if (oppStrength <= 0)
+            {
+                oppStrength = BotApiTranslationReader.GetInt(opponent, "strength");
+            }
+
+            if (oppStrength >= 930) return TacticDefensive;
+            if (oppStrength > 0 && oppStrength <= 760) return TacticAttacking;
+        }
+
+    FallbackByRisk:
         if (bot.Risk > 70) return TacticAttacking;
         if (bot.Risk < 30) return TacticDefensive;
         return TacticBalanced;
     }
+
+    private static PlayerSnapshot ToPlayer(Dictionary<string, object?> data)
+        => new()
+        {
+            Id = BotApiTranslationReader.GetString(data, "id"),
+            Position = BotApiTranslationReader.GetInt(data, "position"),
+            Strength = BotApiTranslationReader.GetDecimal(data, "strength"),
+            HasRedCard = BotApiTranslationReader.GetBool(data, "hasRedCard"),
+            Injured = BotApiTranslationReader.GetInt(data, "injured")
+        };
+
+    private static LineupSnapshot ToLineup(Dictionary<string, object?> data)
+        => new()
+        {
+            MatchId = BotApiTranslationReader.GetString(data, "matchId"),
+            IsLocked = BotApiTranslationReader.GetBool(data, "isLocked"),
+            OpponentName = BotApiTranslationReader.GetString(data, "opponent")
+        };
 }

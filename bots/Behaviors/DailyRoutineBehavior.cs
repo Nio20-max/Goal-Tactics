@@ -1,5 +1,6 @@
 using GoalTactics.Bots.Client.ApiClient;
 using GoalTactics.Bots.Client.Database;
+using GoalTactics.Bots.Client.Neural;
 
 namespace GoalTactics.Bots.Client.Behaviors;
 
@@ -11,7 +12,7 @@ public sealed class DailyRoutineBehavior
 {
     private readonly Random _rng = new();
 
-    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot)
+    public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan = null)
     {
         await ClaimDailyRewardAsync(api);
         await WatchAdsAsync(api, bot);
@@ -23,7 +24,7 @@ public sealed class DailyRoutineBehavior
     /// </summary>
     private static async Task ClaimDailyRewardAsync(GoalTacticsApiClient api)
     {
-        await api.ClaimDailyRewardAsync();
+        await api.ExecuteForBotAsync("ClaimDailyReward");
     }
 
     /// <summary>
@@ -42,9 +43,10 @@ public sealed class DailyRoutineBehavior
         int maxAttempts = 50;
         for (int i = 0; i < maxAttempts && accumulated < targetStars; i++)
         {
-            var result = await api.WatchAdAsync();
-            if (result is null || !result.Success) break;
-            accumulated += result.Value;
+            var result = await api.ExecuteForBotAsync("WatchAd");
+            if (!result.Success) break;
+
+            accumulated += BotApiTranslationReader.GetInt(result.Output, "rewardValue");
         }
     }
 
@@ -53,10 +55,16 @@ public sealed class DailyRoutineBehavior
     /// </summary>
     private static async Task AcceptBestSponsorAsync(GoalTacticsApiClient api)
     {
-        var response = await api.GetSponsorOffersAsync();
-        if (response?.Offers is null || response.Offers.Count == 0) return;
+        var response = await api.ExecuteForBotAsync("GetSponsorOffers");
+        if (!response.Success) return;
 
-        var best = response.Offers.OrderByDescending(s => s.Stars).First();
-        await api.AcceptSponsorAsync(best.Id);
+        var offers = BotApiTranslationReader.GetObjectList(response, "offers");
+        if (offers.Count == 0) return;
+
+        var best = offers.OrderByDescending(s => BotApiTranslationReader.GetInt(s, "stars")).First();
+        var sponsorId = BotApiTranslationReader.GetString(best, "id");
+        if (string.IsNullOrEmpty(sponsorId)) return;
+
+        await api.ExecuteForBotAsync("AcceptSponsor", new IdRequest { Id = sponsorId });
     }
 }
