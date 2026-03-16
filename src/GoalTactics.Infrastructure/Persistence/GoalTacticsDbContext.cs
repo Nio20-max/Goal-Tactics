@@ -19,6 +19,8 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
 
     public DbSet<TeamPlayerEntity> TeamPlayers => Set<TeamPlayerEntity>();
 
+    public DbSet<TeamSkillCardEntity> TeamSkillCards => Set<TeamSkillCardEntity>();
+
     public DbSet<TeamTrainingStateEntity> TeamTrainingStates => Set<TeamTrainingStateEntity>();
 
     public DbSet<TeamNewsEntity> TeamNews => Set<TeamNewsEntity>();
@@ -230,6 +232,21 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.Age).HasColumnName("age").IsRequired();
             entity.Property(x => x.Talent).HasColumnName("talent").IsRequired();
             entity.Property(x => x.Strength).HasColumnName("strength").IsRequired();
+            entity.Property(x => x.MarketValue).HasColumnName("market_value");
+            entity.Property(x => x.Skill0).HasColumnName("skill_0");
+            entity.Property(x => x.Skill1).HasColumnName("skill_1");
+            entity.Property(x => x.Skill2).HasColumnName("skill_2");
+            entity.Property(x => x.Skill3).HasColumnName("skill_3");
+            entity.Property(x => x.Skill4).HasColumnName("skill_4");
+            entity.Property(x => x.Skill5).HasColumnName("skill_5");
+            entity.Property(x => x.Skill6).HasColumnName("skill_6");
+            entity.Property(x => x.Skill7).HasColumnName("skill_7");
+            entity.Property(x => x.Skill8).HasColumnName("skill_8");
+            entity.Property(x => x.Skill9).HasColumnName("skill_9");
+            entity.Property(x => x.Skill10).HasColumnName("skill_10");
+            entity.Property(x => x.Skill11).HasColumnName("skill_11");
+            entity.Property(x => x.Skill12).HasColumnName("skill_12");
+            entity.Property(x => x.Skill13).HasColumnName("skill_13");
             entity.Property(x => x.Fitness).HasColumnName("fitness").IsRequired();
             entity.Property(x => x.Matches).HasColumnName("matches").IsRequired();
             entity.Property(x => x.Goals).HasColumnName("goals").IsRequired();
@@ -240,7 +257,28 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.ContractEndUtc).HasColumnName("contract_end_utc");
             entity.Property(x => x.IsScouted).HasColumnName("is_scouted").HasDefaultValue(false);
             entity.Property(x => x.ScoutingReadyAtUtc).HasColumnName("scouting_ready_at_utc");
+            entity.Property(x => x.IsPremiumScouting).HasColumnName("is_premium_scout").IsRequired().HasDefaultValue(false);
             entity.Property(x => x.Head).HasColumnName("head").HasMaxLength(32).HasDefaultValue("01_head-A01");
+            entity.Property(x => x.Body).HasColumnName("body").HasMaxLength(32).HasDefaultValue("01_body-A00");
+            entity.Property(x => x.Gloves).HasColumnName("gloves").HasMaxLength(32).HasDefaultValue("01_Gloves01");
+            entity.Property(x => x.Shoes).HasColumnName("shoes").HasMaxLength(32).HasDefaultValue("01_Shoes01");
+            entity.HasIndex(x => x.TeamId);
+            entity.HasOne(x => x.Team)
+                .WithMany()
+                .HasForeignKey(x => x.TeamId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TeamSkillCardEntity>(entity =>
+        {
+            entity.ToTable("team_skill_cards");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.TeamId).HasColumnName("team_id").IsRequired();
+            entity.Property(x => x.Skill).HasColumnName("skill").IsRequired();
+            entity.Property(x => x.Rarity).HasColumnName("rarity").IsRequired();
+            entity.Property(x => x.Count).HasColumnName("count").IsRequired();
+            entity.Property(x => x.Bonus).HasColumnName("bonus").IsRequired();
             entity.HasIndex(x => x.TeamId);
             entity.HasOne(x => x.Team)
                 .WithMany()
@@ -260,6 +298,7 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.TrainingChangedAtUtc).HasColumnName("training_changed_at_utc");
             entity.Property(x => x.SelectedTacticId).HasColumnName("selected_tactic_id").HasMaxLength(64);
             entity.Property(x => x.SelectedTacticStartUtc).HasColumnName("selected_tactic_start_utc");
+            entity.Property(x => x.TacticTrainingProgressJson).HasColumnName("tactic_training_progress");
             entity.Property(x => x.CampRefreshCount).HasColumnName("camp_refresh_count").HasDefaultValue(0);
             entity.HasOne(x => x.Team)
                 .WithOne()

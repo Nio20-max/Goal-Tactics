@@ -1,10 +1,11 @@
 using GoalTactics.Contracts.Common;
+using GoalTactics.Contracts.Squad;
 
 namespace GoalTactics.Contracts.Scouting;
 
 public sealed class ScoutingPlayersResponse : ResponseObject
 {
-    public IReadOnlyList<ScoutedPlayerData> Players { get; init; } = [];
+    public IReadOnlyList<SquadPlayerData> Players { get; init; } = [];
     public int ScoutingCost { get; init; }
     public int PremiumScoutingCost { get; init; }
     public int SpeedupCost { get; init; }
@@ -12,13 +13,4 @@ public sealed class ScoutingPlayersResponse : ResponseObject
     public string? NextPremiumScoutingDate { get; init; }
     public int PendingScoutCount { get; init; }
     public int MaxSimultaneousScouts { get; init; }
-}
-
-public sealed class ScoutedPlayerData
-{
-    public Guid Id { get; init; }
-    public string? Name { get; init; }
-    public string? Position { get; init; }
-    public int Talent { get; init; }
-    public int Strength { get; init; }
 }

@@ -34,7 +34,7 @@ public interface ITeamStore
 
     Task<IReadOnlyList<BuildPlaceRecord>> GetBuildPlacesAsync(string userId, CancellationToken cancellationToken = default);
 
-    Task<bool> BuildPlaceAsync(string userId, Guid placeId, CancellationToken cancellationToken = default);
+    Task<bool> BuildPlaceAsync(string userId, Guid placeId, int count, CancellationToken cancellationToken = default);
 
     Task<ConstructionRecord?> GetUnderConstructionAsync(string userId, CancellationToken cancellationToken = default);
 
@@ -61,6 +61,12 @@ public interface ITeamStore
     Task<IReadOnlyList<SquadPlayerRecord>> GetSquadPlayersForTeamAsync(Guid teamId, CancellationToken cancellationToken = default);
 
     Task<SquadPlayerRecord?> GetSquadPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SkillCardRecord>> GetSkillCardsAsync(string userId, CancellationToken cancellationToken = default);
+
+    Task AddSkillCardsAsync(string userId, IEnumerable<SkillCardRecord> cards, CancellationToken cancellationToken = default);
+
+    Task<bool> UseSkillCardAsync(string userId, SkillCardRecord card, CancellationToken cancellationToken = default);
 
     Task<bool> SaveIndividualTrainingAsync(string userId, Guid playerId, string? skillType, CancellationToken cancellationToken = default);
 
@@ -91,7 +97,7 @@ public interface ITeamStore
     /// <summary>Returns scouted players including those still pending (not yet ready).</summary>
     Task<IReadOnlyList<SquadPlayerRecord>> GetAllScoutedPlayersAsync(string userId, CancellationToken cancellationToken = default);
 
-    Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, DateTime? readyAtUtc = null, CancellationToken cancellationToken = default);
+    Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, bool isPremiumScouting = false, DateTime? readyAtUtc = null, CancellationToken cancellationToken = default);
 
     Task<bool> RecruitScoutedPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
 
@@ -121,7 +127,7 @@ public sealed record SeasonInfoRecord(int SeasonNumber, int Matchday, int DaysLe
 public sealed record OwnedEquipmentRecord(string Id, string Image, string EquipmentType, bool IsActive);
 
 public sealed record TeamRecord(string TeamId, string UserId, string Name, string Country, string CountryName, string LeagueName, decimal MarketValue, int Mood, string TeamMood, int Wins, int Losses, int Fans, int Members, int Strength, string MatchTrend, string ManagerName, string UserEmail, DateTime UserCreatedAtUtc, DateTime? UserLastActivityAtUtc, string? SelectedShirt, string? SelectedEmblem);
-
+public sealed record SkillCardRecord(int Skill, int Rarity, int Count, decimal Bonus);
 public sealed record TeamResourcesRecord(decimal Money, decimal Medipacks, decimal GTStars);
 
 public sealed record TeamNewsRecord(string Date, string Title, string Text);
@@ -172,23 +178,31 @@ public sealed record TeamTrainingStateRecord(
     string? SelectedTacticId,
     DateTime? SelectedTacticStartUtc,
     int LeagueTier,
-    int CampRefreshCount);
+    int CampRefreshCount,
+    Dictionary<string, int> TacticTrainingProgress);
 
 public sealed record SquadPlayerRecord(
     Guid Id,
     string Name,
     string Origin,
+    string Head,
+    string Body,
+    string Gloves,
+    string Shoes,
     string Position,
     int ShirtNumber,
     int Age,
     int Talent,
     int Strength,
+    decimal MarketValue,
     int Fitness,
     int Matches,
     int Goals,
     int YellowCards,
     int RedCards,
+    decimal[] Skills,
     string? IndividualTrainingSkill,
     DateTime? IndividualTrainingUntilUtc,
     DateTime? ContractEndUtc,
+    bool IsPremiumScouting,
     DateTime? ScoutingReadyAtUtc = null);

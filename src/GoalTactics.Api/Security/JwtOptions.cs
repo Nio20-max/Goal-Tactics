@@ -10,5 +10,6 @@ public sealed class JwtOptions
 
     public string SigningKey { get; init; } = "dev-only-super-long-change-me-signing-key-123456";
 
-    public int ExpiryMinutes { get; init; } = 120;
+    // 24 hours to match legacy client expectations and avoid frequent re-login
+    public int ExpiryMinutes { get; init; } = 1440;
 }

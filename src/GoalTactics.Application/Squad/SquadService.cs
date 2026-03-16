@@ -78,7 +78,7 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
             return new TrainingProgressResponse { Success = false, Message = "Player not found" };
         }
 
-        var skills = LegacyAppCompatibility.BuildSkills(player.Strength, player.Position, player.Talent, player.Age);
+        var skills = player.Skills;
         var today = DateTime.UtcNow.Date;
 
         return new TrainingProgressResponse
@@ -198,6 +198,15 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
         }
 
         var response = BuildContractResponse(player, salary);
+
+        // Grant skill cards based on the salary amount on the contract.
+        // The card count is derived from the salary (1 card per 1,000 salary).
+        var cardCount = Math.Max(1, (int)Math.Round(response.Contracts.First().Salary / 1000m));
+        await teamStore.AddSkillCardsAsync(userId, new[]
+        {
+            new SkillCardRecord(0, 0, cardCount, 0.5m)
+        }, cancellationToken);
+
         return new PlayerContractResponse
         {
             Success = response.Success,
@@ -221,12 +230,21 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
         var player = await teamStore.GetSquadPlayerAsync(userId, playerId, cancellationToken)
             ?? throw new InvalidOperationException("Player not found in squad.");
 
+        var skillCards = await teamStore.GetSkillCardsAsync(userId, cancellationToken);
+        var cardToUse = skillCards.OrderByDescending(c => c.Bonus).ThenByDescending(c => c.Rarity).FirstOrDefault();
+        if (cardToUse is null)
+        {
+            throw new InvalidOperationException("No skill cards available.");
+        }
+
         // Applying a skill card grants a small strength boost (equivalent to a training session).
         var success = await teamStore.UpgradePlayerStrengthAsync(userId, playerId, cancellationToken);
         if (!success)
         {
             throw new InvalidOperationException("Skill card could not be applied. Check GT Stars balance.");
         }
+
+        await teamStore.UseSkillCardAsync(userId, cardToUse, cancellationToken);
     }
 
     public async Task HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
@@ -238,43 +256,15 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
         }
     }
 
-    public Task<SkillCardsResponse> GetSkillCardsAsync(string userId, CancellationToken cancellationToken = default)
-        => Task.FromResult(new SkillCardsResponse
+    public async Task<SkillCardsResponse> GetSkillCardsAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var cards = await teamStore.GetSkillCardsAsync(userId, cancellationToken);
+        return new GoalTactics.Contracts.Squad.SkillCardsResponse
         {
             Success = true,
-            SkillCards =
-            [
-                new SkillCardData { Skill = 0, Rarity = 1, Count = 2, Bonus = 1.25m },
-                new SkillCardData { Skill = 12, Rarity = 1, Count = 3, Bonus = 1.25m },
-                new SkillCardData { Skill = 11, Rarity = 1, Count = 2, Bonus = 1.25m },
-                new SkillCardData { Skill = 1, Rarity = 1, Count = 4, Bonus = 1.25m },
-                new SkillCardData { Skill = 0, Rarity = 2, Count = 2, Bonus = 2.5m },
-                new SkillCardData { Skill = 5, Rarity = 1, Count = 2, Bonus = 1.25m },
-                new SkillCardData { Skill = 3, Rarity = 0, Count = 2, Bonus = 0.5m },
-                new SkillCardData { Skill = 4, Rarity = 1, Count = 2, Bonus = 1.25m },
-                new SkillCardData { Skill = 9, Rarity = 2, Count = 2, Bonus = 2.5m },
-                new SkillCardData { Skill = 2, Rarity = 0, Count = 3, Bonus = 0.5m },
-                new SkillCardData { Skill = 12, Rarity = 0, Count = 3, Bonus = 0.5m },
-                new SkillCardData { Skill = 11, Rarity = 2, Count = 1, Bonus = 2.5m },
-                new SkillCardData { Skill = 8, Rarity = 1, Count = 2, Bonus = 1.25m },
-                new SkillCardData { Skill = 5, Rarity = 0, Count = 2, Bonus = 0.5m },
-                new SkillCardData { Skill = 0, Rarity = 0, Count = 1, Bonus = 0.5m },
-                new SkillCardData { Skill = 7, Rarity = 0, Count = 1, Bonus = 0.5m },
-                new SkillCardData { Skill = 11, Rarity = 0, Count = 2, Bonus = 0.5m },
-                new SkillCardData { Skill = 6, Rarity = 1, Count = 1, Bonus = 1.25m },
-                new SkillCardData { Skill = 13, Rarity = 1, Count = 1, Bonus = 1.25m },
-                new SkillCardData { Skill = 7, Rarity = 1, Count = 1, Bonus = 1.25m },
-                new SkillCardData { Skill = 1, Rarity = 0, Count = 2, Bonus = 0.5m },
-                new SkillCardData { Skill = 8, Rarity = 0, Count = 1, Bonus = 0.5m },
-                new SkillCardData { Skill = 10, Rarity = 1, Count = 1, Bonus = 1.25m },
-                new SkillCardData { Skill = 3, Rarity = 2, Count = 1, Bonus = 2.5m },
-                new SkillCardData { Skill = 5, Rarity = 2, Count = 1, Bonus = 2.5m },
-                new SkillCardData { Skill = 2, Rarity = 1, Count = 2, Bonus = 1.25m },
-                new SkillCardData { Skill = 6, Rarity = 0, Count = 1, Bonus = 0.5m },
-                new SkillCardData { Skill = 4, Rarity = 0, Count = 1, Bonus = 0.5m },
-                new SkillCardData { Skill = 12, Rarity = 2, Count = 1, Bonus = 2.5m }
-            ]
-        });
+            SkillCards = cards.Select(x => new GoalTactics.Contracts.Squad.SkillCardData { Skill = x.Skill, Rarity = x.Rarity, Count = x.Count, Bonus = x.Bonus }).ToArray()
+        };
+    }
 
     private PlayerContractResponse BuildContractResponse(SquadPlayerRecord player, decimal requestedSalary)
     {
@@ -294,7 +284,7 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
                     StartDate = DateTime.UtcNow.Date.ToString("O"),
                     EndDate = DateTime.UtcNow.Date.AddDays(365).ToString("O"),
                     Salary = salary,
-                    MarketValue = Math.Max(25_000m, player.Strength * player.Strength * 10m),
+                    MarketValue = player.MarketValue,
                     PremiumCost = Math.Max(1, budgetCost / 50),
                     BudgetCost = budgetCost
                 }
@@ -315,7 +305,7 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
             Id = x.Id,
             Name = x.Name,
             Country = LegacyAppCompatibility.NormalizeCountryCode(x.Origin),
-            Head = LegacyAppCompatibility.BuildHeadId(x.Id),
+            Head = x.Head,
             Strength = x.Strength,
             Talent = x.Talent,
             Age = x.Age,
@@ -323,13 +313,13 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
             EndDate = x.ContractEndUtc?.ToString("O"),
             Experience = LegacyAppCompatibility.BuildExperience(x.Strength, x.Age, x.Matches),
             Fitness = (int)x.Fitness,
-            Body = LegacyAppCompatibility.BuildBodyId(x.Id),
-            Gloves = LegacyAppCompatibility.BuildGlovesId(x.Id, x.Position == "GK"),
-            Shoes = LegacyAppCompatibility.BuildShoesId(x.Id),
+            Body = x.Body,
+            Gloves = x.Gloves,
+            Shoes = x.Shoes,
             Salary = Math.Max(1_000m, x.Strength * x.Strength / 4m),
-            MarketValue = Math.Max(25_000m, x.Strength * x.Strength * 10m),
+            MarketValue = x.MarketValue,
             Origin = x.Origin,
-            Skills = LegacyAppCompatibility.BuildSkills(x.Strength, x.Position, x.Talent, x.Age),
+            Skills = x.Skills,
             MainSkill = LegacyAppCompatibility.MainSkillIndex(x.Position),
             BonusSkills = LegacyAppCompatibility.BuildBonusSkills(x.Position),
             YellowCards = x.YellowCards,

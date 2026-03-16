@@ -10,6 +10,7 @@ namespace GoalTactics.Infrastructure.Authentication;
 public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 {
     private const int ClubsPerLeague = 16;
+    private const int PreferredHumanTier = 3;
     private const int StartingMoney = 10_000_000;
     private const int StartingMedipacks = 3;
     private const int StartingGtStars = 5_000;
@@ -231,53 +232,38 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
     private async Task EnsureLeaguePyramidSeededAsync(CancellationToken cancellationToken)
     {
-        foreach (var tierEntry in LeagueGroupsPerTier)
+        // Seed the minimal league structure needed for the first user.
+        // The first league is created lazily; additional leagues are created on demand as users join.
+        if (await dbContext.Leagues.AnyAsync(cancellationToken))
         {
-            var tier = tierEntry.Key;
-            var groups = tierEntry.Value;
-
-            for (var groupNumber = 1; groupNumber <= groups; groupNumber++)
-            {
-                var league = await dbContext.Leagues.FirstOrDefaultAsync(
-                    x => x.Tier == tier && x.GroupNumber == groupNumber,
-                    cancellationToken);
-
-                if (league is null)
-                {
-                    league = new LeagueEntity
-                    {
-                        Id = Guid.NewGuid().ToString("N"),
-                        Tier = tier,
-                        GroupNumber = groupNumber,
-                        Name = BuildLeagueName(tier, groupNumber),
-                        Mount = GetMountForTier(tier),
-                        Dismount = GetDismountForTier(tier)
-                    };
-                    dbContext.Leagues.Add(league);
-                    await dbContext.SaveChangesAsync(cancellationToken);
-                }
-                else
-                {
-                    league.Name = BuildLeagueName(tier, groupNumber);
-                    league.Mount = GetMountForTier(tier);
-                    league.Dismount = GetDismountForTier(tier);
-                    await dbContext.SaveChangesAsync(cancellationToken);
-                }
-
-                var existingSlots = await dbContext.LeagueTeams
-                    .Where(x => x.LeagueId == league.Id)
-                    .OrderBy(x => x.Id)
-                    .ToListAsync(cancellationToken);
-
-                for (var slotIndex = existingSlots.Count + 1; slotIndex <= ClubsPerLeague; slotIndex++)
-                {
-                    await CreateBotLeagueSlotAsync(league, slotIndex, cancellationToken);
-                }
-            }
+            return;
         }
+
+        var tier = PreferredHumanTier;
+        var groupNumber = 1;
+
+        var league = new LeagueEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Tier = tier,
+            GroupNumber = groupNumber,
+            Name = BuildLeagueName(tier, groupNumber),
+            Mount = GetMountForTier(tier),
+            Dismount = GetDismountForTier(tier)
+        };
+
+        dbContext.Leagues.Add(league);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        for (var slotIndex = 1; slotIndex <= ClubsPerLeague; slotIndex++)
+        {
+            await CreateBotLeagueSlotAsync(league, slotIndex, cancellationToken, saveChanges: false);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task CreateBotLeagueSlotAsync(LeagueEntity league, int slotIndex, CancellationToken cancellationToken)
+    private async Task CreateBotLeagueSlotAsync(LeagueEntity league, int slotIndex, CancellationToken cancellationToken, bool saveChanges = true)
     {
         var randomSeed = HashCode.Combine(league.Tier, league.GroupNumber, slotIndex);
         var random = new Random(randomSeed);
@@ -360,23 +346,26 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             Country = "DE",
             Logo = LegacyAppCompatibility.BuildLogoId(botTeamId),
             IsOnline = false,
-            MatchesHome = 15,
-            MatchesAway = 15,
-            WinsHome = random.Next(0, 8),
-            WinsAway = random.Next(0, 8),
-            LossesHome = random.Next(0, 8),
-            LossesAway = random.Next(0, 8),
-            DrawsHome = random.Next(0, 8),
-            DrawsAway = random.Next(0, 8),
-            GoalsScoredHome = random.Next(10, 40),
-            GoalsScoredAway = random.Next(8, 36),
-            GoalsReceivedHome = random.Next(8, 36),
-            GoalsReceivedAway = random.Next(8, 36),
-            PointsHome = random.Next(0, 45),
-            PointsAway = random.Next(0, 45)
+            MatchesHome = 0,
+            MatchesAway = 0,
+            WinsHome = 0,
+            WinsAway = 0,
+            LossesHome = 0,
+            LossesAway = 0,
+            DrawsHome = 0,
+            DrawsAway = 0,
+            GoalsScoredHome = 0,
+            GoalsScoredAway = 0,
+            GoalsReceivedHome = 0,
+            GoalsReceivedAway = 0,
+            PointsHome = 0,
+            PointsAway = 0
         });
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (saveChanges)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private async Task AssignUserToThirdLeagueBotTeamAsync(string userId, CancellationToken cancellationToken)
@@ -396,11 +385,12 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
         if (targetSlot is null)
         {
-            var nextGroupNumber = await dbContext.Leagues
+            var tierThreeGroupNumbers = await dbContext.Leagues
                 .Where(x => x.Tier == 3)
                 .Select(x => x.GroupNumber)
-                .DefaultIfEmpty(0)
-                .MaxAsync(cancellationToken) + 1;
+                .ToListAsync(cancellationToken);
+
+            var nextGroupNumber = (tierThreeGroupNumbers.Count == 0 ? 0 : tierThreeGroupNumbers.Max()) + 1;
 
             var league = new LeagueEntity
             {
@@ -417,8 +407,10 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
             for (var slotIndex = 1; slotIndex <= ClubsPerLeague; slotIndex++)
             {
-                await CreateBotLeagueSlotAsync(league, slotIndex, cancellationToken);
+                await CreateBotLeagueSlotAsync(league, slotIndex, cancellationToken, saveChanges: false);
             }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             targetSlot = await dbContext.LeagueTeams
                 .Join(dbContext.Leagues, lt => lt.LeagueId, l => l.Id, (lt, l) => new { Slot = lt, League = l })
@@ -589,9 +581,10 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
                 _ => 65
             };
 
+            var playerId = Guid.NewGuid();
             players.Add(new TeamPlayerEntity
             {
-                Id = Guid.NewGuid().ToString("N"),
+                Id = playerId.ToString("N"),
                 TeamId = teamId,
                 Name = $"{firstNames[(random.Next(firstNames.Length) + i) % firstNames.Length]} {lastNames[(random.Next(lastNames.Length) + (i * 3)) % lastNames.Length]}",
                 Origin = origins[(random.Next(origins.Length) + i) % origins.Length],
@@ -605,7 +598,11 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
                 Goals = position == "FWD" ? random.Next(0, 20) : random.Next(0, 6),
                 YellowCards = random.Next(0, 6),
                 RedCards = random.Next(0, 2),
-                ContractEndUtc = DateTime.UtcNow.AddDays(random.Next(15, 90))
+                ContractEndUtc = DateTime.UtcNow.AddDays(random.Next(15, 90)),
+                Head = LegacyAppCompatibility.BuildHeadId(playerId),
+                Body = LegacyAppCompatibility.BuildBodyId(playerId),
+                Gloves = LegacyAppCompatibility.BuildGlovesId(playerId, position == "GK"),
+                Shoes = LegacyAppCompatibility.BuildShoesId(playerId)
             });
         }
 

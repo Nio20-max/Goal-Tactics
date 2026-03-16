@@ -126,6 +126,39 @@ builder.Services
                 {
                     context.Fail("Session is revoked or expired.");
                 }
+            },
+            OnChallenge = async context =>
+            {
+                // Legacy client often expects a JSON payload even on auth errors.
+                // Return a predictable TrainingCampData-like response to avoid crashes.
+                context.HandleResponse();
+
+                context.Response.StatusCode = StatusCodes.Status200OK;
+                context.Response.ContentType = "application/json; charset=utf-8";
+
+                var payload = new
+                {
+                    success = false,
+                    message = "Authentication required",
+                    status = 0,
+                    errorMessage = "Invalid or expired token",
+                    trainingCamp = new
+                    {
+                        campItems = Array.Empty<object>(),
+                        updateCampsCost = 0,
+                        isUpdateEnabled = false,
+                        success = false,
+                        message = "Authentication required",
+                        status = 0,
+                        errorMessage = "Invalid or expired token",
+                        punishment = 0,
+                        totalCount = 0,
+                        currentPage = 0,
+                        totalPages = 0
+                    }
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
             }
         };
     });

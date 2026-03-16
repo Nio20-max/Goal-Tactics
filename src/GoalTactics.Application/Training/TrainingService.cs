@@ -1,3 +1,4 @@
+using GoalTactics.Application.Common;
 using GoalTactics.Contracts.Training;
 using GoalTactics.Application.Team;
 
@@ -66,9 +67,13 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
 
     public async Task SaveTacticTrainingAsync(string userId, TacticTrainingSaveRequest request, CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrWhiteSpace(request.TacticId))
+        var tacticId = !string.IsNullOrWhiteSpace(request.TacticId)
+            ? request.TacticId.Trim()
+            : (request.Id != Guid.Empty ? request.Id.ToString() : null);
+
+        if (!string.IsNullOrWhiteSpace(tacticId))
         {
-            await teamStore.SaveTacticTrainingAsync(userId, request.TacticId.Trim(), cancellationToken);
+            await teamStore.SaveTacticTrainingAsync(userId, tacticId, cancellationToken);
         }
     }
 
@@ -157,14 +162,26 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
             (Id: Guid.Parse("02f01198-2101-4ba0-88d4-f02442240e1c"), Name: "Kick and Rush")
         };
 
-        // Compute tactic values: all start at 0%, selected tactic goes up 2%/day
+        // Compute tactic values: all start at 0%, selected tactic accumulates progress over time.
         var selectedId = Guid.TryParse(state.SelectedTacticId, out var parsed) ? parsed : Guid.Empty;
-        var daysTrained = state.SelectedTacticStartUtc.HasValue
-            ? (int)(DateTime.UtcNow - state.SelectedTacticStartUtc.Value).TotalDays
-            : 0;
-        var selectedValue = Math.Min(100, Math.Max(0, daysTrained * 2));
 
-        var tactics = tacticDefs.Select(t => (t.Id, t.Name, Value: t.Id == selectedId ? selectedValue : 0)).ToArray();
+        // Tactic progress is stored per tactic so switching tactics doesn't reset the progress.
+        var progressMap = state.TacticTrainingProgress ?? new Dictionary<string, int>();
+
+        int GetTacticValue(Guid tacticId)
+        {
+            var storedDays = progressMap.TryGetValue(tacticId.ToString(), out var existingDays) ? existingDays : 0;
+            var currentDays = 0;
+            if (tacticId == selectedId && state.SelectedTacticStartUtc.HasValue)
+            {
+                currentDays = Math.Max(1, (int)(DateTime.UtcNow - state.SelectedTacticStartUtc.Value).TotalDays + 1);
+            }
+
+            var totalDays = storedDays + currentDays;
+            return Math.Min(100, totalDays * 2);
+        }
+
+        var tactics = tacticDefs.Select(t => (t.Id, t.Name, Value: GetTacticValue(t.Id))).ToArray();
 
         return new TacticTrainingData
         {
@@ -207,31 +224,45 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         var rng = new Random(HashCode.Combine(daySeed, state.CampRefreshCount));
         var allCamps = new[]
         {
-            (Effect: 0, Variant: 0, Name: "Defensivtraining", Image: "Camp_0_0"),
-            (Effect: 1, Variant: 0, Name: "Torwarttraining", Image: "Camp_1_0"),
-            (Effect: 2, Variant: 0, Name: "Schusstraining", Image: "Camp_2_0_high"),
-            (Effect: 0, Variant: 1, Name: "Spielaufbau-Workshop", Image: "Camp_0_1"),
-            (Effect: 1, Variant: 1, Name: "Passspiel-Seminar", Image: "Camp_1_1"),
-            (Effect: 2, Variant: 1, Name: "Ballkontrolle-Kurs", Image: "Camp_2_1_low"),
-            (Effect: 0, Variant: 2, Name: "Zweikampftraining", Image: "Camp_0_2"),
-            (Effect: 1, Variant: 2, Name: "Eins-gegen-Eins-Camp", Image: "Camp_1_2_low"),
-            (Effect: 0, Variant: 3, Name: "Kopfball-Workshop", Image: "Camp_0_3_high"),
-            (Effect: 1, Variant: 3, Name: "Schnelligkeitslager", Image: "Camp_1_3"),
-            (Effect: 2, Variant: 2, Name: "Flankentraining", Image: "Camp_2_2"),
-            (Effect: 1, Variant: 4, Name: "Eckball-Seminar", Image: "Camp_1_4_high"),
-            (Effect: 2, Variant: 3, Name: "Freistoß-Workshop", Image: "Camp_2_3"),
-            (Effect: 2, Variant: 4, Name: "Elfmetertraining", Image: "Camp_2_4")
+            (Effect: 0, Variant: 0, Name: "Defensivtraining", Image: "camp_0_0_mid"),
+            (Effect: 0, Variant: 1, Name: "Torwarttraining", Image: "camp_0_1_mid"),
+            (Effect: 0, Variant: 2, Name: "Schusstraining", Image: "camp_0_2_mid"),
+            (Effect: 0, Variant: 3, Name: "Spielaufbau-Workshop", Image: "camp_0_3_mid"),
+            (Effect: 1, Variant: 0, Name: "Passspiel-Seminar", Image: "camp_1_0_mid"),
+            (Effect: 1, Variant: 1, Name: "Ballkontrolle-Kurs", Image: "camp_1_1_mid"),
+            (Effect: 1, Variant: 2, Name: "Zweikampftraining", Image: "camp_1_2_mid"),
+            (Effect: 1, Variant: 3, Name: "Schnelligkeitslager", Image: "camp_1_3_mid"),
+            (Effect: 1, Variant: 4, Name: "Eckball-Seminar", Image: "camp_1_4_mid"),
+            (Effect: 1, Variant: 5, Name: "Flankentraining", Image: "camp_1_5_mid"),
+            (Effect: 1, Variant: 6, Name: "Freistoß-Workshop", Image: "camp_1_6_mid"),
+            (Effect: 1, Variant: 7, Name: "Elfmetertraining", Image: "camp_1_7_mid"),
+            (Effect: 1, Variant: 8, Name: "Passspiel", Image: "camp_1_8_mid"),
+            (Effect: 1, Variant: 9, Name: "Dribbling", Image: "camp_1_9_mid"),
+            (Effect: 2, Variant: 0, Name: "Erfahrung", Image: "camp_2_0_mid")
         };
 
-        // Pick 3 random camps
-        var shuffled = allCamps.OrderBy(_ => rng.Next()).Take(3).ToArray();
-
-        return new TrainingCampData
+        // Pick 3 random camps (but always include the currently booked one, if any)
+        var shuffled = allCamps.OrderBy(_ => rng.Next()).Take(3).ToList();
+        if (!string.IsNullOrWhiteSpace(activeIdentifier) && !shuffled.Any(c => c.Image == activeIdentifier))
         {
-            Success = true,
-            UpdateCampsCost = 1000,
-            IsUpdateEnabled = !state.CampActiveUntilUtc.HasValue || state.CampActiveUntilUtc.Value.Date < DateTime.UtcNow.Date,
-            CampItems = shuffled.Select(c => new TrainingCampItem
+            var activeCamp = allCamps.FirstOrDefault(c => c.Image == activeIdentifier);
+            if (activeCamp != default)
+            {
+                // Ensure the booked camp always appears in the list.
+                shuffled[^1] = activeCamp;
+            }
+        }
+
+        var bookedCampIndex = -1;
+        var campItems = shuffled.Select((c, i) =>
+        {
+            var bookDate = activeIdentifier == c.Image ? activeBookDate : string.Empty;
+            if (bookDate.Length > 0)
+            {
+                bookedCampIndex = i;
+            }
+
+            return new TrainingCampItem
             {
                 Identifier = c.Image,
                 Image = c.Image,
@@ -242,8 +273,17 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
                 Percent = false,
                 PriceEuro = campCostEuro,
                 PriceStars = 1000,
-                BookDate = activeIdentifier == c.Image ? activeBookDate : string.Empty
-            }).ToArray()
+                BookDate = bookDate
+            };
+        }).ToArray();
+
+        return new TrainingCampData
+        {
+            Success = true,
+            BookedCampIndex = bookedCampIndex,
+            UpdateCampsCost = 1000,
+            IsUpdateEnabled = !state.CampActiveUntilUtc.HasValue || state.CampActiveUntilUtc.Value.Date < DateTime.UtcNow.Date,
+            CampItems = campItems
         };
     }
 
@@ -268,8 +308,9 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         return new TrainingPlayerData
         {
             Id = player.Id,
-            Name = player.Name,
-            Country = player.Origin.ToLowerInvariant(),
+            Name = string.IsNullOrWhiteSpace(player.Name) ? "" : player.Name,
+            Country = LegacyAppCompatibility.NormalizeCountryCode(player.Origin),
+            Head = player.Head,
             Strength = player.Strength,
             Talent = player.Talent,
             Age = player.Age,

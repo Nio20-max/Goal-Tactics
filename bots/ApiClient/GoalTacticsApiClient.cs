@@ -39,7 +39,7 @@ public sealed class GoalTacticsApiClient : IDisposable
     {
         body ??= new RequestObject();
         var response = await _http.PostAsJsonAsync(endpoint, body, JsonOptions);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessWithDetailsAsync(response, endpoint);
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions);
     }
 
@@ -47,14 +47,31 @@ public sealed class GoalTacticsApiClient : IDisposable
     {
         body ??= new RequestObject();
         var response = await _http.PostAsJsonAsync(endpoint, body, JsonOptions);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessWithDetailsAsync(response, endpoint);
     }
 
     private async Task<T?> GetAsync<T>(string endpoint)
     {
         var response = await _http.GetAsync(endpoint);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessWithDetailsAsync(response, endpoint);
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions);
+    }
+
+    private static async Task EnsureSuccessWithDetailsAsync(HttpResponseMessage response, string endpoint)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var body = response.Content is null ? string.Empty : await response.Content.ReadAsStringAsync();
+        if (body.Length > 800)
+        {
+            body = body[..800] + "...";
+        }
+
+        throw new HttpRequestException(
+            $"Request failed: {(int)response.StatusCode} {response.ReasonPhrase} at {endpoint}. Body: {body}");
     }
 
     // ── Authentication (no auth required) ───────────────────────

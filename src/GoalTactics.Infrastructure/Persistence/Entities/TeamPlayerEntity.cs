@@ -20,6 +20,36 @@ public sealed class TeamPlayerEntity
 
     public decimal Strength { get; set; }
 
+    public decimal? MarketValue { get; set; }
+
+    public decimal? Skill0 { get; set; }
+
+    public decimal? Skill1 { get; set; }
+
+    public decimal? Skill2 { get; set; }
+
+    public decimal? Skill3 { get; set; }
+
+    public decimal? Skill4 { get; set; }
+
+    public decimal? Skill5 { get; set; }
+
+    public decimal? Skill6 { get; set; }
+
+    public decimal? Skill7 { get; set; }
+
+    public decimal? Skill8 { get; set; }
+
+    public decimal? Skill9 { get; set; }
+
+    public decimal? Skill10 { get; set; }
+
+    public decimal? Skill11 { get; set; }
+
+    public decimal? Skill12 { get; set; }
+
+    public decimal? Skill13 { get; set; }
+
     public int Fitness { get; set; }
 
     public int Matches { get; set; }
@@ -43,6 +73,15 @@ public sealed class TeamPlayerEntity
     public DateTime? ScoutingReadyAtUtc { get; set; }
 
     public string Head { get; set; } = "01_head-A01";
+
+    public string Body { get; set; } = "01_body-A00";
+
+    public string Gloves { get; set; } = "01_Gloves01";
+
+    public string Shoes { get; set; } = "01_Shoes01";
+
+    /// <summary>Whether this scouted player was obtained using premium (stars) scouting.</summary>
+    public bool IsPremiumScouting { get; set; }
 
     public TeamEntity? Team { get; set; }
 }

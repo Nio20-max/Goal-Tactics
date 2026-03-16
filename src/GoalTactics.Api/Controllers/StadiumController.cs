@@ -40,7 +40,7 @@ public sealed class StadiumController(IStadiumService stadiumService) : Controll
     [HttpPost("BuildStadium")]
     [HttpPost("Build")]
     public Task<ActionResult<ResponseObject>> BuildStadium([FromBody] IdRequest request, CancellationToken cancellationToken) =>
-        ExecuteMutation(request.Id, cancellationToken, stadiumService.BuildAsync, "Build started");
+        ExecuteMutation(request.Id, cancellationToken, (userId, id, ct) => stadiumService.BuildAsync(userId, id, 1, ct), "Build started");
 
     [HttpPost("BuildPlaces")]
     public async Task<ActionResult<ResponseObject>> BuildPlaces([FromBody] StadiumPlacesRequest request, CancellationToken cancellationToken)
@@ -57,7 +57,7 @@ public sealed class StadiumController(IStadiumService stadiumService) : Controll
             return Ok(new ResponseObject { Success = false, Message = "No places specified" });
         }
 
-        await stadiumService.BuildAsync(userId, place.Id, cancellationToken);
+        await stadiumService.BuildAsync(userId, place.Id, place.Count, cancellationToken);
         return Ok(new ResponseObject { Success = true, Message = "Build started" });
     }
 

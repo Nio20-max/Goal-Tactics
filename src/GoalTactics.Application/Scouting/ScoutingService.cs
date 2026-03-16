@@ -1,6 +1,8 @@
+using GoalTactics.Application.Common;
 using GoalTactics.Application.Team;
 using GoalTactics.Contracts.Scouting;
 using GoalTactics.Contracts.Squad;
+using System.Linq;
 
 namespace GoalTactics.Application.Scouting;
 
@@ -10,6 +12,8 @@ public interface IScoutingService
 
     Task InstructScoutAsync(string userId, ScoutInstructionRequest request, CancellationToken cancellationToken = default);
 
+    Task<Guid> GetNextPendingScoutIdAsync(string userId, bool premiumOnly, CancellationToken cancellationToken = default);
+
     Task RecruitAsync(string userId, Guid playerId, CancellationToken cancellationToken = default);
 
     Task SpeedupAsync(string userId, Guid assignmentId, CancellationToken cancellationToken = default);
@@ -18,11 +22,11 @@ public interface IScoutingService
 public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
 {
     private const int NormalScoutCost = 10_000;
-    private const int PremiumScoutCostStars = 1_000;
-    private const int SpeedupCostStars = 3;
+    private const int PremiumScoutCostStars = 300;
+    private const int SpeedupCostStars = 300;
     private const int MaxSimultaneousScouts = 3;
-    private static readonly TimeSpan NormalScoutDuration = TimeSpan.FromHours(4);
-    private static readonly TimeSpan PremiumScoutDuration = TimeSpan.FromHours(1);
+    private static readonly TimeSpan NormalScoutDuration = TimeSpan.FromHours(12);
+    private static readonly TimeSpan PremiumScoutDuration = TimeSpan.FromHours(3);
 
     private static readonly string[] FirstNames = ["Marco", "Lukas", "Felix", "Jan", "Niklas", "Tim", "Jonas", "Leon", "David", "Moritz",
         "Fabio", "Alex", "Kevin", "Stefan", "Paul", "Erik", "Tobias", "Lars", "Christian", "Max"];
@@ -38,17 +42,28 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
         var now = DateTime.UtcNow;
 
         // Ready players (visible to user)
-        var readyPlayers = allScouted.Where(p => p.ScoutingReadyAtUtc is null || p.ScoutingReadyAtUtc <= now).ToList();
+        // Scouted players appear immediately; the "ready" time is now used only to throttle
+        // how many scouts can be active at once (cooldown until next scout can be started).
+        var readyPlayers = allScouted.ToList();
 
-        // Pending players (still scouting)
+        // Pending scouts (cooling down)
         var pendingPlayers = allScouted.Where(p => p.ScoutingReadyAtUtc.HasValue && p.ScoutingReadyAtUtc > now).ToList();
+        var pendingPremium = pendingPlayers.Where(p => p.IsPremiumScouting).ToList();
+        var pendingNormal = pendingPlayers.Where(p => !p.IsPremiumScouting).ToList();
 
-        // Compute the earliest pending scout completion
+        // Compute the earliest pending scout completion for each type
         string? nextScoutingDate = null;
-        if (pendingPlayers.Count > 0)
+        if (pendingNormal.Count > 0)
         {
-            var earliest = pendingPlayers.Min(p => p.ScoutingReadyAtUtc!.Value);
+            var earliest = pendingNormal.Min(p => p.ScoutingReadyAtUtc!.Value);
             nextScoutingDate = earliest.ToString("o");
+        }
+
+        string? nextPremiumScoutingDate = null;
+        if (pendingPremium.Count > 0)
+        {
+            var earliest = pendingPremium.Min(p => p.ScoutingReadyAtUtc!.Value);
+            nextPremiumScoutingDate = earliest.ToString("o");
         }
 
         return new ScoutingPlayersResponse
@@ -58,16 +73,52 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
             PremiumScoutingCost = PremiumScoutCostStars,
             SpeedupCost = SpeedupCostStars,
             NextScoutingDate = nextScoutingDate,
+            NextPremiumScoutingDate = nextPremiumScoutingDate,
             PendingScoutCount = pendingPlayers.Count,
             MaxSimultaneousScouts = MaxSimultaneousScouts,
-            Players = readyPlayers.Select(p => new ScoutedPlayerData
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Position = p.Position,
-                Talent = p.Talent,
-                Strength = p.Strength
-            }).ToList()
+            Players = readyPlayers.Select(MapScoutedPlayer).ToList()
+        };
+    }
+
+    private static SquadPlayerData MapScoutedPlayer(SquadPlayerRecord p)
+    {
+        // Use the same conversion logic as SquadService to match the app model.
+        return new SquadPlayerData
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Country = LegacyAppCompatibility.NormalizeCountryCode(p.Origin),
+            Head = p.Head,
+            Strength = p.Strength,
+            Talent = p.Talent,
+            Age = p.Age,
+            Position = LegacyAppCompatibility.MapPositionCode(p.Position),
+            EndDate = p.ContractEndUtc?.ToString("O"),
+            Experience = LegacyAppCompatibility.BuildExperience(p.Strength, p.Age, p.Matches),
+            Fitness = (int)p.Fitness,
+            Body = p.Body,
+            Gloves = p.Gloves,
+            Shoes = p.Shoes,
+            Salary = Math.Max(1_000m, p.Strength * p.Strength / 4m),
+            MarketValue = p.MarketValue,
+            Origin = p.Origin,
+            Skills = p.Skills,
+            MainSkill = LegacyAppCompatibility.MainSkillIndex(p.Position),
+            BonusSkills = LegacyAppCompatibility.BuildBonusSkills(p.Position),
+            YellowCards = p.YellowCards,
+            HasRedCard = p.RedCards > 0,
+            Injured = 0,
+            IsForSale = false,
+            SellPrice = Math.Max(10_000m, p.Strength * p.Strength),
+            TransfermarketFee = Math.Max(1_000m, p.Strength * 14m),
+            TransfermarketMaxOffer = Math.Max(10_000m, p.Strength * p.Strength * 11m / 10m),
+            TransfermarketMinOffer = Math.Max(1_000m, p.Strength * 14m),
+            TransfermarketMaxHours = 48,
+            IsUpgraded = false,
+            MaxUpgradeStrength = (int)(p.Strength + 25m),
+            Shirt = p.ShirtNumber <= 0 ? -1 : p.ShirtNumber,
+            CanExtendContract = true,
+            HasIndividualTraining = !string.IsNullOrWhiteSpace(p.IndividualTrainingSkill)
         };
     }
 
@@ -80,8 +131,11 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
             throw new InvalidOperationException($"Maximum of {MaxSimultaneousScouts} simultaneous scouts reached. Wait for one to complete or speed it up.");
         }
 
-        // Determine if this is a premium (stars) or normal (money) scout
-        bool isPremium = string.Equals(request.ScoutType, "premium", StringComparison.OrdinalIgnoreCase);
+        // Determine if this is a premium (stars) or normal (money) scout.
+        // Legacy clients sometimes send the premium flag via scoutType, some via type, or via price.
+        bool isPremium = string.Equals(request.ScoutType, "premium", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(request.Type, "premium", StringComparison.OrdinalIgnoreCase)
+            || request.Price == PremiumScoutCostStars;
 
         if (!isPremium)
         {
@@ -94,10 +148,30 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
             if (!spent) return;
         }
 
-        // Determine position filter
-        string? posFilter = request.Position >= 0 && request.Position < Positions.Length
-            ? Positions[request.Position]
-            : request.PositionFilter;
+        // Determine position filter.
+        // Legacy clients sometimes send 0-3, sometimes 1-4 (GK=1, DEF=2, MID=3, FWD=4).
+        // If the client doesn't send a position, we want the server to randomly pick one.
+        string? posFilter = null;
+        if (request.Position.HasValue)
+        {
+            var posValue = request.Position.Value;
+            if (posValue >= 0 && posValue < Positions.Length)
+            {
+                posFilter = Positions[posValue];
+            }
+            else if (posValue >= 1 && posValue <= Positions.Length)
+            {
+                posFilter = Positions[posValue - 1];
+            }
+        }
+
+        posFilter ??= request.PositionFilter;
+
+        // Premium scouts should always use a specific position; if none is provided, default to GK.
+        if (isPremium && string.IsNullOrWhiteSpace(posFilter))
+        {
+            posFilter = "GK";
+        }
 
         // Generate a random scouted player
         var rng = new Random();
@@ -106,7 +180,7 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
         var lastName = LastNames[rng.Next(LastNames.Length)];
         var name = $"{firstName} {lastName}";
         var origin = Origins[rng.Next(Origins.Length)];
-        var age = rng.Next(17, 33);
+        var age = rng.Next(16, 19); // 16-18 inclusive
         var talent = isPremium ? rng.Next(6, 11) : rng.Next(3, 9);
         var baseStr = position switch
         {
@@ -117,18 +191,34 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
             _ => 60m
         };
         var strength = Math.Clamp(baseStr + rng.Next(-5, 15) + (talent >= 8 ? rng.Next(2, 8) : 0), 50m, 90m);
-        var fitness = rng.Next(80, 101);
+        var fitness = rng.Next(0, 101);
 
         // Set scouting ready time based on scout type
         var duration = isPremium ? PremiumScoutDuration : NormalScoutDuration;
         var readyAtUtc = DateTime.UtcNow.Add(duration);
 
-        await teamStore.AddScoutedPlayerAsync(userId, name, origin, position, age, talent, strength, fitness, readyAtUtc, cancellationToken);
+        await teamStore.AddScoutedPlayerAsync(userId, name, origin, position, age, talent, strength, fitness, isPremium, readyAtUtc, cancellationToken);
     }
 
     public async Task RecruitAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
     {
         await teamStore.RecruitScoutedPlayerAsync(userId, playerId, cancellationToken);
+    }
+
+    public async Task<Guid> GetNextPendingScoutIdAsync(string userId, bool premiumOnly, CancellationToken cancellationToken = default)
+    {
+        var allScouted = await teamStore.GetAllScoutedPlayersAsync(userId, cancellationToken);
+        var now = DateTime.UtcNow;
+        var pending = allScouted
+            .Where(p => p.ScoutingReadyAtUtc.HasValue && p.ScoutingReadyAtUtc > now);
+
+        if (premiumOnly)
+        {
+            pending = pending.Where(p => p.IsPremiumScouting);
+        }
+
+        var next = pending.OrderBy(p => p.ScoutingReadyAtUtc).FirstOrDefault();
+        return next?.Id ?? Guid.Empty;
     }
 
     public async Task SpeedupAsync(string userId, Guid assignmentId, CancellationToken cancellationToken = default)

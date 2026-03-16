@@ -9,7 +9,7 @@ public interface IStadiumService
 
     Task<BuildPlacesResponse> GetBuildPlacesAsync(string userId, CancellationToken cancellationToken = default);
 
-    Task BuildAsync(string userId, Guid placeId, CancellationToken cancellationToken = default);
+    Task BuildAsync(string userId, Guid placeId, int count = 1, CancellationToken cancellationToken = default);
 
     Task SpeedupAsync(string userId, Guid buildId, CancellationToken cancellationToken = default);
 
@@ -83,9 +83,9 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
         };
     }
 
-    public async Task BuildAsync(string userId, Guid placeId, CancellationToken cancellationToken = default)
+    public async Task BuildAsync(string userId, Guid placeId, int count = 1, CancellationToken cancellationToken = default)
     {
-        var success = await teamStore.BuildPlaceAsync(userId, placeId, cancellationToken);
+        var success = await teamStore.BuildPlaceAsync(userId, placeId, count, cancellationToken);
         if (!success)
         {
             throw new InvalidOperationException("Upgrade unavailable or insufficient resources.");
@@ -226,10 +226,15 @@ public sealed class StadiumService(ITeamStore teamStore) : IStadiumService
         if (buildingType is "StadiumSeats") return 1m;
         if (buildingType is "StadiumStands") return 1m;
 
-        // Facility durations depend on level: Level 0→1: 30min, Level 19→20: 50hrs (3000min), linear
+        // Facility durations depend on level: linear was previously used, but the backend now uses exponential scaling.
         const decimal minMinutes = 30m;
         const decimal maxMinutes = 50m * 60m;
-        return Math.Round(minMinutes + (Math.Clamp(currentLevel, 0, 19) * ((maxMinutes - minMinutes) / 19m)), 0);
+        const int maxLevel = 19;
+
+        var level = Math.Clamp(currentLevel, 0, maxLevel);
+        var factor = Math.Pow((double)(maxMinutes / minMinutes), 1.0 / maxLevel);
+        var minutes = minMinutes * (decimal)Math.Pow(factor, level);
+        return Math.Round(minutes, 0);
     }
 
     private static int GetMaxValue(string buildingType, int leagueTier)

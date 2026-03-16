@@ -237,9 +237,9 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        GenerateRoundRobinSchedule(league.Id, leagueTeams);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
+        // Schedule generation is deferred until a client requests matches in this league.
+        // This keeps initial league creation fast and avoids bulk inserting thousands of match
+        // entities on the first launch of a fresh database.
         return league;
     }
 

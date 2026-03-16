@@ -21,6 +21,9 @@ public sealed class TeamTrainingStateEntity
     /// <summary>When the current tactic training started (for 2%/day progression).</summary>
     public DateTime? SelectedTacticStartUtc { get; set; }
 
+    /// <summary>Serialized JSON map of tacticId -> total days trained (stored so switching tactics doesn't reset progress).</summary>
+    public string? TacticTrainingProgressJson { get; set; }
+
     /// <summary>Incremented each time the user refreshes camp offerings.</summary>
     public int CampRefreshCount { get; set; }
 

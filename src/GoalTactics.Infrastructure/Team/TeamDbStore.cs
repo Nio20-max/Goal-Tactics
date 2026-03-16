@@ -103,10 +103,14 @@ public sealed class TeamDbStore(
                 CampActiveUntilUtc = null
             });
 
-            foreach (var player in BuildInitialPlayers(team.Id))
+            var initialPlayers = BuildInitialPlayers(team.Id);
+            foreach (var player in initialPlayers)
             {
                 dbContext.TeamPlayers.Add(player);
             }
+
+            team.Strength = RecalculateTeamStrength(initialPlayers);
+            team.MarketValue = RecalculateTeamMarketValue(initialPlayers);
 
             dbContext.TeamNews.Add(new TeamNewsEntity
             {
@@ -138,6 +142,20 @@ public sealed class TeamDbStore(
                 Outcome = 0,
                 Balance = 50000
             });
+
+            // Give new accounts a starting set of skill cards.
+            foreach (var card in BuildInitialSkillCards(team.Id))
+            {
+                dbContext.TeamSkillCards.Add(new TeamSkillCardEntity
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    TeamId = team.Id,
+                    Skill = card.Skill,
+                    Rarity = card.Rarity,
+                    Count = card.Count,
+                    Bonus = card.Bonus
+                });
+            }
 
             await dbContext.SaveChangesAsync(cancellationToken);
         }
@@ -497,7 +515,7 @@ public sealed class TeamDbStore(
         ];
     }
 
-    public async Task<bool> BuildPlaceAsync(string userId, Guid placeId, CancellationToken cancellationToken = default)
+    public async Task<bool> BuildPlaceAsync(string userId, Guid placeId, int count = 1, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         await ApplyProgressionTicksAsync(team.TeamId, cancellationToken);
@@ -533,30 +551,45 @@ public sealed class TeamDbStore(
 
         if (placeId == StadiumBuildingCatalog.StadiumVips || placeId == StadiumBuildingCatalog.StadiumSeats || placeId == StadiumBuildingCatalog.StadiumStands)
         {
-            if (!CanUpgradeStadium(resources, resources.OfficeLevel, teamEntity.LeagueTier, placeId))
-            {
-                return false;
-            }
-
+            // The client sends the *number of seats* to add (e.g. 200), but construction is done in fixed blocks
+            // (10 seats for VIP, 100 for Sit/Stand). Map the requested seat count to the required number of blocks.
+            var desiredSeats = Math.Max(1, count);
             var seatBlock = placeId == StadiumBuildingCatalog.StadiumVips ? 10 : 100;
+            var blocks = (desiredSeats + seatBlock - 1) / seatBlock; // round up to full blocks
+            var totalSeats = blocks * seatBlock;
+
             var currentValue = placeId == StadiumBuildingCatalog.StadiumVips
                 ? resources.StadiumVipSeats
                 : (placeId == StadiumBuildingCatalog.StadiumSeats ? resources.StadiumSitSeats : resources.StadiumStandSeats);
 
-            var currentLevel = placeId == StadiumBuildingCatalog.StadiumVips
-                ? resources.StadiumVipSeats / 10
-                : (placeId == StadiumBuildingCatalog.StadiumSeats ? resources.StadiumSitSeats / 100 : resources.StadiumStandSeats / 100);
+            var cap = stadiumEconomy.GetSeatCaps(teamEntity.LeagueTier);
+            var maxValue = placeId == StadiumBuildingCatalog.StadiumVips ? cap.MaxVipSeats
+                : placeId == StadiumBuildingCatalog.StadiumSeats ? cap.MaxSitSeats
+                : int.MaxValue;
 
-            var cost = GetSeatUpgradeCost(placeId);
+            if (currentValue + totalSeats > maxValue)
+            {
+                return false;
+            }
+
+            var cost = GetSeatUpgradeCost(placeId) * blocks;
             if (resources.Money < cost)
             {
                 return false;
             }
 
             resources.Money -= cost;
-            QueueConstruction(resources, placeId, GetSeatConstructionType(placeId), currentValue, currentValue + seatBlock, cost, GetSeatBuildDurationMinutes(placeId), DateTime.UtcNow);
+            QueueConstruction(
+                resources,
+                placeId,
+                GetSeatConstructionType(placeId),
+                currentValue,
+                currentValue + totalSeats,
+                cost,
+                GetSeatBuildDurationMinutes(placeId) * blocks,
+                DateTime.UtcNow);
             await AddFinanceHistoryAsync(userId, income: 0m, outcome: cost, resources.Money, cancellationToken);
-            AddConstructionNews(team.TeamId, GetSeatDisplayName(placeId), currentValue + seatBlock, resources.ActiveConstructionEndUtc);
+            AddConstructionNews(team.TeamId, GetSeatDisplayName(placeId), currentValue + totalSeats, resources.ActiveConstructionEndUtc);
             await dbContext.SaveChangesAsync(cancellationToken);
             return true;
         }
@@ -698,6 +731,20 @@ public sealed class TeamDbStore(
         var efficiency = Math.Max(10, baseEfficiency - decay);
         var trainPrice = IndividualTrainingWeeklyStars;
 
+        var tacticProgress = new Dictionary<string, int>();
+        if (!string.IsNullOrWhiteSpace(state.TacticTrainingProgressJson))
+        {
+            try
+            {
+                tacticProgress = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(state.TacticTrainingProgressJson)
+                    ?? new Dictionary<string, int>();
+            }
+            catch
+            {
+                tacticProgress = new Dictionary<string, int>();
+            }
+        }
+
         return new TeamTrainingStateRecord(
             state.MainSkillIndex,
             state.SubSkillIndex,
@@ -709,7 +756,8 @@ public sealed class TeamDbStore(
             state.SelectedTacticId,
             state.SelectedTacticStartUtc,
             teamEntity.LeagueTier,
-            state.CampRefreshCount);
+            state.CampRefreshCount,
+            tacticProgress);
     }
 
     public async Task SaveTeamTrainingAsync(string userId, int mainSkillIndex, int subSkillIndex, CancellationToken cancellationToken = default)
@@ -728,8 +776,32 @@ public sealed class TeamDbStore(
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         var state = await EnsureTrainingStateAsync(team.TeamId, cancellationToken);
 
+        // Keep per-tactic progress so switching tactics doesn't reset previous progress.
+        var progress = new Dictionary<string, int>();
+        if (!string.IsNullOrWhiteSpace(state.TacticTrainingProgressJson))
+        {
+            try
+            {
+                progress = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(state.TacticTrainingProgressJson)
+                    ?? new Dictionary<string, int>();
+            }
+            catch
+            {
+                progress = new Dictionary<string, int>();
+            }
+        }
+
+        // If we were training another tactic, save the elapsed time as progress.
+        if (!string.IsNullOrWhiteSpace(state.SelectedTacticId) && state.SelectedTacticStartUtc.HasValue && state.SelectedTacticId != tacticId)
+        {
+            var elapsedDays = Math.Max(1, (int)(DateTime.UtcNow - state.SelectedTacticStartUtc.Value).TotalDays + 1);
+            progress[state.SelectedTacticId] = (progress.TryGetValue(state.SelectedTacticId, out var existing) ? existing : 0) + elapsedDays;
+        }
+
         state.SelectedTacticId = tacticId;
         state.SelectedTacticStartUtc = DateTime.UtcNow;
+        state.TacticTrainingProgressJson = System.Text.Json.JsonSerializer.Serialize(progress);
+
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -969,6 +1041,17 @@ public sealed class TeamDbStore(
             }
         }
 
+        var hasLegacyPlayers = false;
+        foreach (var player in players)
+        {
+            if (EnsurePlayerSkillsInitialized(player))
+            {
+                hasLegacyPlayers = true;
+            }
+
+            RecalculatePlayerDerivedValues(player);
+        }
+
         var economyDays = FullDaysElapsed(resources.LastEconomyTickUtc, now);
         if (economyDays > 0)
         {
@@ -1106,13 +1189,15 @@ public sealed class TeamDbStore(
 
             resources.LastTrainingTickUtc = now.Date;
             team.Strength = RecalculateTeamStrength(players);
+            team.MarketValue = RecalculateTeamMarketValue(players);
         }
         else if (players.Count > 0)
         {
             team.Strength = RecalculateTeamStrength(players);
+            team.MarketValue = RecalculateTeamMarketValue(players);
         }
 
-        if (economyDays > 0 || sponsorDays > 0 || trainingDays > 0)
+        if (economyDays > 0 || sponsorDays > 0 || trainingDays > 0 || hasLegacyPlayers)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
@@ -1141,11 +1226,27 @@ public sealed class TeamDbStore(
                 individualActive,
                 hasCamp);
 
-            player.Strength = Math.Min(700m, player.Strength + gain);
+            var mainSkillIndex = NormalizeSkillIndex(training.MainSkillIndex, player.Position);
+            var subSkillIndex = NormalizeSkillIndex(training.SubSkillIndex, player.Position);
+
+            // Daily team training focuses mostly on main skill with smaller sub-skill gains.
+            AddSkillGain(player, mainSkillIndex, gain * 0.65m);
+            if (subSkillIndex != mainSkillIndex)
+            {
+                AddSkillGain(player, subSkillIndex, gain * 0.35m);
+            }
+
+            if (individualActive && TryResolveSkillIndex(player.IndividualTrainingSkill, out var individualSkillIndex))
+            {
+                var individualGain = trainingProgress.CalculateIndividualGainPublic(player.Age, player.Talent, player.Fitness);
+                AddSkillGain(player, individualSkillIndex, individualGain);
+            }
 
             // Fitness climbs over time; at training center level 20, daily gain reaches +4.
             var fitnessGain = Math.Max(1, (int)Math.Round(resources.TrainingCenterLevel / 5.0, MidpointRounding.AwayFromZero));
             player.Fitness = Math.Min(100, player.Fitness + fitnessGain);
+
+            RecalculatePlayerDerivedValues(player);
         }
     }
 
@@ -1163,6 +1264,133 @@ public sealed class TeamDbStore(
             .Sum(x => (int)Math.Round(x.Strength, MidpointRounding.AwayFromZero));
 
         return strengthCalculator.Calculate(startingLineupStrength, tacticBonus: 0, fitnessAverage: 0);
+    }
+
+    private static decimal RecalculateTeamMarketValue(IReadOnlyList<TeamPlayerEntity> players)
+    {
+        if (players.Count == 0)
+        {
+            return 0m;
+        }
+
+        // Players may be missing persisted market value in legacy rows; treat unknown as 0.
+        return players.Sum(x => x.MarketValue ?? 0m);
+    }
+
+    private static decimal[] GetSkills(TeamPlayerEntity player)
+    {
+        // Skill columns are nullable to support legacy rows without skill persistence.
+        // Treat missing skills as 0 when computing derived values.
+        return
+        [
+            player.Skill0 ?? 0m,
+            player.Skill1 ?? 0m,
+            player.Skill2 ?? 0m,
+            player.Skill3 ?? 0m,
+            player.Skill4 ?? 0m,
+            player.Skill5 ?? 0m,
+            player.Skill6 ?? 0m,
+            player.Skill7 ?? 0m,
+            player.Skill8 ?? 0m,
+            player.Skill9 ?? 0m,
+            player.Skill10 ?? 0m,
+            player.Skill11 ?? 0m,
+            player.Skill12 ?? 0m,
+            player.Skill13 ?? 0m
+        ];
+    }
+
+    private static void SetSkills(TeamPlayerEntity player, decimal[] skills)
+    {
+        if (skills.Length < 14)
+        {
+            throw new ArgumentException("Expected 14 skills.", nameof(skills));
+        }
+
+        player.Skill0 = PlayerValueCalculator.ClampSkill(skills[0]);
+        player.Skill1 = PlayerValueCalculator.ClampSkill(skills[1]);
+        player.Skill2 = PlayerValueCalculator.ClampSkill(skills[2]);
+        player.Skill3 = PlayerValueCalculator.ClampSkill(skills[3]);
+        player.Skill4 = PlayerValueCalculator.ClampSkill(skills[4]);
+        player.Skill5 = PlayerValueCalculator.ClampSkill(skills[5]);
+        player.Skill6 = PlayerValueCalculator.ClampSkill(skills[6]);
+        player.Skill7 = PlayerValueCalculator.ClampSkill(skills[7]);
+        player.Skill8 = PlayerValueCalculator.ClampSkill(skills[8]);
+        player.Skill9 = PlayerValueCalculator.ClampSkill(skills[9]);
+        player.Skill10 = PlayerValueCalculator.ClampSkill(skills[10]);
+        player.Skill11 = PlayerValueCalculator.ClampSkill(skills[11]);
+        player.Skill12 = PlayerValueCalculator.ClampSkill(skills[12]);
+        player.Skill13 = PlayerValueCalculator.ClampSkill(skills[13]);
+    }
+
+    private static bool EnsurePlayerSkillsInitialized(TeamPlayerEntity player)
+    {
+        var skills = GetSkills(player);
+        if (skills.Any(v => v > 0m))
+        {
+            return false;
+        }
+
+        // Backfill legacy rows that previously persisted only aggregate strength.
+        var generated = LegacyAppCompatibility.BuildSkills(player.Strength, player.Position, player.Talent, player.Age);
+        SetSkills(player, generated);
+        return true;
+    }
+
+    private static void RecalculatePlayerDerivedValues(TeamPlayerEntity player)
+    {
+        var skills = GetSkills(player);
+        player.Strength = PlayerValueCalculator.CalculateStrength(skills, player.Position, player.Fitness, player.Age, player.Talent);
+        player.MarketValue = PlayerValueCalculator.CalculateMarketValue(skills, player.Position, player.Fitness, player.Age, player.Talent);
+    }
+
+    private static int NormalizeSkillIndex(int requestedIndex, string position)
+    {
+        if (requestedIndex >= 0 && requestedIndex < 14)
+        {
+            return requestedIndex;
+        }
+
+        return LegacyAppCompatibility.MainSkillIndex(position);
+    }
+
+    private static bool TryResolveSkillIndex(string? skillName, out int index)
+    {
+        index = -1;
+        if (string.IsNullOrWhiteSpace(skillName))
+        {
+            return false;
+        }
+
+        var key = skillName.Trim().ToLowerInvariant();
+        if (key.Contains("parade") || key.Contains("goalkeeping") || key.Contains("keeper")) { index = 0; return true; }
+        if (key.Contains("manndeckung") || key.Contains("deck") || key.Contains("defend")) { index = 1; return true; }
+        if (key.Contains("zweikampf") || key.Contains("duell") || key.Contains("tackle")) { index = 2; return true; }
+        if (key.Contains("abschluss") || key.Contains("finish") || key.Contains("shot")) { index = 3; return true; }
+        if (key.Contains("dribbel")) { index = 4; return true; }
+        if (key.Contains("pass")) { index = 5; return true; }
+        if (key.Contains("flanke") || key.Contains("cross")) { index = 6; return true; }
+        if (key.Contains("lauf") || key.Contains("tempo") || key.Contains("speed")) { index = 7; return true; }
+        if (key.Contains("ausdauer") || key.Contains("stamina")) { index = 8; return true; }
+        if (key.Contains("technik") || key.Contains("tech")) { index = 9; return true; }
+        if (key.Contains("einsatz") || key.Contains("aggress")) { index = 10; return true; }
+        if (key.Contains("kopf") || key.Contains("header")) { index = 11; return true; }
+        if (key.Contains("freisto") || key.Contains("freekick")) { index = 12; return true; }
+        if (key.Contains("elfmeter") || key.Contains("penalty") || key.Contains("eckb") || key.Contains("corner")) { index = 13; return true; }
+
+        return false;
+    }
+
+    private static void AddSkillGain(TeamPlayerEntity player, int skillIndex, decimal gain)
+    {
+        if (skillIndex < 0 || skillIndex > 13 || gain <= 0m)
+        {
+            return;
+        }
+
+        var skills = GetSkills(player);
+        skills[skillIndex] = PlayerValueCalculator.ClampSkill(skills[skillIndex] + gain);
+        SetSkills(player, skills);
     }
 
     private async Task<TeamTrainingStateEntity> EnsureTrainingStateAsync(string teamId, CancellationToken cancellationToken)
@@ -1494,12 +1722,14 @@ public sealed class TeamDbStore(
         return players.Select(MapPlayer).ToArray();
     }
 
-    public async Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, DateTime? readyAtUtc = null, CancellationToken cancellationToken = default)
+    public async Task<bool> AddScoutedPlayerAsync(string userId, string name, string origin, string position, int age, int talent, decimal strength, int fitness, bool isPremiumScouting = false, DateTime? readyAtUtc = null, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
-        dbContext.TeamPlayers.Add(new TeamPlayerEntity
+        var playerId = Guid.NewGuid();
+        var skills = LegacyAppCompatibility.BuildSkills(strength, position, talent, age);
+        var entity = new TeamPlayerEntity
         {
-            Id = Guid.NewGuid().ToString("N"),
+            Id = playerId.ToString("N"),
             TeamId = team.TeamId,
             Name = name,
             Origin = origin,
@@ -1507,12 +1737,20 @@ public sealed class TeamDbStore(
             ShirtNumber = 0,
             Age = age,
             Talent = talent,
-            Strength = strength,
             Fitness = fitness,
             IsScouted = true,
+            IsPremiumScouting = isPremiumScouting,
             ScoutingReadyAtUtc = readyAtUtc,
-            ContractEndUtc = DateTime.UtcNow.AddDays(90)
-        });
+            ContractEndUtc = DateTime.UtcNow.AddDays(90),
+            Head = LegacyAppCompatibility.BuildHeadId(playerId),
+            Body = LegacyAppCompatibility.BuildBodyId(playerId),
+            Gloves = LegacyAppCompatibility.BuildGlovesId(playerId, position == "GK"),
+            Shoes = LegacyAppCompatibility.BuildShoesId(playerId)
+        };
+        SetSkills(entity, skills);
+        RecalculatePlayerDerivedValues(entity);
+
+        dbContext.TeamPlayers.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -1539,6 +1777,20 @@ public sealed class TeamDbStore(
         player.IsScouted = false;
         player.ShirtNumber = nextShirt;
         player.ScoutingReadyAtUtc = null;
+
+        var squadPlayers = await dbContext.TeamPlayers
+            .Where(x => x.TeamId == team.TeamId && !x.IsScouted)
+            .ToListAsync(cancellationToken);
+        foreach (var squadPlayer in squadPlayers)
+        {
+            EnsurePlayerSkillsInitialized(squadPlayer);
+            RecalculatePlayerDerivedValues(squadPlayer);
+        }
+
+        var teamEntity = await dbContext.Teams.FirstAsync(x => x.Id == team.TeamId, cancellationToken);
+        teamEntity.Strength = RecalculateTeamStrength(squadPlayers);
+        teamEntity.MarketValue = RecalculateTeamMarketValue(squadPlayers);
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -1590,6 +1842,14 @@ public sealed class TeamDbStore(
             return false;
 
         dbContext.TeamPlayers.Remove(player);
+
+        var remainingPlayers = await dbContext.TeamPlayers
+            .Where(x => x.TeamId == team.TeamId && !x.IsScouted && x.Id != player.Id)
+            .ToListAsync(cancellationToken);
+        var teamEntity = await dbContext.Teams.FirstAsync(x => x.Id == team.TeamId, cancellationToken);
+        teamEntity.Strength = RecalculateTeamStrength(remainingPlayers);
+        teamEntity.MarketValue = RecalculateTeamMarketValue(remainingPlayers);
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -1597,7 +1857,7 @@ public sealed class TeamDbStore(
     public async Task<bool> UpgradePlayerStrengthAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
     {
         const int upgradeStarsCost = 200;
-        const decimal strengthBoost = 1m;
+        const decimal skillBoost = 1m;
 
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         var resources = await dbContext.TeamResources.FirstAsync(x => x.TeamId == team.TeamId, cancellationToken);
@@ -1614,7 +1874,103 @@ public sealed class TeamDbStore(
             return false;
 
         resources.GTStars -= upgradeStarsCost;
-        player.Strength = Math.Min(700m, player.Strength + strengthBoost);
+
+        var mainSkillIndex = LegacyAppCompatibility.MainSkillIndex(player.Position);
+        AddSkillGain(player, mainSkillIndex, skillBoost);
+        RecalculatePlayerDerivedValues(player);
+
+        var squadPlayers = await dbContext.TeamPlayers
+            .Where(x => x.TeamId == team.TeamId && !x.IsScouted)
+            .ToListAsync(cancellationToken);
+        var teamEntity = await dbContext.Teams.FirstAsync(x => x.Id == team.TeamId, cancellationToken);
+        teamEntity.Strength = RecalculateTeamStrength(squadPlayers);
+        teamEntity.MarketValue = RecalculateTeamMarketValue(squadPlayers);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<SkillCardRecord>> GetSkillCardsAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+
+        var cards = await dbContext.TeamSkillCards.AsNoTracking()
+            .Where(x => x.TeamId == team.TeamId)
+            .ToListAsync(cancellationToken);
+
+        if (cards.Count == 0)
+        {
+            // For legacy accounts created before we added skill cards, seed a starting set.
+            var initialCards = BuildInitialSkillCards(team.TeamId);
+            foreach (var card in initialCards)
+            {
+                dbContext.TeamSkillCards.Add(new TeamSkillCardEntity
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    TeamId = team.TeamId,
+                    Skill = card.Skill,
+                    Rarity = card.Rarity,
+                    Count = card.Count,
+                    Bonus = card.Bonus
+                });
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            cards = await dbContext.TeamSkillCards.AsNoTracking().Where(x => x.TeamId == team.TeamId).ToListAsync(cancellationToken);
+        }
+
+        return cards.Select(x => new SkillCardRecord(x.Skill, x.Rarity, x.Count, x.Bonus)).ToArray();
+    }
+
+    public async Task AddSkillCardsAsync(string userId, IEnumerable<SkillCardRecord> cards, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+
+        foreach (var card in cards)
+        {
+            var existing = await dbContext.TeamSkillCards.FirstOrDefaultAsync(
+                x => x.TeamId == team.TeamId && x.Skill == card.Skill && x.Rarity == card.Rarity && x.Bonus == card.Bonus,
+                cancellationToken);
+
+            if (existing is null)
+            {
+                dbContext.TeamSkillCards.Add(new TeamSkillCardEntity
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    TeamId = team.TeamId,
+                    Skill = card.Skill,
+                    Rarity = card.Rarity,
+                    Count = card.Count,
+                    Bonus = card.Bonus
+                });
+            }
+            else
+            {
+                existing.Count += card.Count;
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> UseSkillCardAsync(string userId, SkillCardRecord card, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var existing = await dbContext.TeamSkillCards.FirstOrDefaultAsync(
+            x => x.TeamId == team.TeamId && x.Skill == card.Skill && x.Rarity == card.Rarity && x.Bonus == card.Bonus,
+            cancellationToken);
+
+        if (existing is null || existing.Count <= 0)
+        {
+            return false;
+        }
+
+        existing.Count--;
+        if (existing.Count == 0)
+        {
+            dbContext.TeamSkillCards.Remove(existing);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -1663,9 +2019,10 @@ public sealed class TeamDbStore(
             var lastName = LastNames[(random.Next(LastNames.Length) + (i * 3)) % LastNames.Length];
             var origin = Origins[(random.Next(Origins.Length) + i) % Origins.Length];
 
-            result.Add(new TeamPlayerEntity
+            var playerId = Guid.NewGuid();
+            var player = new TeamPlayerEntity
             {
-                Id = Guid.NewGuid().ToString("N"),
+                Id = playerId.ToString("N"),
                 TeamId = teamId,
                 Name = $"{firstName} {lastName}",
                 Origin = origin,
@@ -1673,34 +2030,78 @@ public sealed class TeamDbStore(
                 ShirtNumber = i + 1,
                 Age = age,
                 Talent = talent,
-                Strength = strength,
                 Fitness = fitness,
-                ContractEndUtc = DateTime.UtcNow.AddDays(random.Next(15, 90))
-            });
+                ContractEndUtc = DateTime.UtcNow.AddDays(random.Next(15, 90)),
+                Head = LegacyAppCompatibility.BuildHeadId(playerId),
+                Body = LegacyAppCompatibility.BuildBodyId(playerId),
+                Gloves = LegacyAppCompatibility.BuildGlovesId(playerId, position == "GK"),
+                Shoes = LegacyAppCompatibility.BuildShoesId(playerId)
+            };
+
+            SetSkills(player, LegacyAppCompatibility.BuildSkills(strength, position, talent, age));
+            RecalculatePlayerDerivedValues(player);
+            result.Add(player);
         }
 
         return result;
     }
 
+    private static IReadOnlyList<SkillCardRecord> BuildInitialSkillCards(string teamId)
+    {
+        var seed = HashCode.Combine(teamId, "skill-cards");
+        var rng = new Random(seed);
+        var cards = new List<SkillCardRecord>(5);
+
+        for (var i = 0; i < 5; i++)
+        {
+            var skill = rng.Next(0, 14);
+            var rarity = rng.Next(0, 3);
+            var bonus = rarity switch
+            {
+                0 => 0.5m,
+                1 => 1.25m,
+                2 => 2.5m,
+                _ => 0.5m
+            };
+
+            cards.Add(new SkillCardRecord(skill, rarity, rng.Next(1, 4), bonus));
+        }
+
+        return cards;
+    }
+
     private static SquadPlayerRecord MapPlayer(TeamPlayerEntity player)
     {
+        var playerId = Guid.TryParse(player.Id, out var parsed) ? parsed : Guid.Empty;
+        var head = string.IsNullOrWhiteSpace(player.Head) ? LegacyAppCompatibility.BuildHeadId(playerId) : player.Head;
+        var body = string.IsNullOrWhiteSpace(player.Body) ? LegacyAppCompatibility.BuildBodyId(playerId) : player.Body;
+        var gloves = string.IsNullOrWhiteSpace(player.Gloves) ? LegacyAppCompatibility.BuildGlovesId(playerId, player.Position == "GK") : player.Gloves;
+        var shoes = string.IsNullOrWhiteSpace(player.Shoes) ? LegacyAppCompatibility.BuildShoesId(playerId) : player.Shoes;
+
         return new SquadPlayerRecord(
-            Guid.TryParse(player.Id, out var id) ? id : Guid.Empty,
+            playerId,
             player.Name,
             player.Origin,
+            head,
+            body,
+            gloves,
+            shoes,
             player.Position,
             player.ShirtNumber,
             player.Age,
             player.Talent,
             (int)Math.Round(player.Strength),
+            player.MarketValue ?? 0m,
             player.Fitness,
             player.Matches,
             player.Goals,
             player.YellowCards,
             player.RedCards,
+            GetSkills(player),
             player.IndividualTrainingSkill,
             player.IndividualTrainingUntilUtc,
             player.ContractEndUtc,
+            player.IsPremiumScouting,
             player.ScoutingReadyAtUtc);
     }
 
@@ -1852,7 +2253,15 @@ public sealed class TeamDbStore(
     {
         const decimal minMinutes = 30m;
         const decimal maxMinutes = 50m * 60m;
-        return Math.Round(minMinutes + (Math.Clamp(currentLevel, 0, 19) * ((maxMinutes - minMinutes) / 19m)), 0);
+        const int maxLevel = 19;
+
+        var level = Math.Clamp(currentLevel, 0, maxLevel);
+
+        // Exponential scaling from min to max over the full range of levels.
+        // Use a growth factor so that `minMinutes * factor^maxLevel == maxMinutes`.
+        var factor = Math.Pow((double)(maxMinutes / minMinutes), 1.0 / maxLevel);
+        var minutes = minMinutes * (decimal)Math.Pow(factor, level);
+        return Math.Round(minutes, 0);
     }
 
     private static decimal GetSeatBuildDurationMinutes(Guid placeId)

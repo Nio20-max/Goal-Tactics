@@ -22,6 +22,7 @@ server {
         rewrite ^/api/Squad/GetPlayers$ /api/GetSquad break;
         rewrite ^/api/Squad/GetSkillCards$ /api/GetSkillCards break;
         rewrite ^/api/Scouting/GetPlayers$ /api/GetScoutedPlayers break;
+        rewrite ^/api/Scouting/Speedup$ /api/SpeedupScout break;
         rewrite ^/api/Training/GetTraining$ /api/GetTeamTraining break;
         rewrite ^/api/Transfermarket/Search$ /api/SearchTransfermarket break;
         rewrite ^/api/Transfermarket/GetDetails$ /api/GetTransferDetails break;

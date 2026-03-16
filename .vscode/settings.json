@@ -1,6 +1,6 @@
 {
     "git.ignoreLimitWarning": true,
     "chat.tools.terminal.autoApprove": {
-        "dotnet build": true
+        
     }
 }

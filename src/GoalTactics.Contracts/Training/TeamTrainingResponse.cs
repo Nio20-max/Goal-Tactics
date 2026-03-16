@@ -41,6 +41,7 @@ public sealed class CounterTactic
 public sealed class TrainingCampData : ResponseObject
 {
     public TrainingCampItem[]? CampItems { get; init; }
+    public int BookedCampIndex { get; init; } = -1;
     public int UpdateCampsCost { get; init; }
     public bool IsUpdateEnabled { get; init; }
 }

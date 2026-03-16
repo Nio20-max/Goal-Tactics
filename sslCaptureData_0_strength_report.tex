@@ -1,0 +1,146 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\geometry{margin=1in}
+\begin{document}
+\title{GoalTactics Strength Formula Reverse Engineering Report}
+\author{analyze\_strength\_formula.py}
+\date{2026-03-15 18:47:02 UTC}
+\maketitle
+\section*{Input and Scope}
+\begin{itemize}
+\item Capture file: \texttt{information/original\_API\_requests/logs/2023\_06\_30\_06\_47\_07\_7/com.xyrality.goaltactics/TCP\_51.116.154.224\_re\_443\_lo\_38888/sslCaptureData\_0.txt}
+\item Players analyzed: 39
+\item Constraints: only own \texttt{mainSkill} from slots 0..3; age and talent excluded.
+\item Model family: ordinary least squares on engineered linear and interaction terms.
+\end{itemize}
+\section*{How Formulas Are Obtained}
+For each candidate feature set, the script builds a design matrix $X$ and solves the normal equation
+$$\beta = (X^T X)^{-1} X^T y$$
+with Gaussian elimination on $X^TX$. Predictions are $\hat{y}=X\beta$. Models are ranked by adjusted $R^2$ (primary) and $R^2$ (secondary).
+Per-position ranking uses compact models (max 4 columns) to reduce overfitting and then aggregates ranks across positions.
+\section*{Top Overall Candidate Models}
+\begin{longtable}{p{0.05\linewidth}p{0.12\linewidth}p{0.12\linewidth}p{0.66\linewidth}}
+\toprule
+\# & adj.$R^2$ & $R^2$ & Formula \\
+\midrule
+\endhead
+1 & 0.997991 & 0.998361 & $\hat{strength} = -21.7897 + 0.5270\,main + 0.2948\,exp\cdot fit_{pct} + 0.1981\,bonus_{sum} + 0.1368\,bonus_{avg} + 1.6855\,sub_{other,avg} - 0.0000\,main\cdot exp - 0.0004\,bonus_{sum}\cdot exp$ \\
+2 & 0.997990 & 0.998360 & $\hat{strength} = -26.1992 + 0.5134\,main + 0.2982\,exp\cdot fit_{pct} + 0.7407\,bonus_{sum} + 0.1408\,bonus_{avg} + 1.7382\,sub_{other,avg} - 0.0005\,bonus_{sum}\cdot exp - 0.5082\,bonus_{sum}\cdot fit_{pct}$ \\
+3 & 0.997988 & 0.998359 & $\hat{strength} = -1.3365 + 0.5134\,main - 24.6810\,fit_{pct} + 0.2319\,bonus_{sum} + 0.1403\,bonus_{avg} + 1.7377\,sub_{other,avg} + 0.2979\,exp - 0.0005\,bonus_{sum}\cdot exp$ \\
+4 & 0.997988 & 0.998359 & $\hat{strength} = -1.3365 + 0.5134\,main - 0.2468\,fit_{raw} + 0.2319\,bonus_{sum} + 0.1403\,bonus_{avg} + 1.7377\,sub_{other,avg} + 0.2979\,exp - 0.0005\,bonus_{sum}\cdot exp$ \\
+5 & 0.997987 & 0.998358 & $\hat{strength} = 12.7345 + 0.5134\,main - 38.6814\,fit_{pct} + 0.1402\,bonus_{avg} + 1.7376\,sub_{other,avg} + 0.2978\,exp - 0.0005\,bonus_{sum}\cdot exp + 0.2317\,bonus_{sum}\cdot fit_{pct}$ \\
+6 & 0.997987 & 0.998358 & $\hat{strength} = 12.7345 + 0.5134\,main - 0.3868\,fit_{raw} + 0.1402\,bonus_{avg} + 1.7376\,sub_{other,avg} + 0.2978\,exp - 0.0005\,bonus_{sum}\cdot exp + 0.2317\,bonus_{sum}\cdot fit_{pct}$ \\
+7 & 0.997987 & 0.998358 & $\hat{strength} = -25.9273 + 1.0214\,main + 0.2977\,exp\cdot fit_{pct} + 0.2316\,bonus_{sum} + 0.1401\,bonus_{avg} + 1.7376\,sub_{other,avg} - 0.0005\,bonus_{sum}\cdot exp - 0.5081\,main\cdot fit_{pct}$ \\
+8 & 0.997987 & 0.998358 & $\hat{strength} = -25.9272 + 0.5134\,main - 1.2549\,exp\cdot fit_{pct} + 0.2316\,bonus_{sum} + 0.1401\,bonus_{avg} + 1.7376\,sub_{other,avg} + 1.5526\,exp - 0.0005\,bonus_{sum}\cdot exp$ \\
+\bottomrule
+\end{longtable}
+\section*{Cross-Position Overall Ranking}
+\begin{longtable}{p{0.05\linewidth}p{0.20\linewidth}p{0.20\linewidth}p{0.55\linewidth}}
+\toprule
+\# & Avg position rank & Avg $R^2$ & Formula \\
+\midrule
+\endhead
+1 & 1.500 & 0.999700 & $\hat{strength} = -2.2590 + 0.5264\,main + 0.2240\,exp\cdot fit_{pct} + 0.2856\,bonus_{avg} + 1.7013\,sub_{other,avg}$ \\
+2 & 4.000 & 0.999652 & $\hat{strength} = 14.0463 + 0.4743\,main + 0.2316\,exp\cdot fit_{pct} + 1.6711\,sub_{other,avg} + 0.0008\,main\cdot bonus_{avg}$ \\
+3 & 7.000 & 0.999263 & $\hat{strength} = 1.0220 + 0.5081\,main + 0.2404\,exp\cdot fit_{pct} + 1.6366\,sub_{other,avg} + 0.1210\,bonus_{sum}\cdot fit_{pct}$ \\
+4 & 7.500 & 0.999269 & $\hat{strength} = 0.7148 + 0.5080\,main + 0.2409\,exp\cdot fit_{pct} + 0.1218\,bonus_{sum} + 1.6361\,sub_{other,avg}$ \\
+5 & 7.500 & 0.999165 & $\hat{strength} = 7.1695 + 0.5200\,main + 0.2161\,exp\cdot fit_{pct} + 1.8800\,sub_{other,avg} + 0.0001\,bonus_{sum}\cdot exp$ \\
+\bottomrule
+\end{longtable}
+\section*{Human-Readable Constrained Models}
+Constraints: no intercept ($0$ baseline) and all coefficients constrained to be non-negative.
+\begin{longtable}{p{0.05\linewidth}p{0.12\linewidth}p{0.12\linewidth}p{0.12\linewidth}p{0.12\linewidth}p{0.40\linewidth}}
+\toprule
+\# & adj.$R^2$ & $R^2$ & MAE & gain-corr & Formula \\
+\midrule
+\endhead
+1 & 0.996361 & 0.996648 & 6.0410 & -0.0534 & $\hat{strength} = 0.2219\,fit_{pct}\cdot(main+bonus_{avg}+sub_{other,avg}+exp) + 0.3045\,main + 0.0530\,bonus_{avg} + 1.4669\,sub_{other,avg}$ \\
+2 & 0.996311 & 0.996603 & 6.1849 & -0.0498 & $\hat{strength} = 0.5264\,main + 0.2808\,bonus_{avg} + 1.6687\,sub_{other,avg} + 0.2232\,exp\cdot fit_{pct}$ \\
+3 & 0.996308 & 0.996600 & 6.3357 & -0.0487 & $\hat{strength} = 0.5080\,main + 0.1220\,bonus_{sum} + 1.6477\,sub_{other,avg} + 0.2413\,exp\cdot fit_{pct}$ \\
+4 & 0.996292 & 0.996585 & 6.2191 & -0.0493 & $\hat{strength} = 0.5265\,main + 0.2817\,bonus_{avg} + 1.6657\,sub_{other,avg} + 0.2233\,exp$ \\
+5 & 0.996262 & 0.996655 & 5.6459 & -0.0589 & $\hat{strength} = 0.5158\,fit_{pct}\cdot main + 0.1675\,fit_{pct}\cdot bonus_{avg} + 1.6164\,fit_{pct}\cdot sub_{other,avg} + 0.2299\,fit_{pct}\cdot exp + 0.0719\,bonus_{sum}$ \\
+6 & 0.996249 & 0.996644 & 6.2199 & -0.0508 & $\hat{strength} = 0.5206\,main + 0.2638\,bonus_{avg} + 1.5651\,sub_{other,avg} + 0.2191\,exp + 0.3584\,age$ \\
+7 & 0.996183 & 0.996585 & 6.2191 & -0.0493 & $\hat{strength} = 0.5265\,main + 0.2817\,bonus_{avg} + 1.6657\,sub_{other,avg} + 0.2233\,exp + 0.0000\,fit_{pct}$ \\
+8 & 0.996183 & 0.996585 & 6.2191 & -0.0493 & $\hat{strength} = 0.5265\,main + 0.2817\,bonus_{avg} + 1.6657\,sub_{other,avg} + 0.2233\,exp + 0.0000\,talent$ \\
+\bottomrule
+\end{longtable}
+\section*{Top Correlated Features}
+\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
+\toprule
+Feature & Pearson corr. with strength \\
+\midrule
+\endhead
+main & 0.956852 \
+main\_x\_bonus & 0.886778 \
+main\_x\_exp & 0.879496 \
+main\_x\_bonus\_sum & 0.839106 \
+exp\_x\_fitpct & 0.818575 \
+exp & 0.818425 \
+sub\_other\_avg & 0.488462 \
+bonus\_sum & 0.419498 \
+off\_position\_sum & 0.402174 \
+bonus\_avg & 0.288425 \
+fit\_pct & 0.269658 \
+fit\_raw & 0.269658 \
+\bottomrule
+\end{longtable}
+\section*{Top Individual Skill Correlations}
+\begin{longtable}{p{0.45\linewidth}p{0.45\linewidth}}
+\toprule
+Skill index & Pearson corr. with strength \\
+\midrule
+\endhead
+skill[0] & 0.571116 \
+skill[3] & 0.565129 \
+skill[9] & 0.525594 \
+skill[10] & 0.507487 \
+skill[5] & 0.463598 \
+skill[6] & 0.404820 \
+skill[7] & 0.391161 \
+skill[4] & 0.382858 \
+skill[8] & 0.344193 \
+skill[2] & 0.305591 \
+\bottomrule
+\end{longtable}
+\section*{Training Reports Overview (Mail Capture)}
+\begin{itemize}
+\item Mail capture: \texttt{information/original\_API\_requests/logs/2023\_06\_30\_06\_47\_07\_7/com.xyrality.goaltactics/TCP\_51.116.154.224\_re\_443\_lo\_38768/sslCaptureData\_0.txt}
+\item Parsed complete mails: 15
+\item Parsed training mails: 14
+\item Capture truncated at end: yes
+\item Unique matched player names: 36
+\item Unique unmatched names: 3
+\end{itemize}
+\textbf{Unmatched names (sample):} Aleš Jiráček, Sigurd Adeler, Tarquin Rosario
+\subsection*{Per-Report Player Match Snapshot}
+\begin{longtable}{p{0.40\linewidth}p{0.17\linewidth}p{0.18\linewidth}p{0.18\linewidth}}
+\toprule
+Report & Parsed rows & Matched rows & Unique players \\
+\midrule
+\endhead
+Trainingsreport vom 29 Juni & 99 & 99 & 36 \
+Trainingsreport vom 28 Juni & 99 & 99 & 36 \
+Trainingsreport vom 27 Juni & 96 & 96 & 35 \
+Trainingsreport vom 26 Juni & 96 & 96 & 35 \
+Trainingsreport vom 25 Juni & 96 & 96 & 35 \
+Trainingsreport vom 24 Juni & 96 & 96 & 35 \
+Trainingsreport vom 23 Juni & 96 & 96 & 35 \
+Trainingsreport vom 22 Juni & 96 & 96 & 35 \
+Trainingsreport vom 21 Juni & 96 & 96 & 35 \
+Trainingsreport vom 20 Juni & 88 & 82 & 32 \
+Trainingsreport vom 19 Juni & 83 & 77 & 31 \
+Trainingsreport vom 18 Juni & 83 & 77 & 31 \
+Trainingsreport vom 17 Juni & 78 & 72 & 31 \
+Trainingsreport vom 16 Juni & 74 & 68 & 29 \
+\bottomrule
+\end{longtable}
+\section*{Notes}
+High in-sample $R^2$ does not guarantee out-of-sample generalization. Use this report as reverse-engineering evidence for this capture distribution, then validate on additional captures.
+\end{document}
