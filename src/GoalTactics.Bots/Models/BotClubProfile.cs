@@ -87,4 +87,24 @@ public sealed class BotClubProfile
     public decimal StarsInSeason { get; set; }
 
     public decimal StarsOutSeason { get; set; }
+
+    /// <summary>Per-player skill arrays (14 skills each) for the starting 11.</summary>
+    public List<BotPlayer> Players { get; } = new();
+
+    /// <summary>Number of skill cards this bot has available.</summary>
+    public int SkillCards { get; set; }
+}
+
+/// <summary>Represents a single player in a bot's squad with individual skills.</summary>
+public sealed class BotPlayer
+{
+    public required string Name { get; init; }
+    public required string Position { get; init; }
+    public int Age { get; set; }
+    public int Talent { get; set; }
+    public int Fitness { get; set; } = 80;
+    public decimal[] Skills { get; set; } = new decimal[14];
+
+    /// <summary>Computed from skills, position, fitness, age, talent.</summary>
+    public decimal Strength { get; set; }
 }

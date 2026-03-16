@@ -20,5 +20,9 @@ public sealed class LeagueMatchEntity
     public bool IsPlayed { get; set; }
     public DateTime ScheduledDateUtc { get; set; }
     public DateTime? PlayedAtUtc { get; set; }
+
+    /// <summary>Serialized JSON array of match events produced by the simulation engine.</summary>
+    public string? EventsJson { get; set; }
+
     public LeagueEntity? League { get; set; }
 }

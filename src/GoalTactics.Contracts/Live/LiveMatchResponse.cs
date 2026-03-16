@@ -38,4 +38,17 @@ public sealed class LiveMatchData
     public string? Date { get; init; }
     public int MyTeam { get; init; }
     public string? Report { get; init; }
+
+    /// <summary>Detailed match events (goals, cards, injuries) with descriptive text.</summary>
+    public IReadOnlyList<LiveMatchEventData>? Events { get; init; }
+}
+
+/// <summary>A single match event with a human-readable description.</summary>
+public sealed class LiveMatchEventData
+{
+    public int Minute { get; init; }
+    public string? Type { get; init; }
+    public bool IsHome { get; init; }
+    public string? PlayerName { get; init; }
+    public string? Description { get; init; }
 }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using GoalTactics.Application.League;
 using GoalTactics.Application.Live;
 using GoalTactics.Application.Mechanics;
@@ -122,7 +123,19 @@ public sealed class ScheduledMatchResolutionJob(
                 return new MatchScorerEvent(teamId, s.PlayerId, s.Minute);
             }).Where(s => !string.IsNullOrEmpty(s.TeamId)).ToList();
 
-            await leagueStore.ResolveMatchAsync(matchGuid, result.HomeScore, result.AwayScore, scorers, cancellationToken);
+            // Serialize events for persistent storage and report generation
+            var eventsJson = JsonSerializer.Serialize(result.Events.Select(e => new
+            {
+                e.Minute,
+                Type = e.Type.ToString(),
+                e.IsHome,
+                e.PlayerId,
+                e.PlayerName,
+                Description = MatchReportGenerator.DescribeEvent(
+                    e, match.HomeTeamName ?? "Home", match.AwayTeamName ?? "Away")
+            }));
+
+            await leagueStore.ResolveMatchAsync(matchGuid, result.HomeScore, result.AwayScore, scorers, eventsJson, cancellationToken);
 
             if (broadcaster is not null)
             {

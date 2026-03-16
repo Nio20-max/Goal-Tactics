@@ -56,7 +56,8 @@ public sealed class BotSimulationRunnerTests
             new BotSponsorPlanner(),
             new BotLadderPlanner(),
             new BotFriendlyPlanner(),
-            new BotChatPlanner());
+            new BotChatPlanner(),
+            new BotSkillCardPlanner());
 
         var metrics = new BotMetricsCollector();
         var executor = new BotActionExecutor(options, new BotCooldownTracker(), new BotMessageGenerator("does-not-exist.json"), metrics);

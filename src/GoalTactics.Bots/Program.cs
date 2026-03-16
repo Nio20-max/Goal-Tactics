@@ -20,6 +20,7 @@ var sponsorPlanner = new BotSponsorPlanner();
 var ladderPlanner = new BotLadderPlanner();
 var friendlyPlanner = new BotFriendlyPlanner();
 var chatPlanner = new BotChatPlanner();
+var skillCardPlanner = new BotSkillCardPlanner();
 
 var scheduler = new BotActionScheduler(
     lineupPlanner,
@@ -30,7 +31,8 @@ var scheduler = new BotActionScheduler(
     sponsorPlanner,
     ladderPlanner,
     friendlyPlanner,
-    chatPlanner);
+    chatPlanner,
+    skillCardPlanner);
 
 var metricsCollector = new BotMetricsCollector();
 var playerCareerTracker = new BotPlayerCareerTracker(options);

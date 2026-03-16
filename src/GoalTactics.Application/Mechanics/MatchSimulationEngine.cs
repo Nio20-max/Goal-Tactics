@@ -99,9 +99,14 @@ public sealed class MatchSimulationEngine
                 Minute: e.Minute))
             .ToList();
 
+        // Generate rich narrative report from events
+        var report = MatchReportGenerator.GenerateFullReport(
+            homePlayers?.FirstOrDefault()?.TeamId ?? "Home",
+            awayPlayers?.FirstOrDefault()?.TeamId ?? "Away",
+            homeScore, awayScore, events);
+
         return new MatchResult(
-            homeScore, awayScore, effectiveHome, effectiveAway, events, scorers,
-            $"Match result {homeScore}:{awayScore} (H:{effectiveHome} vs A:{effectiveAway})");
+            homeScore, awayScore, effectiveHome, effectiveAway, events, scorers, report);
     }
 
     /// <summary>Backward-compatible simulate with optional seed.</summary>
