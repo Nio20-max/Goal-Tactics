@@ -237,13 +237,14 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
             throw new InvalidOperationException("No skill cards available.");
         }
 
-        // Applying a skill card grants a small strength boost (equivalent to a training session).
-        var success = await teamStore.UpgradePlayerStrengthAsync(userId, playerId, cancellationToken);
-        if (!success)
+        // Apply the card bonus to the player's target skill and recalculate strength.
+        var applied = await teamStore.ApplySkillCardToPlayerAsync(userId, playerId, cardToUse, cancellationToken);
+        if (!applied)
         {
-            throw new InvalidOperationException("Skill card could not be applied. Check GT Stars balance.");
+            throw new InvalidOperationException("Skill card could not be applied.");
         }
 
+        // Consume the card (decrement count or remove)
         await teamStore.UseSkillCardAsync(userId, cardToUse, cancellationToken);
     }
 

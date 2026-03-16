@@ -1980,6 +1980,34 @@ public sealed class TeamDbStore(
         return true;
     }
 
+    public async Task<bool> ApplySkillCardToPlayerAsync(string userId, Guid playerId, SkillCardRecord card, CancellationToken cancellationToken = default)
+    {
+        var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
+        var player = await dbContext.TeamPlayers.FirstOrDefaultAsync(
+            x => x.TeamId == team.TeamId && x.Id == playerId.ToString("N") && !x.IsScouted,
+            cancellationToken);
+        if (player is null)
+            return false;
+
+        EnsurePlayerSkillsInitialized(player);
+
+        // Apply the card bonus to the card's target skill index
+        var skillIndex = Math.Clamp(card.Skill, 0, 13);
+        AddSkillGain(player, skillIndex, card.Bonus);
+        RecalculatePlayerDerivedValues(player);
+
+        // Update team strength / market value
+        var squadPlayers = await dbContext.TeamPlayers
+            .Where(x => x.TeamId == team.TeamId && !x.IsScouted)
+            .ToListAsync(cancellationToken);
+        var teamEntity = await dbContext.Teams.FirstAsync(x => x.Id == team.TeamId, cancellationToken);
+        teamEntity.Strength = RecalculateTeamStrength(squadPlayers);
+        teamEntity.MarketValue = RecalculateTeamMarketValue(squadPlayers);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<bool> HealPlayerAsync(string userId, Guid playerId, CancellationToken cancellationToken = default)
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);

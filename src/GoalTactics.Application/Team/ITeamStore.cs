@@ -68,6 +68,9 @@ public interface ITeamStore
 
     Task<bool> UseSkillCardAsync(string userId, SkillCardRecord card, CancellationToken cancellationToken = default);
 
+    /// <summary>Apply a skill card bonus to a specific player's skill and recalculate derived values.</summary>
+    Task<bool> ApplySkillCardToPlayerAsync(string userId, Guid playerId, SkillCardRecord card, CancellationToken cancellationToken = default);
+
     Task<bool> SaveIndividualTrainingAsync(string userId, Guid playerId, string? skillType, CancellationToken cancellationToken = default);
 
     Task<int> RenewIndividualTrainingAsync(string userId, Guid? playerId, CancellationToken cancellationToken = default);
