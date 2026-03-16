@@ -1,4 +1,6 @@
+using System.Text.Json;
 using GoalTactics.Application.League;
+using GoalTactics.Application.Mechanics;
 using GoalTactics.Application.Team;
 using GoalTactics.Contracts.Live;
 
@@ -78,8 +80,51 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
 
     private static LiveMatchResponse BuildResponse(LeagueMatchRecord match)
     {
+        // Parse stored events JSON if available
+        List<LiveMatchEventData>? eventDataList = null;
+        List<MatchEvent>? matchEvents = null;
+        if (!string.IsNullOrEmpty(match.EventsJson))
+        {
+            try
+            {
+                var jsonEvents = JsonSerializer.Deserialize<JsonElement[]>(match.EventsJson);
+                if (jsonEvents is not null)
+                {
+                    eventDataList = new List<LiveMatchEventData>();
+                    matchEvents = new List<MatchEvent>();
+                    foreach (var je in jsonEvents)
+                    {
+                        var minute = je.GetProperty("Minute").GetInt32();
+                        var typeName = je.GetProperty("Type").GetString() ?? "Goal";
+                        var isHome = je.GetProperty("IsHome").GetBoolean();
+                        var playerId = je.TryGetProperty("PlayerId", out var pid) ? pid.GetString() : null;
+                        var playerName = je.TryGetProperty("PlayerName", out var pn) ? pn.GetString() : null;
+                        var description = je.TryGetProperty("Description", out var desc) ? desc.GetString() : null;
+
+                        eventDataList.Add(new LiveMatchEventData
+                        {
+                            Minute = minute,
+                            Type = typeName,
+                            IsHome = isHome,
+                            PlayerName = playerName,
+                            Description = description ?? $"{minute}' — {playerName}"
+                        });
+
+                        if (Enum.TryParse<MatchEventType>(typeName, out var eventType))
+                        {
+                            matchEvents.Add(new MatchEvent(minute, eventType, isHome, playerId, playerName));
+                        }
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                // Corrupted JSON — ignore and fall back to simple report
+            }
+        }
+
         var report = match.IsPlayed
-            ? GenerateReport(match)
+            ? GenerateReport(match, matchEvents)
             : $"Upcoming match: {match.HomeName} vs {match.AwayName} on {match.ScheduledDateUtc:yyyy-MM-dd}";
 
         var myTeam = match.UserTeamId == match.HomeTeamId ? 1
@@ -119,13 +164,22 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
                 OpponentTeamId = opponentTeamId,
                 Date = match.ScheduledDateUtc.ToString("O"),
                 MyTeam = myTeam,
-                Report = report
+                Report = report,
+                Events = eventDataList?.ToArray()
             }
         };
     }
 
-    private static string GenerateReport(LeagueMatchRecord m)
+    private static string GenerateReport(LeagueMatchRecord m, IReadOnlyList<MatchEvent>? events)
     {
+        if (events is not null && events.Count > 0)
+        {
+            return MatchReportGenerator.GenerateFullReport(
+                m.HomeName, m.AwayName,
+                m.HomeScore ?? 0, m.AwayScore ?? 0,
+                events);
+        }
+
         return $"<b>{m.HomeName} {m.HomeScore} - {m.AwayScore} {m.AwayName}</b>";
     }
 }

@@ -19,6 +19,8 @@ public sealed class SignalRMatchEventBroadcaster(
         IReadOnlyList<MatchEvent> events,
         CancellationToken cancellationToken = default)
     {
+        var report = MatchReportGenerator.GenerateFullReport(homeName, awayName, homeScore, awayScore, events);
+
         var payload = new
         {
             matchId,
@@ -26,13 +28,16 @@ public sealed class SignalRMatchEventBroadcaster(
             awayName,
             homeScore,
             awayScore,
-            goals = events
-                .Where(e => e.Type == MatchEventType.Goal)
-                .Select(e => new { e.Minute, e.IsHome, e.PlayerName })
-                .ToArray(),
-            cards = events
-                .Where(e => e.Type is MatchEventType.YellowCard or MatchEventType.RedCard)
-                .Select(e => new { e.Minute, e.IsHome, type = e.Type.ToString(), e.PlayerName })
+            report,
+            events = events
+                .Select(e => new
+                {
+                    e.Minute,
+                    type = e.Type.ToString(),
+                    e.IsHome,
+                    e.PlayerName,
+                    description = MatchReportGenerator.DescribeEvent(e, homeName, awayName)
+                })
                 .ToArray()
         };
 

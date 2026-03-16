@@ -467,6 +467,7 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.IsPlayed).HasColumnName("is_played").IsRequired();
             entity.Property(x => x.ScheduledDateUtc).HasColumnName("scheduled_date_utc").IsRequired();
             entity.Property(x => x.PlayedAtUtc).HasColumnName("played_at_utc");
+            entity.Property(x => x.EventsJson).HasColumnName("events_json");
             entity.HasIndex(x => x.LeagueId);
             entity.HasIndex(x => new { x.LeagueId, x.Matchday });
             entity.HasOne(x => x.League)

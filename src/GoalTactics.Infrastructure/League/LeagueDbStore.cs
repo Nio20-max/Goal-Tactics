@@ -406,7 +406,8 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
             ScheduledDateUtc: m.ScheduledDateUtc,
             HomeTeamId: homeTeam?.TeamId ?? m.HomeLeagueTeamId,
             AwayTeamId: awayTeam?.TeamId ?? m.AwayLeagueTeamId,
-            UserTeamId: null);
+            UserTeamId: null,
+            EventsJson: m.EventsJson);
     }
 
     public async Task<IReadOnlyList<LeagueMatchRecord>> GetUpcomingMatchesForTeamAsync(string teamId, CancellationToken cancellationToken = default)
@@ -509,7 +510,7 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
     }
 
     public async Task ResolveMatchAsync(Guid matchId, int homeScore, int awayScore,
-        IReadOnlyList<MatchScorerEvent> scorers, CancellationToken cancellationToken = default)
+        IReadOnlyList<MatchScorerEvent> scorers, string? eventsJson, CancellationToken cancellationToken = default)
     {
         var match = await dbContext.LeagueMatches
             .FirstOrDefaultAsync(x => x.Id == matchId.ToString("N"), cancellationToken);
@@ -519,6 +520,7 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
         match.AwayScore = awayScore;
         match.IsPlayed = true;
         match.PlayedAtUtc = DateTime.UtcNow;
+        match.EventsJson = eventsJson;
 
         // Update league team statistics
         var homeTeam = await dbContext.LeagueTeams.FirstOrDefaultAsync(x => x.Id == match.HomeLeagueTeamId, cancellationToken);
