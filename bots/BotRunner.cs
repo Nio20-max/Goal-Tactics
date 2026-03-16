@@ -24,6 +24,7 @@ public sealed class BotRunner : IDisposable
     private readonly SocialBehavior _social;
     private readonly DailyRoutineBehavior _dailyRoutine;
     private readonly LineupBehavior _lineup;
+    private readonly SkillCardBehavior _skillCard;
 
     // Rate-limit tracking (action type → last execution UTC)
     private readonly Dictionary<string, DateTime> _rateLimits = new(StringComparer.Ordinal);
@@ -42,6 +43,7 @@ public sealed class BotRunner : IDisposable
         _training = new TrainingBehavior();
         _dailyRoutine = new DailyRoutineBehavior();
         _lineup = new LineupBehavior();
+        _skillCard = new SkillCardBehavior();
     }
 
     public void Dispose()
@@ -162,6 +164,7 @@ public sealed class BotRunner : IDisposable
         await ExecuteWithRateLimit("daily", () => _dailyRoutine.ExecuteAsync(_api, bot));
         await ExecuteWithRateLimit("lineup", () => _lineup.ExecuteAsync(_api, bot));
         await ExecuteWithRateLimit("training", () => _training.ExecuteAsync(_api, bot));
+        await ExecuteWithRateLimit("skillcard", () => _skillCard.ExecuteAsync(_api, bot));
         await ExecuteWithRateLimit("stadium", () => _stadium.ExecuteAsync(_api, bot));
         await ExecuteWithRateLimit("transfer", () => _transferMarket.ExecuteAsync(_api, bot));
         await ExecuteWithRateLimit("social", () => _social.ExecuteAsync(_api, bot));

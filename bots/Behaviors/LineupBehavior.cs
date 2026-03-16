@@ -31,6 +31,12 @@ public sealed class LineupBehavior
         var squad = await api.GetSquadAsync();
         if (squad?.Players is null || squad.Players.Count < 11) return;
 
+        // Filter out unavailable players (injured or red-carded)
+        var available = squad.Players
+            .Where(p => !p.HasRedCard && p.Injured == 0)
+            .ToList();
+        if (available.Count < 11) return; // Not enough fit players
+
         var lineups = await api.GetLineupsAsync();
         if (lineups?.Lineups is null) return;
 
@@ -38,7 +44,7 @@ public sealed class LineupBehavior
         {
             if (lineup.IsLocked) continue;
 
-            var (formation, selectedIds) = ChooseFormation(squad.Players);
+            var (formation, selectedIds) = ChooseFormation(available);
 
             await api.SaveLineupAsync(new SaveLineupRequest
             {

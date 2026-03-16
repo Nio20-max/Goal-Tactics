@@ -103,6 +103,12 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task<SquadResponse?> GetSquadAsync()
         => PostAsync<SquadResponse>("/api/GetSquad");
 
+    public Task<SkillCardsResponse?> GetSkillCardsAsync()
+        => PostAsync<SkillCardsResponse>("/api/GetSkillCards");
+
+    public Task UseSkillCardAsync(string playerId)
+        => PostAsync("/api/UseSkillCard", new IdRequest { Id = playerId });
+
     // ── Lineup ──────────────────────────────────────────────────
 
     public Task<LineupsResponse?> GetLineupsAsync()

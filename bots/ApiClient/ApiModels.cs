@@ -201,6 +201,27 @@ public sealed class PlayerDto
 
     [JsonPropertyName("hasIndividualTraining")]
     public bool HasIndividualTraining { get; set; }
+
+    /// <summary>14 individual skill values (skill_0 through skill_13).</summary>
+    [JsonPropertyName("skills")]
+    public decimal[]? Skills { get; set; }
+
+    /// <summary>Primary skill index for this player's position.</summary>
+    [JsonPropertyName("mainSkill")]
+    public int MainSkill { get; set; }
+
+    /// <summary>Secondary skill indices for this player's position.</summary>
+    [JsonPropertyName("bonusSkills")]
+    public int[]? BonusSkills { get; set; }
+
+    [JsonPropertyName("yellowCards")]
+    public int YellowCards { get; set; }
+
+    [JsonPropertyName("hasRedCard")]
+    public bool HasRedCard { get; set; }
+
+    [JsonPropertyName("injured")]
+    public int Injured { get; set; }
 }
 
 public sealed class SquadResponse
@@ -801,3 +822,29 @@ public sealed class CountriesResponse
 }
 
 public sealed class SendChallengeRequest : IdRequest { }
+
+// ── Skill Cards ──────────────────────────────────────────────
+
+public sealed class SkillCardDto
+{
+    [JsonPropertyName("skill")]
+    public int Skill { get; set; }
+
+    [JsonPropertyName("rarity")]
+    public int Rarity { get; set; }
+
+    [JsonPropertyName("count")]
+    public int Count { get; set; }
+
+    [JsonPropertyName("bonus")]
+    public decimal Bonus { get; set; }
+}
+
+public sealed class SkillCardsResponse
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+
+    [JsonPropertyName("skillCards")]
+    public List<SkillCardDto> SkillCards { get; set; } = [];
+}

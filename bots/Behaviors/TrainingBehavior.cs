@@ -33,6 +33,7 @@ public sealed class TrainingBehavior
 
     /// <summary>
     /// High youth focus bots invest in individual training for young players.
+    /// Targets players with the weakest main skill to maximise strength gain.
     /// </summary>
     private async Task HandleIndividualTrainingAsync(GoalTacticsApiClient api, BotRecord bot)
     {
@@ -41,10 +42,12 @@ public sealed class TrainingBehavior
         var squad = await api.GetSquadAsync();
         if (squad?.Players is null || squad.Players.Count == 0) return;
 
-        // Pick youngest players for individual training
+        // Pick youngest players, preferring those with the weakest main skill
         var youngPlayers = squad.Players
-            .Where(p => p.Age <= 22)
-            .OrderBy(p => p.Age)
+            .Where(p => p.Age <= 22 && !p.HasIndividualTraining && !p.HasRedCard && p.Injured == 0)
+            .OrderBy(p => p.Skills is not null && p.Skills.Length > p.MainSkill
+                        ? p.Skills[p.MainSkill]
+                        : p.Strength)
             .ThenByDescending(p => p.Talent)
             .ToList();
 
