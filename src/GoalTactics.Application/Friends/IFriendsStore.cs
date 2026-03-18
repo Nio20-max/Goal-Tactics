@@ -34,14 +34,29 @@ public sealed record FriendRecord(
     string? Country = null,
     string? TeamLogo = null,
     int Strength = 0,
-    string? Language = null);
+    string? Language = null,
+    string ChallengeId = "",
+    int ChallengeStatus = 0);
 
 public sealed record ChallengeRecord(
     string Id,
     string ForeignTeamId,
     string OpponentName,
     bool Accepted,
-    DateTime MatchDateUtc);
+    DateTime MatchDateUtc,
+    string OpponentTeamId,
+    bool IsDeclined = false,
+    int MyTeam = 0,
+    int HomeScore = -1,
+    int AwayScore = -1,
+    string? HomeName = null,
+    string? AwayName = null,
+    string? HomeLogo = null,
+    string? AwayLogo = null,
+    string? HomeCountry = null,
+    string? AwayCountry = null,
+    int HomeStrength = 0,
+    int AwayStrength = 0);
 
 public sealed record ChallengeOverviewRecord(
     IReadOnlyList<ChallengeRecord> Challenges,

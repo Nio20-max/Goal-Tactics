@@ -30,6 +30,12 @@ public sealed class BotConfig
     public bool EnableMultilingualChat { get; set; } = true;
     public bool EnableFallbackRollbackStrategy { get; set; } = true;
     public bool EnableSelfAudit { get; set; } = true;
+    public int SimulateSeasons { get; set; } = 0;
+    public int SimulateMatchdaysPerSeason { get; set; } = 30;
+    public string SimulationOutputRoot { get; set; } = "/mnt/website/goal_tactics/simulations";
+    public bool EnableSimulationAudit { get; set; } = true;
+    public bool CaptureSimulationSnapshots { get; set; } = true;
+    public int SimulationSnapshotStride { get; set; } = 1;
 
     /// <summary>Rate limits expressed as minimum seconds between successive calls.</summary>
     public RateLimits Rates { get; set; } = new();

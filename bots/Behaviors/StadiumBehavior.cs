@@ -22,6 +22,9 @@ public sealed class StadiumBehavior
         public string Id { get; init; } = "";
         public string Name { get; init; } = "";
         public int Utilization { get; init; }
+        public int CurrentValue { get; init; }
+        public int MaxValue { get; init; }
+        public decimal UpgradeCost { get; init; }
     }
 
     public async Task ExecuteAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan = null)
@@ -34,6 +37,20 @@ public sealed class StadiumBehavior
             .Where(b => !string.IsNullOrEmpty(b.Id))
             .ToList();
         if (buildings is null || buildings.Count == 0) return;
+
+        decimal money = 0;
+        try
+        {
+            var resources = await api.ExecuteForBotAsync("GetMyResources");
+            if (resources.Success)
+            {
+                money = BotApiTranslationReader.GetDecimal(resources.Output, "money");
+            }
+        }
+        catch
+        {
+            // Keep behavior best-effort if resources endpoint is unavailable.
+        }
 
         // Determine if the stadium is at capacity using the embedded StadiumDataDto
         int capacity = 0;
@@ -51,7 +68,31 @@ public sealed class StadiumBehavior
 
         foreach (string buildingId in toBuild)
         {
+            var building = buildings.FirstOrDefault(b => b.Id == buildingId);
+            if (building is null)
+            {
+                continue;
+            }
+
+            if (building.CurrentValue >= building.MaxValue)
+            {
+                continue;
+            }
+
+            if (building.UpgradeCost > 0 && money > 0 && building.UpgradeCost > money)
+            {
+                continue;
+            }
+
             await api.ExecuteForBotAsync("BuildStadium", new IdRequest { Id = buildingId });
+
+            if (building.UpgradeCost > 0 && money > 0)
+            {
+                money -= building.UpgradeCost;
+            }
+
+            // Limit to one upgrade per online session to avoid repeated 422s and bursty spending.
+            break;
         }
     }
 
@@ -108,6 +149,9 @@ public sealed class StadiumBehavior
         {
             Id = BotApiTranslationReader.GetString(data, "id"),
             Name = BotApiTranslationReader.GetString(data, "name"),
-            Utilization = BotApiTranslationReader.GetInt(data, "utilization")
+            Utilization = BotApiTranslationReader.GetInt(data, "utilization"),
+            CurrentValue = BotApiTranslationReader.GetInt(data, "currentValue"),
+            MaxValue = BotApiTranslationReader.GetInt(data, "maxValue"),
+            UpgradeCost = BotApiTranslationReader.GetDecimal(data, "upgradeCost")
         };
 }

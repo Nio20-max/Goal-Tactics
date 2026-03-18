@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using GoalTactics.Contracts.Auth;
 using GoalTactics.Contracts.Common;
 using GoalTactics.Contracts.Squad;
+using GoalTactics.Contracts.Sponsors;
 using GoalTactics.Contracts.Team;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -34,7 +35,7 @@ public sealed class SquadControllerTests : IClassFixture<WebApplicationFactory<P
         Assert.All(squadBody.Players, player => Assert.DoesNotContain("Player ", player.Name ?? string.Empty));
         Assert.All(squadBody.Players, player => Assert.False(string.IsNullOrWhiteSpace(player.Head)));
         Assert.Contains(squadBody.Players, player => player.Position == 0);
-        Assert.Contains(squadBody.Players, player => player.Position == 6);
+        Assert.Contains(squadBody.Players, player => player.Position == 3);
 
         var skillCardsResponse = await client.PostAsJsonAsync("/api/Squad/GetSkillCards", new RequestObject());
         Assert.Equal(HttpStatusCode.OK, skillCardsResponse.StatusCode);
@@ -86,6 +87,84 @@ public sealed class SquadControllerTests : IClassFixture<WebApplicationFactory<P
         Assert.NotNull(contractCostBody);
         Assert.True(contractCostBody!.Success);
         Assert.Single(contractCostBody.Contracts);
+    }
+
+    [Fact]
+    public async Task UseSkillCard_AppliesBonusToExpectedSkillIndex_WhenClientSendsOneBasedIndex()
+    {
+        var token = await RegisterAndLoginAsync();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var squadResponse = await client.PostAsJsonAsync("/api/Squad/GetPlayers", new RequestObject());
+        var squadBody = await squadResponse.Content.ReadFromJsonAsync<SquadResponse>();
+        Assert.NotNull(squadBody);
+
+        var player = squadBody!.Players[0];
+        var beforeSkills = player.Skills ?? Array.Empty<decimal>();
+
+        // Ensure at least one skill card exists (sponsors grant skill cards when accepted).
+        var sponsorOffersResponse = await client.PostAsJsonAsync("/api/Sponsor/GetSponsorOffers", new RequestObject());
+        var sponsorOffersBody = await sponsorOffersResponse.Content.ReadFromJsonAsync<SponsorOffersResponse>();
+        Assert.NotNull(sponsorOffersBody);
+        Assert.True(sponsorOffersBody.Success);
+
+        var offerId = sponsorOffersBody.Offers.First().Id;
+        var acceptOfferResponse = await client.PostAsJsonAsync("/api/Sponsor/AcceptSponsor", new IdRequest { Id = offerId });
+        Assert.Equal(HttpStatusCode.OK, acceptOfferResponse.StatusCode);
+
+        var skillCardsResponse = await client.PostAsJsonAsync("/api/Squad/GetSkillCards", new RequestObject());
+        var skillCardsBody = await skillCardsResponse.Content.ReadFromJsonAsync<SkillCardsResponse>();
+        Assert.NotNull(skillCardsBody);
+        Assert.NotEmpty(skillCardsBody!.SkillCards);
+
+        // Simulate legacy clients that send 1-based skill indices (1..14).
+        var card = skillCardsBody.SkillCards.First();
+        var cardRequest = new UseSkillCardRequest
+        {
+            Id = player.Id,
+            Card = new SkillCardData
+            {
+                Skill = card.Skill + 1,
+                Rarity = card.Rarity,
+                Count = card.Count,
+                Bonus = card.Bonus
+            }
+        };
+
+        var useResponse = await client.PostAsJsonAsync("/api/Squad/UseSkillCard", cardRequest);
+        Assert.Equal(HttpStatusCode.OK, useResponse.StatusCode);
+
+        var squadAfterResponse = await client.PostAsJsonAsync("/api/Squad/GetPlayers", new RequestObject());
+        var squadAfterBody = await squadAfterResponse.Content.ReadFromJsonAsync<SquadResponse>();
+        Assert.NotNull(squadAfterBody);
+
+        var playerAfter = squadAfterBody!.Players.First(p => p.Id == player.Id);
+        var afterSkills = playerAfter.Skills ?? Array.Empty<decimal>();
+
+        // Determine which skill index changed by approx the card bonus.
+        var deltas = afterSkills.Zip(beforeSkills, (after, before) => after - before).ToArray();
+        var matchingIndices = deltas
+            .Select((delta, idx) => (Index: idx, Delta: delta))
+            .Where(x => Math.Abs(x.Delta - card.Bonus) < 0.0001m)
+            .ToArray();
+
+        Assert.Single(matchingIndices);
+        Assert.True(matchingIndices[0].Index == card.Skill, $"card.Skill={card.Skill}, actualIndex={matchingIndices[0].Index}");
+
+        var skillCardsAfterResponse = await client.PostAsJsonAsync("/api/Squad/GetSkillCards", new RequestObject());
+        var skillCardsAfterBody = await skillCardsAfterResponse.Content.ReadFromJsonAsync<SkillCardsResponse>();
+        Assert.NotNull(skillCardsAfterBody);
+
+        var beforeTotalCount = skillCardsBody!.SkillCards
+            .Where(c => c.Skill == card.Skill && c.Rarity == card.Rarity && c.Bonus == card.Bonus)
+            .Sum(c => c.Count);
+
+        var afterTotalCount = skillCardsAfterBody!.SkillCards
+            .Where(c => c.Skill == card.Skill && c.Rarity == card.Rarity && c.Bonus == card.Bonus)
+            .Sum(c => c.Count);
+
+        // Using a card should decrease the total available count by exactly 1.
+        Assert.Equal(beforeTotalCount - 1, afterTotalCount);
     }
 
     private async Task<Guid> GetCurrentTeamIdAsync()

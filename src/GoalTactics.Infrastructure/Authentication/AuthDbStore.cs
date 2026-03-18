@@ -553,9 +553,10 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             var talent = random.Next(4, 11);
             var fitness = random.Next(86, 101);
             var strength = Math.Clamp(baseStrength + random.Next(-6, 12) + random.Next(0, 6), 55m, 95m);
-            var skills = LegacyAppCompatibility.BuildSkills(strength, position, talent, age);
-            var calculatedStrength = PlayerValueCalculator.CalculateStrength(skills, position, fitness, age, talent);
-            var marketValue = PlayerValueCalculator.CalculateMarketValue(skills, position, fitness, age, talent);
+            var bonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(playerId);
+            var skills = LegacyAppCompatibility.BuildSkills(strength, position, talent, age, bonusSkills);
+            var calculatedStrength = PlayerValueCalculator.CalculateStrength(skills, position, fitness, age, talent, bonusSkills);
+            var marketValue = PlayerValueCalculator.CalculateMarketValue(skills, position, fitness, age, talent, bonusSkills);
 
             players.Add(new TeamPlayerEntity
             {
@@ -590,6 +591,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
                 RedCards = 0,
                 SuspensionMatchesRemaining = 0,
                 ContractEndUtc = DateTime.UtcNow.AddDays(random.Next(15, 90)),
+                Experience = LegacyAppCompatibility.BuildExperience(calculatedStrength, age, random.Next(0, 30)),
                 Head = LegacyAppCompatibility.BuildHeadId(playerId),
                 Body = LegacyAppCompatibility.BuildBodyId(playerId),
                 Gloves = LegacyAppCompatibility.BuildGlovesId(playerId, position == "GK"),

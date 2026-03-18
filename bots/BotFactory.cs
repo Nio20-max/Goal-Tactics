@@ -62,33 +62,50 @@ public sealed class BotFactory
         // Fetch countries if no countryId provided
         if (countryId is null)
         {
-            var countries = await _api.ExecuteForBotAsync("GetCountries");
-            var countryList = countries.Success
-                ? BotApiTranslationReader.GetObjectList(countries, "countries")
-                : [];
+            try
+            {
+                var countries = await _api.ExecuteForBotAsync("GetCountries");
+                var countryList = countries.Success
+                    ? BotApiTranslationReader.GetObjectList(countries, "countries")
+                    : [];
 
-            if (countryList.Count > 0)
-            {
-                countryId = BotApiTranslationReader.GetString(countryList[_rng.Next(countryList.Count)], "id", "1");
+                if (countryList.Count > 0)
+                {
+                    countryId = BotApiTranslationReader.GetString(countryList[_rng.Next(countryList.Count)], "id", "1");
+                }
+                else
+                {
+                    countryId = "1";
+                }
             }
-            else
+            catch (HttpRequestException ex)
             {
+                Console.Error.WriteLine($"[BotFactory] GetCountries failed for {teamName}: {ex.Message}");
                 countryId = "1";
             }
         }
 
         string email = SanitizeEmail(teamName);
 
-        var registerResult = await _api.ExecuteForBotAsync("Register", new RegisterRequest
+        BotApiTranslation registerResult;
+        try
         {
-            IsGuest = false,
-            Email = email,
-            Login = email,
-            Password = password,
-            ManagerName = managerName,
-            TeamName = teamName,
-            CountryId = countryId
-        });
+            registerResult = await _api.ExecuteForBotAsync("Register", new RegisterRequest
+            {
+                IsGuest = false,
+                Email = email,
+                Login = email,
+                Password = password,
+                ManagerName = managerName,
+                TeamName = teamName,
+                CountryId = countryId
+            });
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"[BotFactory] Registration failed for {teamName}: {ex.Message}");
+            return null;
+        }
 
         if (!registerResult.Success)
         {
@@ -104,11 +121,20 @@ public sealed class BotFactory
         }
 
         // Login to get JWT
-        var loginResult = await _api.ExecuteForBotAsync("Login", new LoginRequest
+        BotApiTranslation loginResult;
+        try
         {
-            Email = email,
-            Password = password
-        });
+            loginResult = await _api.ExecuteForBotAsync("Login", new LoginRequest
+            {
+                Email = email,
+                Password = password
+            });
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"[BotFactory] Login failed for {teamName}: {ex.Message}");
+            return null;
+        }
 
         if (!loginResult.Success)
         {

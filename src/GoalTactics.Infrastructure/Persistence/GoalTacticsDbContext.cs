@@ -232,6 +232,7 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.Property(x => x.Age).HasColumnName("age").IsRequired();
             entity.Property(x => x.Talent).HasColumnName("talent").IsRequired();
             entity.Property(x => x.Strength).HasColumnName("strength").IsRequired();
+            entity.Property(x => x.Experience).HasColumnName("experience").IsRequired();
             entity.Property(x => x.MarketValue).HasColumnName("market_value");
             entity.Property(x => x.Skill0).HasColumnName("skill_0");
             entity.Property(x => x.Skill1).HasColumnName("skill_1");
@@ -554,10 +555,16 @@ public sealed class GoalTacticsDbContext(DbContextOptions<GoalTacticsDbContext> 
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasColumnName("id");
             entity.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(x => x.Channel).HasColumnName("channel").HasMaxLength(16).IsRequired().HasDefaultValue("global");
+            entity.Property(x => x.GroupKey).HasColumnName("group_key").HasMaxLength(64);
+            entity.Property(x => x.TargetUserId).HasColumnName("target_user_id").HasMaxLength(32);
             entity.Property(x => x.Message).HasColumnName("message").HasMaxLength(512).IsRequired();
             entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at").IsRequired();
             entity.HasIndex(x => x.CreatedAtUtc);
             entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.Channel);
+            entity.HasIndex(x => x.TargetUserId);
+            entity.HasIndex(x => x.GroupKey);
             entity.HasOne(x => x.User)
                 .WithMany()
                 .HasForeignKey(x => x.UserId)

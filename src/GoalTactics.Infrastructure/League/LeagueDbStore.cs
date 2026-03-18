@@ -107,6 +107,15 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
         var existingMembership = await dbContext.LeagueTeams.FirstOrDefaultAsync(x => x.TeamId == team.Id, cancellationToken);
         if (existingMembership is not null)
         {
+            // Keep the team's LeagueName/LeagueTier in sync with its current league.
+            var league = await dbContext.Leagues.FirstOrDefaultAsync(x => x.Id == existingMembership.LeagueId, cancellationToken);
+            if (league is not null && (team.LeagueName != league.Name || team.LeagueTier != league.Tier))
+            {
+                team.LeagueName = league.Name;
+                team.LeagueTier = league.Tier;
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
             return;
         }
 
@@ -129,6 +138,9 @@ public sealed class LeagueDbStore(GoalTacticsDbContext dbContext) : ILeagueStore
         botSlot.Strength = team.Strength;
         botSlot.Country = team.Country;
         botSlot.Logo = team.SelectedEmblem ?? LegacyAppCompatibility.BuildLogoId(team.Id);
+
+        team.LeagueName = targetLeague.Name;
+        team.LeagueTier = targetLeague.Tier;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

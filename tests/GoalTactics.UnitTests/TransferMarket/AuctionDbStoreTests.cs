@@ -120,6 +120,19 @@ public sealed class AuctionDbStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task PlaceBid_Rejects_WhenAuctionAlreadyExpired()
+    {
+        var auctionId = await SeedAuction(minimumBid: 1000, currentBid: 0, secondsRemaining: -1);
+
+        var result = await _store.PlaceBidAsync(auctionId, "team-1", "Team One", null, 1500);
+
+        Assert.False(result);
+
+        var auction = await _dbContext.Auctions.FirstAsync(a => a.Id == auctionId.ToString("N"));
+        Assert.Equal("Expired", auction.Status);
+    }
+
+    [Fact]
     public async Task ToggleFavorite_AddsAndRemoves()
     {
         var auctionId = await SeedAuction();

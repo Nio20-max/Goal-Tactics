@@ -4,7 +4,7 @@ namespace GoalTactics.Application.Common;
 
 public static class PlayerValueCalculator
 {
-    public static decimal CalculateStrength(decimal[] skills, string position, int fitness, int age, int talent)
+    public static decimal CalculateStrength(decimal[] skills, string position, int fitness, int age, int talent, int[]? bonusSkillIndices = null)
     {
         if (skills is null || skills.Length < 14)
         {
@@ -12,7 +12,7 @@ public static class PlayerValueCalculator
         }
 
         var mainIdx = LegacyAppCompatibility.MainSkillIndex(position);
-        var bonusIdx = LegacyAppCompatibility.BuildBonusSkills(position);
+        var bonusIdx = bonusSkillIndices ?? LegacyAppCompatibility.BuildBonusSkills(position);
 
         var main = ClampSkill(skills[mainIdx]);
         var bonusVals = bonusIdx.Where(i => i >= 0 && i < skills.Length && i != mainIdx).Select(i => ClampSkill(skills[i])).ToArray();
@@ -38,9 +38,9 @@ public static class PlayerValueCalculator
         return Math.Clamp(Math.Round(strength, 2, MidpointRounding.AwayFromZero), 1m, 700m);
     }
 
-    public static decimal CalculateMarketValue(decimal[] skills, string position, int fitness, int age, int talent)
+    public static decimal CalculateMarketValue(decimal[] skills, string position, int fitness, int age, int talent, int[]? bonusSkillIndices = null)
     {
-        var strength = CalculateStrength(skills, position, fitness, age, talent);
+        var strength = CalculateStrength(skills, position, fitness, age, talent, bonusSkillIndices);
         var talentFactor = 0.85m + (Math.Clamp(talent, 1, 10) * 0.04m);
         var ageFactor = age switch
         {

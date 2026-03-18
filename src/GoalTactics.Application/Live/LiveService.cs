@@ -80,10 +80,24 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
         if (matchId != Guid.Empty)
             return await leagueStore.GetMatchAsync(matchId, cancellationToken);
 
-        // No matchId provided — find the user's next/current match
+        // No matchId provided — find the user's live match (in-progress) if any, otherwise next upcoming match.
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
         var upcoming = await leagueStore.GetUpcomingMatchesForTeamAsync(team.TeamId, cancellationToken);
-        return upcoming.FirstOrDefault();
+
+        var now = DateTime.UtcNow;
+
+        // Prefer a match that should already have started but is not yet marked as played.
+        var inProgress = upcoming
+            .Where(m => !m.IsPlayed && m.ScheduledDateUtc <= now)
+            .OrderByDescending(m => m.ScheduledDateUtc)
+            .FirstOrDefault();
+
+        if (inProgress is not null)
+            return inProgress;
+
+        return upcoming
+            .OrderBy(m => m.ScheduledDateUtc)
+            .FirstOrDefault();
     }
 
     private static LiveMatchResponse BuildResponse(LeagueMatchRecord match, string? userTeamId)
@@ -133,12 +147,48 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
 
         // Build the match report payload expected by the legacy client.
         // It must be JSON that deserializes into the client's MatchReportData type.
+        var now = DateTime.UtcNow;
+        var isLiveInProgress = !match.IsPlayed && match.ScheduledDateUtc <= now;
+
+        // For live matches, we can derive the current score from the stored event list.
+        // Otherwise, for upcoming matches we still return -1:-1 to match legacy client behavior.
+        int homeScore;
+        int awayScore;
+        bool hasScore;
+
+        if (match.IsPlayed)
+        {
+            homeScore = match.HomeScore ?? -1;
+            awayScore = match.AwayScore ?? -1;
+            hasScore = true;
+        }
+        else if (isLiveInProgress)
+        {
+            if (matchEvents is not null && matchEvents.Any(e => e.Type == MatchEventType.Goal))
+            {
+                homeScore = matchEvents.Count(e => e.Type == MatchEventType.Goal && e.IsHome);
+                awayScore = matchEvents.Count(e => e.Type == MatchEventType.Goal && !e.IsHome);
+            }
+            else
+            {
+                homeScore = 0;
+                awayScore = 0;
+            }
+
+            hasScore = true;
+        }
+        else
+        {
+            homeScore = -1;
+            awayScore = -1;
+            hasScore = false;
+        }
+
         var reportMessage = match.IsPlayed
             ? GenerateReport(match, matchEvents)
-            : $"Upcoming match: {match.HomeName} vs {match.AwayName} on {match.ScheduledDateUtc:yyyy-MM-dd}";
-
-        var homeScore = match.IsPlayed ? match.HomeScore ?? -1 : -1;
-        var awayScore = match.IsPlayed ? match.AwayScore ?? -1 : -1;
+            : isLiveInProgress
+                ? $"Live match: {match.HomeName} vs {match.AwayName}"
+                : $"Upcoming match: {match.HomeName} vs {match.AwayName} on {match.ScheduledDateUtc:yyyy-MM-dd}";
 
         var matchEventList = matchEvents?.Select(e => new MatchReportEntryData
         {
@@ -254,7 +304,7 @@ public sealed class LiveService(ILeagueStore leagueStore, ITeamStore teamStore) 
                 IsFriendly = false,
                 HomeTrikot = null,
                 AwayTrikot = null,
-                HasScore = match.IsPlayed,
+                HasScore = hasScore,
             }
         };
     }

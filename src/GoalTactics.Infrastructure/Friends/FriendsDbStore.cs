@@ -24,14 +24,39 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
             .GroupBy(x => x.UserId)
             .ToDictionary(x => x.Key, x => x.First().Id);
 
+        // Preload friendly challenges between the current user and each related user so we can show pending/accepted challenge state.
+        var relatedUserIds = relations
+            .Select(x => x.RequesterUserId == userId ? x.AddresseeUserId : x.RequesterUserId)
+            .Distinct()
+            .ToHashSet();
+
+        // Ensure every related user has a team so the UI can render friend requests correctly.
+        var missingTeamUserIds = relatedUserIds.Except(teamByUserId.Keys).ToList();
+        foreach (var missingUserId in missingTeamUserIds)
+        {
+            var team = await GetOrCreateTeamAsync(missingUserId, cancellationToken);
+            teamByUserId[missingUserId] = team.Id;
+            teams.Add(team);
+        }
+
+        var challenges = await dbContext.FriendlyChallenges
+            .AsNoTracking()
+            .Where(x => (x.HomeUserId == userId && relatedUserIds.Contains(x.AwayUserId))
+                     || (x.AwayUserId == userId && relatedUserIds.Contains(x.HomeUserId)))
+            .Where(x => x.Status != DeclinedStatus)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var challengeByFriend = challenges
+            .GroupBy(x => x.HomeUserId == userId ? x.AwayUserId : x.HomeUserId)
+            .ToDictionary(x => x.Key, x => x.First());
+
         var normalizedQuery = queryText?.Trim();
 
         // Build records from existing friend relations
-        var relatedUserIds = new HashSet<string>();
         var records = relations.Select(x =>
         {
             var foreignUserId = x.RequesterUserId == userId ? x.AddresseeUserId : x.RequesterUserId;
-            relatedUserIds.Add(foreignUserId);
             var name = users.TryGetValue(foreignUserId, out var foreignUser)
                 ? (string.IsNullOrWhiteSpace(foreignUser.ManagerName) ? foreignUser.Email : foreignUser.ManagerName)
                 : "Unknown";
@@ -42,6 +67,43 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
             var incoming = x.Status == PendingStatus && x.AddresseeUserId == userId;
             var outgoing = x.Status == PendingStatus && x.RequesterUserId == userId;
 
+            bool myLike;
+            bool likesMe;
+
+            if (x.Status == AcceptedStatus)
+            {
+                // Accepted friendship behaves like mutual "likes" in the old client logic.
+                myLike = true;
+                likesMe = true;
+            }
+            else
+            {
+                var isRequester = x.RequesterUserId == userId;
+                myLike = isRequester && x.IsLikedByRequester;
+                likesMe = !isRequester && x.IsLikedByRequester;
+            }
+
+            challengeByFriend.TryGetValue(foreignUserId, out var challenge);
+
+            var challengeStatus = 1; // Default: can send a challenge
+            if (challenge != null)
+            {
+                if (challenge.Status == PendingStatus)
+                {
+                    // Pending: either we sent it or we need to accept it
+                    challengeStatus = challenge.HomeUserId == userId ? 4 : 3;
+                }
+                else if (challenge.Status == AcceptedStatus)
+                {
+                    // Accepted: match booked
+                    challengeStatus = 5;
+                }
+                else if (challenge.Status == DeclinedStatus)
+                {
+                    challengeStatus = 6;
+                }
+            }
+
             return new FriendRecord(
                 RelationId: x.Id,
                 ForeignUserId: foreignUserId,
@@ -50,12 +112,14 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
                 IsFriend: x.Status == AcceptedStatus,
                 IsRequestIncoming: incoming,
                 IsRequestOutgoing: outgoing,
-                IsLiked: x.IsLikedByRequester,
+                IsLiked: myLike,
                 TeamName: foreignTeam?.Name,
                 Country: foreignTeam?.Country?.ToLowerInvariant(),
                 TeamLogo: "wappen01",
                 Strength: foreignTeam?.Strength ?? 0,
-                Language: "de");
+                Language: "de",
+                ChallengeId: challenge?.Id ?? string.Empty,
+                ChallengeStatus: challengeStatus);
         }).ToList();
 
         // When searching, also include non-friend users matching the query
@@ -236,6 +300,7 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
             .ToListAsync(cancellationToken);
 
         var users = await dbContext.Users.AsNoTracking().ToDictionaryAsync(x => x.Id, cancellationToken);
+        var teams = await dbContext.Teams.AsNoTracking().ToDictionaryAsync(x => x.Id, cancellationToken);
 
         var challenges = challengeRows.Select(x =>
         {
@@ -245,12 +310,29 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
                 ? (string.IsNullOrWhiteSpace(foreignUser.ManagerName) ? foreignUser.Email : foreignUser.ManagerName)
                 : "Unknown";
 
+            var homeTeam = teams.TryGetValue(x.HomeTeamId, out var homeTeamEntity) ? homeTeamEntity : null;
+            var awayTeam = teams.TryGetValue(x.AwayTeamId, out var awayTeamEntity) ? awayTeamEntity : null;
+            var isHome = x.HomeUserId == userId;
+
             return new ChallengeRecord(
                 Id: x.Id,
                 ForeignTeamId: foreignTeamId,
                 OpponentName: name,
                 Accepted: x.Status == AcceptedStatus,
-                MatchDateUtc: x.MatchDateUtc);
+                MatchDateUtc: x.MatchDateUtc,
+                OpponentTeamId: foreignTeamId,
+                IsDeclined: x.Status == DeclinedStatus,
+                MyTeam: isHome ? 1 : 2,
+                HomeScore: -1,
+                AwayScore: -1,
+                HomeName: homeTeam?.Name,
+                AwayName: awayTeam?.Name,
+                HomeLogo: "wappen01",
+                AwayLogo: "wappen01",
+                HomeCountry: homeTeam?.Country?.ToLowerInvariant(),
+                AwayCountry: awayTeam?.Country?.ToLowerInvariant(),
+                HomeStrength: homeTeam?.Strength ?? 0,
+                AwayStrength: awayTeam?.Strength ?? 0);
         }).ToArray();
 
         var friends = await GetFriendsAsync(userId, queryText: null, cancellationToken);

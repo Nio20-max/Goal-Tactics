@@ -25,6 +25,11 @@ public sealed class LineupSummaryData
     public int AwayStrength { get; init; }
     public bool HasLineup { get; init; }
     public bool IsFriendly { get; init; }
+
+    // New field to match the legacy Xamarin client expectation
+    // (the client treats non-league matches as friendly).
+    public bool IsLeagueMatch { get; init; }
+
     public string? HomeTrikot { get; init; }
     public string? AwayTrikot { get; init; }
 }

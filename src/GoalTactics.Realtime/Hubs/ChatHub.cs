@@ -40,7 +40,7 @@ public sealed class ChatHub(UserConnectionRegistry registry, IChatStore chatStor
         var userId = Context.UserIdentifier ?? Context.User?.Identity?.Name;
         if (!string.IsNullOrWhiteSpace(userId) && !string.IsNullOrWhiteSpace(message.Text))
         {
-            await chatStore.AddMessageAsync(userId, message.Text);
+            await chatStore.AddMessageAsync(userId, message.Text, "global", null);
         }
 
         await Clients.Group("public").SendAsync("Post", teamId, message);

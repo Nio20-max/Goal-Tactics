@@ -40,7 +40,7 @@ public sealed class DailyRoutineBehavior
         targetStars = Math.Min(targetStars, 5000);
 
         int accumulated = 0;
-        int maxAttempts = 50;
+        int maxAttempts = 8;
         for (int i = 0; i < maxAttempts && accumulated < targetStars; i++)
         {
             var result = await api.ExecuteForBotAsync("WatchAd");
@@ -61,7 +61,13 @@ public sealed class DailyRoutineBehavior
         var offers = BotApiTranslationReader.GetObjectList(response, "offers");
         if (offers.Count == 0) return;
 
-        var best = offers.OrderByDescending(s => BotApiTranslationReader.GetInt(s, "stars")).First();
+        var candidates = offers
+            .Where(s => BotApiTranslationReader.GetBool(s, "isActive", true))
+            .Where(s => Guid.TryParse(BotApiTranslationReader.GetString(s, "id"), out _))
+            .ToList();
+        if (candidates.Count == 0) return;
+
+        var best = candidates.OrderByDescending(s => BotApiTranslationReader.GetInt(s, "stars")).First();
         var sponsorId = BotApiTranslationReader.GetString(best, "id");
         if (string.IsNullOrEmpty(sponsorId)) return;
 

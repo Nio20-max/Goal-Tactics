@@ -418,6 +418,27 @@ public sealed class TeamTrainingDto
     public bool NoTraining { get; set; }
 }
 
+public sealed class TrainingCampItemDto
+{
+    [JsonPropertyName("identifier")]
+    public string? Identifier { get; set; }
+
+    [JsonPropertyName("bookDate")]
+    public string? BookDate { get; set; }
+}
+
+public sealed class TrainingCampDto
+{
+    [JsonPropertyName("bookedCampIdentifier")]
+    public string? BookedCampIdentifier { get; set; }
+
+    [JsonPropertyName("isUpdateEnabled")]
+    public bool IsUpdateEnabled { get; set; }
+
+    [JsonPropertyName("campItems")]
+    public List<TrainingCampItemDto> CampItems { get; set; } = [];
+}
+
 public sealed class TrainingResponse
 {
     [JsonPropertyName("success")]
@@ -425,6 +446,9 @@ public sealed class TrainingResponse
 
     [JsonPropertyName("teamTraining")]
     public TeamTrainingDto? TeamTraining { get; set; }
+
+    [JsonPropertyName("trainingCamp")]
+    public TrainingCampDto? TrainingCamp { get; set; }
 }
 
 public sealed class SaveTrainingRequest : RequestObject
@@ -453,7 +477,7 @@ public sealed class ScoutedPlayerDto
     public string Name { get; set; } = "";
 
     [JsonPropertyName("position")]
-    public string? Position { get; set; }
+    public int Position { get; set; }
 
     [JsonPropertyName("talent")]
     public int Talent { get; set; }

@@ -715,7 +715,7 @@ public sealed class TeamDbStore(
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE league_teams SET matches_home = 0, matches_away = 0, wins_home = 0, wins_away = 0, losses_home = 0, losses_away = 0, draws_home = 0, draws_away = 0, goals_scored_home = 0, goals_scored_away = 0, goals_received_home = 0, goals_received_away = 0, points_home = 0, points_away = 0", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("DELETE FROM league_matches", cancellationToken);
 
-        // Update team entities' league tier to match their current slot.
+        // Update team entities' league tier/name to match their current slot.
         var teamSlots = await dbContext.LeagueTeams.Where(x => x.TeamId != null).ToListAsync(cancellationToken);
         foreach (var slot in teamSlots)
         {
@@ -726,6 +726,7 @@ public sealed class TeamDbStore(
                 if (league != null)
                 {
                     teamEntity.LeagueTier = league.Tier;
+                    teamEntity.LeagueName = league.Name;
                 }
             }
         }
@@ -1140,12 +1141,26 @@ public sealed class TeamDbStore(
         var state = await EnsureTrainingStateAsync(team.TeamId, cancellationToken);
         var baseEfficiency = trainingProgress.CalculateEfficiencyValue(resources.TrainingCenterLevel);
 
-        // Efficiency decays after 3 days without changing training
+        // Efficiency decays after 3 days without changing training.
+        // After day 3, it loses 20% per additional day (multiplicative).
         var daysSinceChange = state.TrainingChangedAtUtc.HasValue
             ? (int)(DateTime.UtcNow - state.TrainingChangedAtUtc.Value).TotalDays
             : 0;
-        var decay = Math.Max(0, daysSinceChange - 3) * 5;
-        var efficiency = Math.Max(10, baseEfficiency - decay);
+
+        // Efficiency is exposed as an integer percentage value.
+        decimal efficiencyValue;
+        if (daysSinceChange <= 3)
+        {
+            efficiencyValue = baseEfficiency;
+        }
+        else
+        {
+            var daysOver = daysSinceChange - 3;
+            var multiplier = (decimal)Math.Pow(0.8, daysOver);
+            efficiencyValue = Math.Max(10m, Math.Round(baseEfficiency * multiplier, 2));
+        }
+
+        var efficiency = (int)Math.Round(efficiencyValue, MidpointRounding.AwayFromZero);
         var trainPrice = IndividualTrainingWeeklyStars;
 
         var tacticProgress = new Dictionary<string, int>();
@@ -1209,14 +1224,30 @@ public sealed class TeamDbStore(
         }
 
         // If we were training another tactic, save the elapsed time as progress.
-        if (!string.IsNullOrWhiteSpace(state.SelectedTacticId) && state.SelectedTacticStartUtc.HasValue && state.SelectedTacticId != tacticId)
+        var isSwitchingTactic =
+            !string.IsNullOrWhiteSpace(state.SelectedTacticId)
+            && state.SelectedTacticStartUtc.HasValue
+            && state.SelectedTacticId != tacticId;
+
+        if (isSwitchingTactic)
         {
             var elapsedDays = Math.Max(1, (int)(DateTime.UtcNow - state.SelectedTacticStartUtc.Value).TotalDays + 1);
             progress[state.SelectedTacticId] = (progress.TryGetValue(state.SelectedTacticId, out var existing) ? existing : 0) + elapsedDays;
+
+            state.SelectedTacticId = tacticId;
+            state.SelectedTacticStartUtc = DateTime.UtcNow;
+        }
+        else
+        {
+            // If we're continuing the same tactic, keep the original start time (so progress continues to accumulate).
+            // If there is no start time yet (first assignment), initialize it.
+            if (string.IsNullOrWhiteSpace(state.SelectedTacticId) || !state.SelectedTacticStartUtc.HasValue)
+            {
+                state.SelectedTacticId = tacticId;
+                state.SelectedTacticStartUtc = DateTime.UtcNow;
+            }
         }
 
-        state.SelectedTacticId = tacticId;
-        state.SelectedTacticStartUtc = DateTime.UtcNow;
         state.TacticTrainingProgressJson = System.Text.Json.JsonSerializer.Serialize(progress);
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -1635,13 +1666,15 @@ public sealed class TeamDbStore(
                 && player.IndividualTrainingUntilUtc.HasValue
                 && player.IndividualTrainingUntilUtc.Value.Date >= tickDate.Date;
 
+            // Note: camp bonuses should apply to a specific skill (not to the overall training total).
+            // The base gain is calculated without the camp bonus; the camp bonus is applied below if active.
             var gain = trainingProgress.CalculateDailyTotalGain(
                 player.Age,
                 player.Talent,
                 player.Fitness,
                 resources.TrainingCenterLevel,
                 individualActive,
-                hasCamp);
+                hasCamp: false);
 
             var mainSkillIndex = NormalizeSkillIndex(training.MainSkillIndex, player.Position);
             var subSkillIndex = NormalizeSkillIndex(training.SubSkillIndex, player.Position);
@@ -1651,6 +1684,28 @@ public sealed class TeamDbStore(
             if (subSkillIndex != mainSkillIndex)
             {
                 AddSkillGain(player, subSkillIndex, gain * 0.35m);
+            }
+
+            // Camp bonus (fixed +1.5) should boost one specific stat depending on the camp type.
+            if (hasCamp && TryGetCampBonusTarget(training.CampType, out var campSkillIndex, out var isExperience))
+            {
+                if (isExperience)
+                {
+                    player.Experience += 1.5m;
+                }
+                else
+                {
+                    AddSkillGain(player, campSkillIndex, 1.5m);
+                }
+            }
+            else if (hasCamp)
+            {
+                // Fallback: preserve previous behavior (camp as extra total gain) when camp type is unknown.
+                AddSkillGain(player, mainSkillIndex, 1.5m * 0.65m);
+                if (subSkillIndex != mainSkillIndex)
+                {
+                    AddSkillGain(player, subSkillIndex, 1.5m * 0.35m);
+                }
             }
 
             if (individualActive && TryResolveSkillIndex(player.IndividualTrainingSkill, out var individualSkillIndex))
@@ -1754,7 +1809,9 @@ public sealed class TeamDbStore(
         }
 
         // Backfill legacy rows that previously persisted only aggregate strength.
-        var generated = LegacyAppCompatibility.BuildSkills(player.Strength, player.Position, player.Talent, player.Age);
+        var playerId = Guid.TryParse(player.Id, out var parsedId) ? parsedId : Guid.Empty;
+        var bonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(playerId);
+        var generated = LegacyAppCompatibility.BuildSkills(player.Strength, player.Position, player.Talent, player.Age, bonusSkills);
         SetSkills(player, generated);
         return true;
     }
@@ -1762,8 +1819,17 @@ public sealed class TeamDbStore(
     private static void RecalculatePlayerDerivedValues(TeamPlayerEntity player)
     {
         var skills = GetSkills(player);
-        player.Strength = PlayerValueCalculator.CalculateStrength(skills, player.Position, player.Fitness, player.Age, player.Talent);
-        player.MarketValue = PlayerValueCalculator.CalculateMarketValue(skills, player.Position, player.Fitness, player.Age, player.Talent);
+        var playerId = Guid.TryParse(player.Id, out var parsedId) ? parsedId : Guid.Empty;
+        var bonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(playerId);
+        player.Strength = PlayerValueCalculator.CalculateStrength(skills, player.Position, player.Fitness, player.Age, player.Talent, bonusSkills);
+        player.MarketValue = PlayerValueCalculator.CalculateMarketValue(skills, player.Position, player.Fitness, player.Age, player.Talent, bonusSkills);
+
+        // Only initialize experience when it has not been set yet.
+        // Experience is now a cumulative stat (gained from matches), so we avoid overwriting it.
+        if (player.Experience <= 0m)
+        {
+            player.Experience = LegacyAppCompatibility.BuildExperience(player.Strength, player.Age, player.Matches);
+        }
     }
 
     private static int NormalizeSkillIndex(int requestedIndex, string position)
@@ -1774,6 +1840,77 @@ public sealed class TeamDbStore(
         }
 
         return LegacyAppCompatibility.MainSkillIndex(position);
+    }
+
+    private static int NormalizeSkillCardIndex(int skill)
+    {
+        // The incoming SkillCardRecord should already be normalized to 0-based by the caller.
+        // Clamp to avoid out-of-range values.
+        return Math.Clamp(skill, 0, TeamStrengthCalculator.NumberOfSkills - 1);
+    }
+
+    private static bool TryGetCampBonusTarget(string? campType, out int skillIndex, out bool isExperience)
+    {
+        skillIndex = -1;
+        isExperience = false;
+        if (string.IsNullOrWhiteSpace(campType))
+        {
+            return false;
+        }
+
+        // Expected format: camp_{effect}_{variant}_{quality}
+        // Example: camp_0_0_mid
+        var parts = campType.Split('_');
+        if (parts.Length < 3 || !string.Equals(parts[0], "camp", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (!int.TryParse(parts[1], out var effect) || !int.TryParse(parts[2], out var variant))
+        {
+            return false;
+        }
+
+        // Campaign mapping to skill indices (0-13), using the canonical skill ordering.
+        // See: 0=Defence, 1=Keeping, 2=Shots, 3=Playmaking, 4=Passing, 5=Ball Control,
+        // 6=Duel, 7=One on One, 8=Header, 9=Speed, 10=Flanks, 11=Cornerkick, 12=Freekicks, 13=Penalties
+        switch (effect)
+        {
+            case 0:
+                skillIndex = variant switch
+                {
+                    0 => 0,  // Defence
+                    1 => 1,  // Keeping
+                    2 => 2,  // Shots
+                    3 => 3,  // Playmaking
+                    _ => -1
+                };
+                break;
+            case 1:
+                skillIndex = variant switch
+                {
+                    0 => 4,  // Passing
+                    1 => 5,  // Ball Control
+                    2 => 6,  // Duel
+                    3 => 7,  // One on One
+                    4 => 8,  // Header
+                    5 => 9,  // Speed
+                    6 => 10, // Flanks
+                    7 => 11, // Cornerkick
+                    8 => 12, // Free Kicks
+                    9 => 13, // Penalties
+                    _ => -1
+                };
+                break;
+            case 2:
+                // Camp effect "experience" is a separate stat, not a skill index.
+                isExperience = true;
+                return true;
+            default:
+                return false;
+        }
+
+        return skillIndex >= 0;
     }
 
     private static bool TryResolveSkillIndex(string? skillName, out int index)
@@ -2148,7 +2285,8 @@ public sealed class TeamDbStore(
     {
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         var playerId = Guid.NewGuid();
-        var skills = LegacyAppCompatibility.BuildSkills(strength, position, talent, age);
+        var bonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(playerId);
+        var skills = LegacyAppCompatibility.BuildSkills(strength, position, talent, age, bonusSkills);
         var entity = new TeamPlayerEntity
         {
             Id = playerId.ToString("N"),
@@ -2388,8 +2526,10 @@ public sealed class TeamDbStore(
 
         EnsurePlayerSkillsInitialized(player);
 
-        // Apply the card bonus to the card's target skill index
-        var skillIndex = Math.Clamp(card.Skill, 0, TeamStrengthCalculator.NumberOfSkills - 1);
+        // Apply the card bonus to the card's target skill index.
+        // Legacy clients may send a 1-based skill index (1..14); normalize to 0-based.
+        var skillIndex = NormalizeSkillCardIndex(card.Skill);
+        Console.WriteLine($"[DEBUG] Applying skill card: skill={card.Skill}, computedIndex={skillIndex}, bonus={card.Bonus}");
         AddSkillGain(player, skillIndex, card.Bonus);
         RecalculatePlayerDerivedValues(player);
 
@@ -2468,7 +2608,8 @@ public sealed class TeamDbStore(
                 Shoes = LegacyAppCompatibility.BuildShoesId(playerId)
             };
 
-            SetSkills(player, LegacyAppCompatibility.BuildSkills(strength, position, talent, age));
+            var bonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(playerId);
+            SetSkills(player, LegacyAppCompatibility.BuildSkills(strength, position, talent, age, bonusSkills));
             RecalculatePlayerDerivedValues(player);
             result.Add(player);
         }
@@ -2521,6 +2662,7 @@ public sealed class TeamDbStore(
             player.Age,
             player.Talent,
             (int)Math.Round(player.Strength),
+            player.Experience,
             player.MarketValue ?? 0m,
             player.Fitness,
             player.Matches,

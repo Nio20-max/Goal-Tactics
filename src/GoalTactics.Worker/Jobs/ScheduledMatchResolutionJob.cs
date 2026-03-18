@@ -180,6 +180,9 @@ public sealed class ScheduledMatchResolutionJob(
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
 
+            // Award experience to players that started the match.
+            await AwardMatchExperienceAsync(dbContext, homeLeagueTeam?.TeamId, awayLeagueTeam?.TeamId, cancellationToken);
+
             // Serialize events for persistent storage and report generation
             var eventsJson = JsonSerializer.Serialize(result.Events.Select(e => new
             {
@@ -208,5 +211,36 @@ public sealed class ScheduledMatchResolutionJob(
         }
 
         logger.LogInformation("Match resolution complete: {Count} matches resolved", pendingMatches.Count);
+    }
+
+    private static decimal CalculateMatchExperienceGain(int age)
+    {
+        // Youth gain more experience; 16 gets 0.5 per match in starting lineup.
+        // Older players gain less, gradually declining.
+        var baseGain = 0.5m;
+        var penaltyPerYear = 0.02m;
+        var ageDelta = Math.Max(0, age - 16);
+        var gain = baseGain - (ageDelta * penaltyPerYear);
+        return Math.Max(0.05m, gain); // Always at least 0.05
+    }
+
+    private static async Task AwardMatchExperienceAsync(GoalTacticsDbContext dbContext, string? homeTeamId, string? awayTeamId, CancellationToken cancellationToken)
+    {
+        var affectedTeamIds = new List<string>();
+        if (!string.IsNullOrWhiteSpace(homeTeamId)) affectedTeamIds.Add(homeTeamId);
+        if (!string.IsNullOrWhiteSpace(awayTeamId)) affectedTeamIds.Add(awayTeamId);
+        if (affectedTeamIds.Count == 0) return;
+
+        // Determine starting lineup: players with shirt numbers 1-11 (sorted by shirt number).
+        var starters = await dbContext.TeamPlayers
+            .Where(p => affectedTeamIds.Contains(p.TeamId) && !p.IsScouted && p.SuspensionMatchesRemaining <= 0 && p.ShirtNumber >= 1 && p.ShirtNumber <= 11)
+            .ToListAsync(cancellationToken);
+
+        foreach (var player in starters)
+        {
+            player.Experience += CalculateMatchExperienceGain(player.Age);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

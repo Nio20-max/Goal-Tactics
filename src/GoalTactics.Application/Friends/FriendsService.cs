@@ -101,7 +101,8 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
         var teamId = ParseGuid(x.ForeignTeamId);
         return new FriendData
         {
-            Id = teamId,
+            // Use relation Id so clients can unambiguously accept/decline/remove the request.
+            Id = ParseGuid(x.RelationId),
             ForeignUserId = ParseGuid(x.ForeignUserId),
             ForeignTeamId = teamId,
             Name = x.Name,
@@ -118,10 +119,10 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
             Strength = x.Strength,
             LastActivity = DateTime.UtcNow.AddHours(-1).ToString("O"),
             Language = x.Language ?? "de",
-            MyLike = x.IsLiked,
-            LikesMe = false,
-            ChallengeStatus = 0,
-            ChallengeId = Guid.Empty
+            MyLike = x.IsRequestOutgoing,
+            LikesMe = x.IsRequestIncoming,
+            ChallengeStatus = x.ChallengeStatus,
+            ChallengeId = ParseGuid(x.ChallengeId)
         };
     }
 
@@ -133,10 +134,27 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
             Challenges = data.Challenges.Select(x => new ChallengeData
             {
                 Id = ParseGuid(x.Id),
-                ForeignTeamId = ParseGuid(x.ForeignTeamId),
+                MatchId = Guid.Empty,
+                Date = x.MatchDateUtc.ToString("O"),
+                MatchDate = x.MatchDateUtc.ToString("O"),
+                OpponentTeamId = ParseGuid(x.ForeignTeamId),
                 OpponentName = x.OpponentName,
                 Accepted = x.Accepted,
-                MatchDate = x.MatchDateUtc.ToString("O")
+                IsAccepted = x.Accepted,
+                IsDeclined = x.IsDeclined,
+                MyTeam = x.MyTeam,
+                HomeScore = x.HomeScore,
+                AwayScore = x.AwayScore,
+                HomeName = x.HomeName,
+                AwayName = x.AwayName,
+                HomeLogo = x.HomeLogo,
+                AwayLogo = x.AwayLogo,
+                HomeCountry = x.HomeCountry,
+                AwayCountry = x.AwayCountry,
+                HomeStrength = x.HomeStrength,
+                AwayStrength = x.AwayStrength,
+                HasLineup = false,
+                IsFriendly = true
             }).ToArray(),
             Friends = data.Friends.Select(MapFriend).ToArray(),
             MatchDate = data.MatchDateUtc.ToString("O"),

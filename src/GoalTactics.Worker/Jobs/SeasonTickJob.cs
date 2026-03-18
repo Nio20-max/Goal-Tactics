@@ -56,15 +56,8 @@ public sealed class SeasonTickJob(
                         player.Age++;
                     }
 
-                    // Fitness decay for players not in a camp and without individual training
-                    var inCamp = trainingState?.CampActiveUntilUtc > now;
-                    var hasIndividualTraining = player.IndividualTrainingSkill != null
-                        && player.IndividualTrainingUntilUtc > now;
-
-                    if (!inCamp && !hasIndividualTraining)
-                    {
-                        player.Fitness = Math.Max(50, player.Fitness - 1);
-                    }
+                    // NOTE: Fitness decay was removed per design; players no longer lose fitness over time.
+                    // (Previous behavior: -1 fitness per tick when not in camp/individual training.)
                 }
             }
 

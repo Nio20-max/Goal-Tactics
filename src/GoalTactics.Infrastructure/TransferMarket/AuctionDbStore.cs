@@ -1,3 +1,4 @@
+using GoalTactics.Application.Common;
 using GoalTactics.Application.TransferMarket;
 using GoalTactics.Contracts.TransferMarket;
 using GoalTactics.Infrastructure.Persistence;
@@ -62,8 +63,11 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
 
     public async Task<(IReadOnlyList<TransferPlayerData> Items, int TotalCount)> SearchAsync(TransferSearchRequest request, CancellationToken ct = default)
     {
+        await ExpireAuctionsAsync(ct);
+
+        var now = DateTime.UtcNow;
         var query = dbContext.Auctions.AsNoTracking()
-            .Where(a => a.Status == "Active");
+            .Where(a => a.Status == "Active" || (a.Status == "Sold" && a.EndDateUtc >= now.AddMinutes(-5)));
 
         if (request.Age is not null)
         {
@@ -119,6 +123,8 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
 
     public async Task<TransferPlayerData?> GetAuctionAsync(Guid auctionId, CancellationToken ct = default)
     {
+        await ExpireAuctionsAsync(ct);
+
         var auction = await dbContext.Auctions.AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == auctionId.ToString("N"), ct);
         return auction is null ? null : ToTransferPlayerData(auction);
@@ -127,10 +133,16 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
     public async Task<bool> PlaceBidAsync(Guid auctionId, string teamId, string teamName, string? teamLogo,
         long amount, CancellationToken ct = default)
     {
+        // Ensure auctions that have reached end time are settled before allowing bids.
+        await ExpireAuctionsAsync(ct);
+
+        var now = DateTime.UtcNow;
+
         var auction = await dbContext.Auctions
-            .FirstOrDefaultAsync(a => a.Id == auctionId.ToString("N") && a.Status == "Active", ct);
+            .FirstOrDefaultAsync(a => a.Id == auctionId.ToString("N"), ct);
 
         if (auction is null) return false;
+        if (auction.Status != "Active" || auction.EndDateUtc <= now) return false;
 
         // Validate bid
         var effectiveCurrent = auction.CurrentBid > 0 ? auction.CurrentBid : auction.MinimumBid;
@@ -170,13 +182,16 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
 
     public async Task<IReadOnlyList<TransferPlayerData>> GetFavoritesAsync(string userId, CancellationToken ct = default)
     {
+        await ExpireAuctionsAsync(ct);
+
+        var now = DateTime.UtcNow;
         var favorites = await dbContext.AuctionFavorites.AsNoTracking()
             .Where(f => f.UserId == userId)
             .Join(dbContext.Auctions.AsNoTracking(),
                 f => f.AuctionId,
                 a => a.Id,
                 (_, a) => a)
-            .Where(a => a.Status == "Active")
+            .Where(a => a.Status == "Active" || (a.Status == "Sold" && a.EndDateUtc >= now.AddMinutes(-5)))
             .ToListAsync(ct);
 
         return favorites.Select(ToTransferPlayerData).ToArray();
@@ -206,8 +221,11 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
 
     public async Task<IReadOnlyList<TransferPlayerData>> GetSellingsAsync(string teamId, CancellationToken ct = default)
     {
+        await ExpireAuctionsAsync(ct);
+
+        var now = DateTime.UtcNow;
         var sellings = await dbContext.Auctions.AsNoTracking()
-            .Where(a => a.SellerTeamId == teamId && a.Status == "Active")
+            .Where(a => a.SellerTeamId == teamId && (a.Status == "Active" || (a.Status == "Sold" && a.EndDateUtc >= now.AddMinutes(-5))))
             .ToListAsync(ct);
 
         return sellings.Select(ToTransferPlayerData).ToArray();
@@ -272,6 +290,7 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
                         Age = auction.PlayerAge,
                         Talent = auction.PlayerTalent,
                         Strength = auction.PlayerStrength,
+                        Experience = LegacyAppCompatibility.BuildExperience(auction.PlayerStrength, auction.PlayerAge, 0),
                         Fitness = 100,
                         ContractEndUtc = DateTime.UtcNow.AddDays(180)
                     });
@@ -406,6 +425,31 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
                 Status = "Active",
                 CreatedAtUtc = now
             });
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    private async Task ExpireAuctionsAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var expired = await dbContext.Auctions
+            .Where(a => a.Status == "Active" && a.EndDateUtc <= now)
+            .ToListAsync(ct);
+
+        if (expired.Count == 0) return;
+
+        foreach (var auction in expired)
+        {
+            if (auction.CurrentBidderTeamId is not null)
+            {
+                auction.Status = "Sold";
+            }
+            else
+            {
+                auction.Status = "Expired";
+            }
+            auction.EndDateUtc = now;
         }
 
         await dbContext.SaveChangesAsync(ct);

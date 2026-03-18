@@ -4,6 +4,8 @@ using GoalTactics.Bots.Client.Database;
 using GoalTactics.Bots.Client.Humanization;
 using GoalTactics.Bots.Client.Neural;
 using GoalTactics.Bots.Client.Scheduling;
+using GoalTactics.Bots.Client.Telemetry;
+using System.Text;
 
 namespace GoalTactics.Bots.Client;
 
@@ -20,6 +22,7 @@ public sealed class BotRunner : IDisposable
     private readonly BotFactory _factory;
     private readonly BotNeuralDecisionEngine _neural;
     private readonly BotHumanizationService _human;
+    private SimulationAuditWriter? _simulationAudit;
 
     // Behaviors
     private readonly TransferMarketBehavior _transferMarket;
@@ -43,7 +46,7 @@ public sealed class BotRunner : IDisposable
         _neural = new BotNeuralDecisionEngine(config, _db);
         _human = new BotHumanizationService(config, _db);
 
-        _social = new SocialBehavior(_db, config, _human);
+        _social = new SocialBehavior(_db, config, _human, _neural);
         _transferMarket = new TransferMarketBehavior(_db, _social, _neural, _human, _config);
         _stadium = new StadiumBehavior();
         _training = new TrainingBehavior();
@@ -54,6 +57,7 @@ public sealed class BotRunner : IDisposable
 
     public void Dispose()
     {
+        _simulationAudit?.Dispose();
         _api.Dispose();
         _db.Dispose();
     }
@@ -77,8 +81,231 @@ public sealed class BotRunner : IDisposable
         // Ensure we have enough bots registered
         await EnsureBotsRegisteredAsync(ct);
 
+        if (_config.SimulateSeasons > 0)
+        {
+            await RunSeasonSimulationAsync(ct);
+            return;
+        }
+
         Console.WriteLine("[BotRunner] Entering main loop...");
         await MainLoopAsync(ct);
+    }
+
+    private async Task RunSeasonSimulationAsync(CancellationToken ct)
+    {
+        string runDir = Path.Combine(_config.SimulationOutputRoot, $"bots_client_sim_{DateTime.UtcNow:yyyyMMdd_HHmmss}");
+        Directory.CreateDirectory(runDir);
+
+        _simulationAudit?.Dispose();
+        _simulationAudit = _config.EnableSimulationAudit ? new SimulationAuditWriter(runDir) : null;
+        _api.ConfigureAuditWriter(_simulationAudit);
+        _api.SetAuditContext(null, null, null, "simulation-bootstrap");
+
+        var seasonLines = new List<string>
+        {
+            "season,matchday,sessions,successes,auth_failures,night_sessions"
+        };
+
+        var reasonSamples = new List<string>();
+        var actionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        int totalSessions = 0;
+        int totalSuccess = 0;
+        int totalAuthFailures = 0;
+        int totalNightSessions = 0;
+
+        Console.WriteLine($"[BotRunner] Starting virtual simulation: seasons={_config.SimulateSeasons}, matchdays={_config.SimulateMatchdaysPerSeason}");
+        Console.WriteLine($"[BotRunner] Simulation output: {runDir}");
+
+        for (int season = 1; season <= _config.SimulateSeasons && !ct.IsCancellationRequested; season++)
+        {
+            for (int matchday = 1; matchday <= _config.SimulateMatchdaysPerSeason && !ct.IsCancellationRequested; matchday++)
+            {
+                var bots = _db.GetAllBots();
+                int daySessions = 0;
+                int daySuccess = 0;
+                int dayAuthFailures = 0;
+                int dayNightSessions = 0;
+
+                foreach (var bot in bots)
+                {
+                    if (ct.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
+                    _api.SetAuditContext(bot.BotId, season, matchday, "session");
+                    BotSessionResult result;
+                    try
+                    {
+                        result = await ExecuteBotSessionAsync(bot);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"[Sim] Bot session crashed for {bot.BotId}: {ex.Message}");
+                        result = new BotSessionResult
+                        {
+                            Success = false,
+                            DecisionReason = $"session-crash:{ex.GetType().Name}"
+                        };
+                        _simulationAudit?.LogError(bot.BotId, season, matchday, "session", ex.Message);
+                    }
+                    daySessions++;
+
+                    if (result.Success)
+                    {
+                        daySuccess++;
+                    }
+                    else if (result.AuthFailed)
+                    {
+                        dayAuthFailures++;
+                    }
+
+                    if (result.NightSession)
+                    {
+                        dayNightSessions++;
+                    }
+
+                    foreach (var action in result.ActionsExecuted)
+                    {
+                        actionCounts.TryGetValue(action, out int count);
+                        actionCounts[action] = count + 1;
+                    }
+
+                    _simulationAudit?.LogSessionResult(
+                        bot.BotId,
+                        bot.TeamName,
+                        season,
+                        matchday,
+                        result.Success,
+                        result.AuthFailed,
+                        result.NightSession,
+                        result.DecisionReason,
+                        result.ActionsExecuted);
+
+                    if (_config.CaptureSimulationSnapshots && matchday % _config.SimulationSnapshotStride == 0)
+                    {
+                        await CaptureSimulationSnapshotAsync(bot, season, matchday);
+                    }
+
+                    if (reasonSamples.Count < 200)
+                    {
+                        reasonSamples.Add($"season={season},matchday={matchday},bot={bot.BotId},team={bot.TeamName},reason={result.DecisionReason}");
+                    }
+                }
+
+                totalSessions += daySessions;
+                totalSuccess += daySuccess;
+                totalAuthFailures += dayAuthFailures;
+                totalNightSessions += dayNightSessions;
+
+                seasonLines.Add($"{season},{matchday},{daySessions},{daySuccess},{dayAuthFailures},{dayNightSessions}");
+                Console.WriteLine($"[Sim] season={season} matchday={matchday} sessions={daySessions} success={daySuccess} auth_fail={dayAuthFailures} night={dayNightSessions}");
+            }
+        }
+
+        await File.WriteAllLinesAsync(Path.Combine(runDir, "season-simulation.csv"), seasonLines, ct);
+
+        var actionsCsv = new List<string> { "action,count" };
+        actionsCsv.AddRange(actionCounts.OrderByDescending(x => x.Value).Select(x => $"{x.Key},{x.Value}"));
+        await File.WriteAllLinesAsync(Path.Combine(runDir, "action-counts.csv"), actionsCsv, ct);
+
+        var groups = _db.GetAllGroups();
+        var report = new StringBuilder();
+        report.AppendLine("# Bots Client Virtual Season Simulation Report");
+        report.AppendLine();
+        report.AppendLine($"- Simulated seasons: {_config.SimulateSeasons}");
+        report.AppendLine($"- Matchdays per season: {_config.SimulateMatchdaysPerSeason}");
+        report.AppendLine($"- Total sessions: {totalSessions}");
+        report.AppendLine($"- Successful sessions: {totalSuccess}");
+        report.AppendLine($"- Auth failures: {totalAuthFailures}");
+        report.AppendLine($"- Night sessions: {totalNightSessions}");
+        report.AppendLine($"- Groups observed: {groups.Count}");
+        report.AppendLine();
+
+        report.AppendLine("## Top Executed Actions");
+        foreach (var row in actionCounts.OrderByDescending(x => x.Value).Take(20))
+        {
+            report.AppendLine($"- {row.Key}: {row.Value}");
+        }
+        report.AppendLine();
+
+        report.AppendLine("## Decision Reason Samples");
+        foreach (var sample in reasonSamples.Take(80))
+        {
+            report.AppendLine($"- {sample}");
+        }
+        report.AppendLine();
+
+        report.AppendLine("## Group Behavior Snapshot");
+        foreach (var group in groups.OrderBy(g => g.GroupId))
+        {
+            var bots = _db.GetBotsInGroup(group.GroupId);
+            var recentMessages = _db.GetRecentGroupChatMessages(group.GroupId, 50);
+            report.AppendLine($"- Group {group.GroupId} ({group.Name}): bots={bots.Count}, recent_messages={recentMessages.Count}");
+        }
+        report.AppendLine();
+
+        report.AppendLine("## Deep Error/Mistake Findings");
+        report.AppendLine("1. Virtual-season simulation currently maps one bot online session to one simulated matchday step. This is fast but still a proxy for real season pacing.");
+        report.AppendLine("2. Session behavior can be skipped by confidence/rollback guardrails, which can make low-confidence bots look less active than expected during simulation windows.");
+        report.AppendLine("3. Group behavior visibility depends on recent chat writes and group formation timing; groups with low social coordination can appear underactive in short windows.");
+        report.AppendLine("4. API-dependent outcomes (auction timing, ladder challenges, sponsor responses) still rely on live backend state, so deterministic replay is limited.");
+
+        await File.WriteAllTextAsync(Path.Combine(runDir, "simulation-report.md"), report.ToString(), ct);
+        Console.WriteLine($"[BotRunner] Virtual simulation finished. Report written to {runDir}");
+    }
+
+    private async Task CaptureSimulationSnapshotAsync(BotRecord bot, int season, int matchday)
+    {
+        if (_simulationAudit is null)
+        {
+            return;
+        }
+
+        _api.SetAuditContext(bot.BotId, season, matchday, "snapshot");
+
+        try
+        {
+            if (!await EnsureAuthenticatedAsync(bot))
+            {
+                _simulationAudit.LogError(bot.BotId, season, matchday, "snapshot", "authentication-failed");
+                return;
+            }
+
+            _api.SetToken(bot.ValidationToken);
+            var teamInfo = await _api.ExecuteForBotAsync("GetMyTeamExtendedInfo");
+            var resources = await _api.ExecuteForBotAsync("GetMyResources");
+            var squad = await _api.ExecuteForBotAsync("GetSquad");
+            var stadium = await _api.ExecuteForBotAsync("GetStadium");
+            var training = await _api.ExecuteForBotAsync("GetTeamTraining");
+            var transferMarket = await _api.ExecuteForBotAsync("SearchTransfermarket", new SearchTransfermarketRequest());
+
+            _simulationAudit.LogTeamSnapshot(
+                bot.BotId,
+                bot.TeamName,
+                season,
+                matchday,
+                teamInfo.Output,
+                resources.Output,
+                stadium.Output,
+                training.Output,
+                transferMarket.Output);
+            _simulationAudit.LogSquadSnapshot(
+                bot.BotId,
+                bot.TeamName,
+                season,
+                matchday,
+                BotApiTranslationReader.GetObjectList(squad, "players"),
+                BotApiTranslationReader.GetObjectList(squad, "playersOnTransfermarket"));
+        }
+        catch (Exception ex)
+        {
+            _simulationAudit.LogError(bot.BotId, season, matchday, "snapshot", ex.Message);
+        }
+        finally
+        {
+            _api.ClearToken();
+        }
     }
 
     private async Task EnsureBotsRegisteredAsync(CancellationToken ct)
@@ -153,9 +380,10 @@ public sealed class BotRunner : IDisposable
     /// <summary>
     /// Execute a single bot's online session: authenticate, run all behaviors, log off.
     /// </summary>
-    private async Task ExecuteBotSessionAsync(BotRecord bot)
+    private async Task<BotSessionResult> ExecuteBotSessionAsync(BotRecord bot)
     {
         Console.WriteLine($"[Bot {bot.BotId}] Waking up ({bot.TeamName})...");
+        var result = new BotSessionResult();
 
         var sessionPlan = _human.BuildSessionPlan(bot);
         var emotion = _human.GetEmotionalState(bot);
@@ -164,7 +392,9 @@ public sealed class BotRunner : IDisposable
         if (!await EnsureAuthenticatedAsync(bot))
         {
             Console.Error.WriteLine($"[Bot {bot.BotId}] Authentication failed, skipping session.");
-            return;
+            result.AuthFailed = true;
+            result.DecisionReason = "authentication-failed";
+            return result;
         }
 
         _api.SetToken(bot.ValidationToken);
@@ -176,7 +406,11 @@ public sealed class BotRunner : IDisposable
             _db.AddActionLog(bot.BotId, "rollback", "Safe mode active after repeated neural failures", true, bot.Risk);
             _api.ClearToken();
             Console.WriteLine($"[Bot {bot.BotId}] Safe-mode session complete.");
-            return;
+            result.Success = true;
+            result.ActionsExecuted.Add("lineup");
+            result.ActionsExecuted.Add("daily");
+            result.DecisionReason = "rollback-safe-mode";
+            return result;
         }
 
         var nightPlan = await _neural.GetOrCreateNightPlanAsync(_api, bot);
@@ -187,13 +421,18 @@ public sealed class BotRunner : IDisposable
             await ExecuteNightCycleIfDueAsync(bot, nightPlan);
             _api.ClearToken();
             Console.WriteLine($"[Bot {bot.BotId}] Night session complete.");
-            return;
+            result.Success = true;
+            result.NightSession = true;
+            result.ActionsExecuted.AddRange(["night-lineup", "night-training", "night-skillcard", "night-transfer", "night-social"]);
+            result.DecisionReason = "night-cycle";
+            return result;
         }
 
         if (!_human.ShouldExecuteByConfidence(bot, "session", confidence))
         {
             _api.ClearToken();
-            return;
+            result.DecisionReason = $"skipped-low-confidence-{confidence:F2}";
+            return result;
         }
 
         if (_human.ShouldRunSelfAudit(bot))
@@ -201,9 +440,19 @@ public sealed class BotRunner : IDisposable
             _db.AddActionLog(bot.BotId, "self-audit", $"Session plan={sessionPlan.DurationMinutes}m interrupted={sessionPlan.Interrupted}", true, bot.Risk);
         }
 
-        var resources = await _api.ExecuteForBotAsync("GetMyResources");
-        var squad = await _api.ExecuteForBotAsync("GetSquad");
-        if (resources.Success)
+        BotApiTranslation? resources = null;
+        BotApiTranslation? squad = null;
+        try
+        {
+            resources = await _api.ExecuteForBotAsync("GetMyResources");
+            squad = await _api.ExecuteForBotAsync("GetSquad");
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"[ActionError] bootstrap: {ex.Message}");
+        }
+
+        if (resources is not null && resources.Success && squad is not null)
         {
             var money = BotApiTranslationReader.GetDecimal(resources.Output, "money");
             var stars = BotApiTranslationReader.GetDecimal(resources.Output, "gtStars");
@@ -213,12 +462,22 @@ public sealed class BotRunner : IDisposable
 
         // Execute behaviors in priority order with rate-limit checks
         await ExecuteWithRateLimit("daily", () => _dailyRoutine.ExecuteAsync(_api, bot, nightPlan));
+        result.ActionsExecuted.Add("daily");
         await ExecuteWithRateLimit("lineup", () => _lineup.ExecuteAsync(_api, bot, nightPlan));
+        result.ActionsExecuted.Add("lineup");
         await ExecuteWithRateLimit("training", () => _training.ExecuteAsync(_api, bot, nightPlan));
+        result.ActionsExecuted.Add("training");
         await ExecuteWithRateLimit("skillcard", () => _skillCard.ExecuteAsync(_api, bot, nightPlan));
-        await ExecuteWithRateLimit("stadium", () => _stadium.ExecuteAsync(_api, bot, nightPlan));
+        result.ActionsExecuted.Add("skillcard");
+        if (_config.SimulateSeasons <= 0)
+        {
+            await ExecuteWithRateLimit("stadium", () => _stadium.ExecuteAsync(_api, bot, nightPlan));
+            result.ActionsExecuted.Add("stadium");
+        }
         await ExecuteWithRateLimit("transfer", () => _transferMarket.ExecuteAsync(_api, bot, nightPlan));
+        result.ActionsExecuted.Add("transfer");
         await ExecuteWithRateLimit("social", () => _social.ExecuteAsync(_api, bot, nightPlan));
+        result.ActionsExecuted.Add("social");
 
         if (sessionPlan.Interrupted)
         {
@@ -227,6 +486,9 @@ public sealed class BotRunner : IDisposable
 
         _api.ClearToken();
         Console.WriteLine($"[Bot {bot.BotId}] Session complete.");
+        result.Success = true;
+        result.DecisionReason = $"confidence={confidence:F2};interrupted={sessionPlan.Interrupted}";
+        return result;
     }
 
     private async Task ExecuteNightCycleIfDueAsync(BotRecord bot, BotNightPlan nightPlan)
@@ -260,6 +522,11 @@ public sealed class BotRunner : IDisposable
                 var resources = await _api.ExecuteForBotAsync("GetMyResources");
                 if (resources.Success) return true;
             }
+            catch (HttpRequestException ex) when (ex.Message.Contains("429 Too Many Requests", StringComparison.OrdinalIgnoreCase))
+            {
+                // Under temporary throttling, keep using the known token instead of forcing re-login.
+                return true;
+            }
             catch
             {
                 // Token expired — re-login below
@@ -268,11 +535,20 @@ public sealed class BotRunner : IDisposable
 
         // Re-login
         string email = BotFactory.SanitizeEmail(bot.TeamName);
-        var loginResult = await _api.ExecuteForBotAsync("Login", new LoginRequest
+        BotApiTranslation loginResult;
+        try
         {
-            Email = email,
-            Password = bot.Password
-        });
+            loginResult = await _api.ExecuteForBotAsync("Login", new LoginRequest
+            {
+                Email = email,
+                Password = bot.Password
+            });
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"[Auth] Re-login failed for {bot.BotId}: {ex.Message}");
+            return false;
+        }
 
         if (!loginResult.Success)
             return false;
@@ -308,6 +584,14 @@ public sealed class BotRunner : IDisposable
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
         {
             Console.Error.WriteLine($"[RateLimit] {action}: rate limited, backing off.");
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"[ActionError] {action}: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ActionError] {action}: {ex.Message}");
         }
 
         _rateLimits[action] = DateTime.UtcNow;
@@ -358,5 +642,14 @@ public sealed class BotRunner : IDisposable
         {
             return utcNow.ToString("yyyy-MM-dd");
         }
+    }
+
+    private sealed class BotSessionResult
+    {
+        public bool Success { get; set; }
+        public bool AuthFailed { get; set; }
+        public bool NightSession { get; set; }
+        public string DecisionReason { get; set; } = "";
+        public List<string> ActionsExecuted { get; } = [];
     }
 }

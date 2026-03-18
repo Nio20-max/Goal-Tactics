@@ -8,6 +8,12 @@ Console.WriteLine($"  API URL:   {config.ApiBaseUrl}");
 Console.WriteLine($"  Neural:    {(config.NeuralEnabled ? "enabled" : "disabled")} ({config.NeuralApiUrl})");
 Console.WriteLine($"  Database:  {config.DatabasePath}");
 Console.WriteLine($"  Bot count: {config.BotCount}");
+if (config.SimulateSeasons > 0)
+{
+    Console.WriteLine($"  Sim mode:  {config.SimulateSeasons} seasons x {config.SimulateMatchdaysPerSeason} matchdays");
+    Console.WriteLine($"  Sim out:   {config.SimulationOutputRoot}");
+    Console.WriteLine($"  Sim audit: {(config.EnableSimulationAudit ? "enabled" : "disabled")}, snapshots={(config.CaptureSimulationSnapshots ? "on" : "off")}, stride={config.SimulationSnapshotStride}");
+}
 Console.WriteLine();
 
 using var cts = new CancellationTokenSource();
@@ -89,6 +95,24 @@ static BotConfig ParseConfig(string[] args)
 
     if (map.TryGetValue("enable-self-audit", out var selfAudit) && bool.TryParse(selfAudit, out var selfAuditEnabled))
         config.EnableSelfAudit = selfAuditEnabled;
+
+    if (map.TryGetValue("simulate-seasons", out var simulateSeasons) && int.TryParse(simulateSeasons, out var seasons))
+        config.SimulateSeasons = Math.Max(0, seasons);
+
+    if (map.TryGetValue("simulate-matchdays", out var simulateMatchdays) && int.TryParse(simulateMatchdays, out var matchdays))
+        config.SimulateMatchdaysPerSeason = Math.Max(1, matchdays);
+
+    if (map.TryGetValue("simulation-output-root", out var simulationOutputRoot) && !string.IsNullOrWhiteSpace(simulationOutputRoot))
+        config.SimulationOutputRoot = simulationOutputRoot;
+
+    if (map.TryGetValue("enable-simulation-audit", out var simulationAudit) && bool.TryParse(simulationAudit, out var simulationAuditEnabled))
+        config.EnableSimulationAudit = simulationAuditEnabled;
+
+    if (map.TryGetValue("capture-simulation-snapshots", out var simulationSnapshots) && bool.TryParse(simulationSnapshots, out var simulationSnapshotsEnabled))
+        config.CaptureSimulationSnapshots = simulationSnapshotsEnabled;
+
+    if (map.TryGetValue("simulation-snapshot-stride", out var simulationSnapshotStride) && int.TryParse(simulationSnapshotStride, out var stride))
+        config.SimulationSnapshotStride = Math.Max(1, stride);
 
     return config;
 }

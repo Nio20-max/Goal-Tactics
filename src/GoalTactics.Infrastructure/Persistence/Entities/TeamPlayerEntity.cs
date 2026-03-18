@@ -20,6 +20,8 @@ public sealed class TeamPlayerEntity
 
     public decimal Strength { get; set; }
 
+    public decimal Experience { get; set; }
+
     public decimal? MarketValue { get; set; }
 
     public decimal? Skill0 { get; set; }

@@ -2,8 +2,8 @@ The lineup is still not working. Compare the traffic with what the app expects a
 
 Live game (worked on it)
 
-Get 1000 stars
+experience for games (working on it)
 
-experience for games
+training (working on it (Trainingscamp, Tactics, individual and team))
 
-All are friendly games
+friends (worked on it)

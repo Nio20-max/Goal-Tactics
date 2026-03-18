@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using GoalTactics.Bots.Client.ApiClient;
 using GoalTactics.Bots.Client.Database;
 using GoalTactics.Bots.Client.Neural;
@@ -18,6 +20,7 @@ public sealed class TrainingBehavior
         public decimal Strength { get; init; }
         public int Talent { get; init; }
         public int Age { get; init; }
+        public string Position { get; init; } = "";
         public bool HasIndividualTraining { get; init; }
         public bool HasRedCard { get; init; }
         public int Injured { get; init; }
@@ -54,6 +57,131 @@ public sealed class TrainingBehavior
             MainSkillIndex = mainSkillIndex,
             SubSkillIndex = subSkillIndex
         });
+
+        await HandleTrainingCampAsync(api, bot, nightPlan, training);
+    }
+
+    private async Task HandleTrainingCampAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan, BotApiTranslation training)
+    {
+        // Book training camps (prefer experience, then position camps) and refresh available options when the bot has enough stars.
+        var campData = BotApiTranslationReader.GetObject(training, "trainingCamp");
+        if (campData is null) return;
+
+        var resources = await api.ExecuteForBotAsync("GetMyResources");
+        if (!resources.Success) return;
+
+        var stars = BotApiTranslationReader.GetInt(resources.Output, "gtStars");
+        var maxRefreshAttempts = Math.Min(3, stars / 1000);
+        var refreshAttempts = 0;
+
+        // Determine the desired camp types (experience first, then position-specific) based on current squad.
+        var desiredCampOrder = await ComputeDesiredCampOrderAsync(api, bot);
+        if (desiredCampOrder.Count == 0)
+        {
+            return;
+        }
+
+        while (true)
+        {
+            campData = BotApiTranslationReader.GetObject(training, "trainingCamp");
+            if (campData is null) return;
+
+            var currentCamp = BotApiTranslationReader.GetString(campData, "bookedCampIdentifier");
+            var currentCampActive = false;
+            var campItems = BotApiTranslationReader.GetObjectList(campData, "campItems");
+            if (!string.IsNullOrWhiteSpace(currentCamp))
+            {
+                currentCampActive = campItems
+                    .Where(item => BotApiTranslationReader.GetString(item, "identifier") == currentCamp)
+                    .Select(item => BotApiTranslationReader.GetString(item, "bookDate"))
+                    .Any(bookDate => !string.IsNullOrWhiteSpace(bookDate));
+            }
+
+            if (currentCampActive && desiredCampOrder.Contains(currentCamp))
+            {
+                // Already booked a desired camp.
+                return;
+            }
+
+            var desiredCamp = campItems
+                .Select(item => BotApiTranslationReader.GetString(item, "identifier"))
+                .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id) && desiredCampOrder.Contains(id));
+
+            if (!string.IsNullOrWhiteSpace(desiredCamp))
+            {
+                await api.ExecuteForBotAsync("BookTrainingCamp", new BookTrainingCampRequest { CampType = desiredCamp });
+                return;
+            }
+
+            // No suitable camps currently offered.
+            var canUpdate = BotApiTranslationReader.GetBool(campData, "isUpdateEnabled");
+            if (!canUpdate && !string.IsNullOrWhiteSpace(currentCamp) && stars >= 2000)
+            {
+                // Cancel an active camp to allow refreshing.
+                await api.ExecuteForBotAsync("CancelCamp");
+                canUpdate = true;
+            }
+
+            if (!canUpdate || refreshAttempts >= maxRefreshAttempts || stars < 1000)
+            {
+                return;
+            }
+
+            await api.ExecuteForBotAsync("UpdateCamps");
+            refreshAttempts++;
+
+            // Re-fetch state after updating camps
+            training = await api.ExecuteForBotAsync("GetTeamTraining");
+            if (!training.Success) return;
+
+            resources = await api.ExecuteForBotAsync("GetMyResources");
+            if (!resources.Success) return;
+            stars = BotApiTranslationReader.GetInt(resources.Output, "gtStars");
+        }
+    }
+
+    private async Task<List<string>> ComputeDesiredCampOrderAsync(GoalTacticsApiClient api, BotRecord bot)
+    {
+        // Primary desire: experience camp.
+        var desired = new List<string> { "camp_2_0_mid" };
+
+        // Secondary desire: positional camps (goalkeeper, defence, midfield, attack) based on squad composition.
+        var squadResponse = await api.ExecuteForBotAsync("GetSquad");
+        if (!squadResponse.Success)
+        {
+            return desired;
+        }
+
+        var players = BotApiTranslationReader.GetObjectList(squadResponse, "players")
+            .Select(ToPlayer)
+            .Where(p => !string.IsNullOrEmpty(p.Id))
+            .ToList();
+
+        if (players.Count == 0)
+        {
+            return desired;
+        }
+
+        var posCounts = players.GroupBy(p => p.Position)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        // Determine most common position for the team.
+        var primaryPosition = posCounts.OrderByDescending(kv => kv.Value).First().Key;
+        var positionCamp = primaryPosition switch
+        {
+            "GK" => "camp_0_1_mid",
+            "DEF" => "camp_0_0_mid",
+            "MID" => "camp_0_3_mid",
+            "FWD" => "camp_0_2_mid",
+            _ => null
+        };
+
+        if (!string.IsNullOrWhiteSpace(positionCamp))
+        {
+            desired.Add(positionCamp);
+        }
+
+        return desired;
     }
 
     /// <summary>
@@ -95,9 +223,41 @@ public sealed class TrainingBehavior
             count = Math.Min(youngPlayers.Count, Math.Max(count, nightPlan.IndividualTrainingSlots));
         }
 
+        var resources = await api.ExecuteForBotAsync("GetMyResources");
+        if (!resources.Success)
+        {
+            return;
+        }
+
+        int stars = BotApiTranslationReader.GetInt(resources.Output, "gtStars");
+        int affordableTrainings = Math.Max(0, stars / 1000);
+        count = Math.Min(count, affordableTrainings);
+        if (count <= 0)
+        {
+            return;
+        }
+
         for (int i = 0; i < count; i++)
         {
-            await api.ExecuteForBotAsync("SaveIndividualTraining", new IdRequest { Id = youngPlayers[i].Id });
+            var targetId = youngPlayers[i].Id;
+
+            // Re-check eligibility right before submission to avoid stale-state 422s.
+            var latestSquad = await api.ExecuteForBotAsync("GetSquad");
+            if (!latestSquad.Success)
+            {
+                continue;
+            }
+
+            var latestTarget = BotApiTranslationReader.GetObjectList(latestSquad, "players")
+                .Select(ToPlayer)
+                .FirstOrDefault(p => p.Id == targetId);
+
+            if (latestTarget is null || latestTarget.HasIndividualTraining || latestTarget.HasRedCard || latestTarget.Injured > 0)
+            {
+                continue;
+            }
+
+            await api.ExecuteForBotAsync("SaveIndividualTraining", new IdRequest { Id = targetId });
         }
     }
 
@@ -120,12 +280,28 @@ public sealed class TrainingBehavior
 
         if (_rng.NextDouble() > scoutChance) return;
 
-        // Instruct scout
-        await api.ExecuteForBotAsync("InstructScout", new InstructScoutRequest());
-
-        // Check scouted players and recruit the best one
         var scouted = await api.ExecuteForBotAsync("GetScoutedPlayers");
         if (!scouted.Success) return;
+
+        int pendingScoutCount = BotApiTranslationReader.GetInt(scouted.Output, "pendingScoutCount");
+        int maxSimultaneousScouts = BotApiTranslationReader.GetInt(scouted.Output, "maxSimultaneousScouts", 3);
+        if (pendingScoutCount < maxSimultaneousScouts)
+        {
+            await api.ExecuteForBotAsync("InstructScout", new InstructScoutRequest());
+
+            // refresh after new instruction (may take multiple attempts to generate candidates)
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                scouted = await api.ExecuteForBotAsync("GetScoutedPlayers");
+                if (!scouted.Success) return;
+
+                var playersTry = BotApiTranslationReader.GetObjectList(scouted, "players");
+                if (playersTry.Count > 0)
+                {
+                    break;
+                }
+            }
+        }
 
         var players = BotApiTranslationReader.GetObjectList(scouted, "players")
             .Select(ToScoutedPlayer)
@@ -133,16 +309,44 @@ public sealed class TrainingBehavior
             .ToList();
         if (players.Count == 0) return;
 
+        // Determine current squad composition to set recruitment standards.
+        var squad = await api.ExecuteForBotAsync("GetSquad");
+        double avgAge = 0;
+        double pctYoung = 0;
+
+        if (squad.Success)
+        {
+            var squadPlayers = BotApiTranslationReader.GetObjectList(squad, "players")
+                .Select(ToPlayer)
+                .Where(p => p.Age > 0)
+                .ToList();
+
+            if (squadPlayers.Count > 0)
+            {
+                avgAge = squadPlayers.Average(p => p.Age);
+                pctYoung = squadPlayers.Count(p => p.Age <= 23) / (double)squadPlayers.Count;
+            }
+        }
+
+        // Determine threshold (1-10 talent scale) based on squad youth profile.
+        // Younger teams keep higher standards; older squads relax.
+        var baseTalent = 6.0;
+        var adjustedTalent = baseTalent + (pctYoung - 0.5) * 4.0;
+        adjustedTalent = Math.Clamp(adjustedTalent, 4.0, 9.0);
+
+        // Determine how strict the talent threshold should be based on squad youth.
+        // No age data is available for scouted players, so recruitment is talent-driven.
         var best = players
             .OrderByDescending(p => p.Talent)
             .ThenByDescending(p => p.Strength)
             .First();
 
-        // High youth focus bots are more likely to recruit
-        if (best.Talent >= 60 || (bot.YouthFocus >= 70 && best.Talent >= 40))
+        if (best.Talent < adjustedTalent)
         {
-            await api.ExecuteForBotAsync("RecruitScoutedPlayer", new IdRequest { Id = best.Id });
+            return;
         }
+
+        await api.ExecuteForBotAsync("RecruitScoutedPlayer", new IdRequest { Id = best.Id });
     }
 
     private static PlayerSnapshot ToPlayer(Dictionary<string, object?> data)
@@ -152,6 +356,7 @@ public sealed class TrainingBehavior
             Strength = BotApiTranslationReader.GetDecimal(data, "strength"),
             Talent = BotApiTranslationReader.GetInt(data, "talent"),
             Age = BotApiTranslationReader.GetInt(data, "age"),
+            Position = BotApiTranslationReader.GetString(data, "position"),
             HasIndividualTraining = BotApiTranslationReader.GetBool(data, "hasIndividualTraining"),
             HasRedCard = BotApiTranslationReader.GetBool(data, "hasRedCard"),
             Injured = BotApiTranslationReader.GetInt(data, "injured"),

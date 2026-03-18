@@ -197,6 +197,7 @@ public sealed record SquadPlayerRecord(
     int Age,
     int Talent,
     int Strength,
+    decimal Experience,
     decimal MarketValue,
     int Fitness,
     int Matches,

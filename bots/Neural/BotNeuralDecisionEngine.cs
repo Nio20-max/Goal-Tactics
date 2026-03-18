@@ -107,6 +107,52 @@ public sealed class BotNeuralDecisionEngine
         return BuildFallbackGroupMessage(plan, desiredPlayers);
     }
 
+    public async Task<string> BuildSocialMessageAsync(
+        BotRecord bot,
+        BotNightPlan plan,
+        IReadOnlyList<string> closeContacts,
+        IReadOnlyList<string> recentGlobalMessages,
+        CancellationToken ct = default)
+    {
+        if (!_config.NeuralEnabled)
+        {
+            return BuildFallbackSocialMessage(plan, closeContacts);
+        }
+
+        var systemPrompt = """
+            You write concise football manager global chat messages for autonomous bots.
+            Keep style natural and short, not robotic.
+            Mention social cooperation and one concrete intent for the next matchday.
+            Output plain text only, no markdown, <= 220 chars.
+            """;
+
+        var userPrompt = $"""
+            Team: {bot.TeamName}
+            Manager: {bot.ManagerName}
+            ChatTone: {plan.ChatTone}
+            CoordinationLevel: {plan.CoordinationLevel}
+            GroupId: {bot.GroupId}
+            CloseContacts: {string.Join(", ", closeContacts.Take(5))}
+            RecentGlobalMessages:
+            {string.Join("\n", recentGlobalMessages.TakeLast(4))}
+            """;
+
+        try
+        {
+            var text = await RequestTextCompletionAsync(systemPrompt, userPrompt, 120, 0.45, ct);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                return text.Trim();
+            }
+        }
+        catch
+        {
+            // Fall back when model/API is unavailable.
+        }
+
+        return BuildFallbackSocialMessage(plan, closeContacts);
+    }
+
     private static string BuildFallbackGroupMessage(BotNightPlan plan, IReadOnlyList<string> desiredPlayers)
     {
         string tone = plan.ChatTone switch
@@ -117,6 +163,21 @@ public sealed class BotNeuralDecisionEngine
         };
 
         return $"{tone}: targeting {string.Join(", ", desiredPlayers.Take(3))}. Profile={plan.TransferTargetProfile}.";
+    }
+
+    private static string BuildFallbackSocialMessage(BotNightPlan plan, IReadOnlyList<string> closeContacts)
+    {
+        var tone = plan.ChatTone switch
+        {
+            "competitive" => "Pushing hard for the next matchday",
+            "supportive" => "Building momentum together",
+            _ => "Preparing for the next fixtures"
+        };
+
+        var contact = closeContacts.FirstOrDefault();
+        return string.IsNullOrWhiteSpace(contact)
+            ? $"{tone}. Friendly challenge window open." 
+            : $"{tone}. Coordinating with {contact} and scouting challenge opportunities.";
     }
 
     private async Task<Dictionary<string, object?>> BuildNightSnapshotAsync(GoalTacticsApiClient api, BotRecord bot)

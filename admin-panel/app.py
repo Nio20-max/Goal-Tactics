@@ -12,12 +12,15 @@ import re
 import sqlite3
 import glob
 import subprocess
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("GT_ADMIN_SECRET", "gt-admin-dev-secret")
 
 # ── Configuration ────────────────────────────────────────────────
 
@@ -27,6 +30,7 @@ BOT_DB_PATH = f"{DATA_ROOT}/data/bots.db"
 LOG_DIR     = f"{DATA_ROOT}/logs"
 BACKUP_DIR  = f"{DATA_ROOT}/backup"
 SAVES_DIR   = f"{DATA_ROOT}/saves"
+API_BASE_URL = os.environ.get("GT_API_BASE_URL", "https://gt.nikolai-linschmann.de")
 
 
 # ── Database helpers ─────────────────────────────────────────────
@@ -44,6 +48,35 @@ def db_query(db_path: str, sql: str, params: tuple = ()) -> list[dict]:
         return rows
     except Exception:
         return []
+
+
+def api_post_json(path: str, payload: dict) -> dict:
+    """POST JSON to GoalTactics API and return decoded JSON object."""
+    url = f"{API_BASE_URL.rstrip('/')}{path}"
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+        data = json.loads(raw) if raw else {}
+        return data if isinstance(data, dict) else {}
+    except urllib.error.HTTPError as ex:
+        try:
+            raw = ex.read().decode("utf-8", errors="replace")
+            data = json.loads(raw) if raw else {}
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+        return {"success": False, "message": f"HTTP {ex.code}"}
+    except Exception as ex:
+        return {"success": False, "message": str(ex)}
 
 
 def get_game_stats() -> dict:
@@ -348,6 +381,106 @@ def backups_page():
     return render_template("backups.html",
                            backups=backup_list,
                            total=len(backups))
+
+
+@app.route("/chat")
+def chat_page():
+    """User-facing chat page for global/group/private bot chats."""
+    return render_template("chat.html",
+                           logged_in=bool(session.get("chat_token")),
+                           manager_name=session.get("chat_manager_name", ""))
+
+
+@app.route("/chat/login", methods=["POST"])
+def chat_login():
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip()
+    password = payload.get("password") or ""
+
+    if not email or not password:
+        return jsonify({"success": False, "message": "Email and password are required."}), 400
+
+    result = api_post_json("/api/Login", {
+        "email": email,
+        "password": password,
+    })
+
+    if not result.get("success") or not result.get("token"):
+        return jsonify({"success": False, "message": result.get("message", "Login failed")}), 401
+
+    session["chat_token"] = result.get("token")
+    session["chat_user_id"] = str(result.get("userId") or "")
+    session["chat_manager_name"] = result.get("managerName") or email
+
+    return jsonify({"success": True, "managerName": session["chat_manager_name"]})
+
+
+@app.route("/chat/logout", methods=["POST"])
+def chat_logout():
+    session.pop("chat_token", None)
+    session.pop("chat_user_id", None)
+    session.pop("chat_manager_name", None)
+    return jsonify({"success": True})
+
+
+def _chat_auth_payload(extra: dict | None = None) -> dict:
+    token = session.get("chat_token")
+    data = {"token": token}
+    if extra:
+        data.update(extra)
+    return data
+
+
+@app.route("/chat/api/contacts", methods=["GET"])
+def chat_api_contacts():
+    token = session.get("chat_token")
+    if not token:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    result = api_post_json("/api/GetChatContacts", _chat_auth_payload())
+    return jsonify(result)
+
+
+@app.route("/chat/api/history", methods=["GET"])
+def chat_api_history():
+    token = session.get("chat_token")
+    if not token:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    channel = (request.args.get("channel") or "global").strip().lower()
+    target = (request.args.get("targetUserId") or "").strip()
+
+    payload = _chat_auth_payload({"channel": channel})
+    if target:
+        payload["targetUserId"] = target
+
+    result = api_post_json("/api/GetChatHistory", payload)
+    return jsonify(result)
+
+
+@app.route("/chat/api/send", methods=["POST"])
+def chat_api_send():
+    token = session.get("chat_token")
+    if not token:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    payload_in = request.get_json(silent=True) or {}
+    message = (payload_in.get("message") or "").strip()
+    channel = (payload_in.get("channel") or "global").strip().lower()
+    target = (payload_in.get("targetUserId") or "").strip()
+
+    if not message:
+        return jsonify({"success": False, "message": "Message required"}), 400
+
+    payload = _chat_auth_payload({
+        "message": message,
+        "channel": channel,
+    })
+    if target:
+        payload["targetUserId"] = target
+
+    result = api_post_json("/api/PostChatMessage", payload)
+    return jsonify(result)
 
 
 # ── API endpoints for AJAX ───────────────────────────────────────

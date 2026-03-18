@@ -133,10 +133,25 @@ public sealed class ShopService(ITeamStore teamStore) : IShopService
                     Action = "Buy",
                     Section = 2,
                     Identifier = "com.xyrality.goaltactics.stars_20k_free",
-                    Image = "shop_stars_1",
+                    Image = "shop_stars_2",
                     Money = 0,
                     Medipacks = 0,
                     GTStars = 20000
+                },
+                new ShopProductData
+                {
+                    Id = Guid.Parse("a1b2c3d4-e5f6-0000-0000-000000000104"),
+                    Name = "1.000 GT Stars",
+                    Category = "gt_stars",
+                    Price = 0,
+                    Cost = 0,
+                    Action = "Buy",
+                    Section = 2,
+                    Identifier = "com.xyrality.goaltactics.stars_1k_free",
+                    Image = "shop_stars_1",
+                    Money = 0,
+                    Medipacks = 0,
+                    GTStars = 1000
                 },
                 new ShopProductData
                 {
@@ -321,6 +336,7 @@ public sealed class ShopService(ITeamStore teamStore) : IShopService
         return normalized switch
         {
             "com.xyrality.goaltactics.stars_20k_free" => await teamStore.TrySpendStarsAsync(userId, -20_000m, cancellationToken),
+            "com.xyrality.goaltactics.stars_1k_free" => await teamStore.TrySpendStarsAsync(userId, -1_000m, cancellationToken),
             "com.xyrality.goaltactics.medipacks_10" => await BuyMedipacksForStarsAsync(userId, starsCost: 1_000m, medipacks: 10m, cancellationToken),
             "com.xyrality.goaltactics.medipacks_30" => await BuyMedipacksForStarsAsync(userId, starsCost: 2_700m, medipacks: 30m, cancellationToken),
             "com.xyrality.goaltactics.medipacks_80" => await BuyMedipacksForStarsAsync(userId, starsCost: 6_400m, medipacks: 80m, cancellationToken),

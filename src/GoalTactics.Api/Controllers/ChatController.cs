@@ -14,7 +14,7 @@ namespace GoalTactics.Api.Controllers;
 public sealed class ChatController(IChatService chatService) : ControllerBase
 {
     [HttpPost("GetChatHistory")]
-    public async Task<ActionResult<ChatHistoryResponse>> GetChatHistory([FromBody] RequestObject request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ChatHistoryResponse>> GetChatHistory([FromBody] ChatHistoryRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
@@ -22,7 +22,19 @@ public sealed class ChatController(IChatService chatService) : ControllerBase
             return Unauthorized(new ChatHistoryResponse { Success = false, Message = "Invalid token context" });
         }
 
-        return Ok(await chatService.GetHistoryAsync(userId, cancellationToken));
+        return Ok(await chatService.GetHistoryAsync(userId, request.Channel, request.TargetUserId?.ToString("N"), cancellationToken));
+    }
+
+    [HttpPost("GetChatContacts")]
+    public async Task<ActionResult<ChatContactsResponse>> GetChatContacts([FromBody] RequestObject request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new ChatContactsResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        return Ok(await chatService.GetContactsAsync(userId, cancellationToken));
     }
 
     [HttpPost("PostChatMessage")]
@@ -45,7 +57,7 @@ public sealed class ChatController(IChatService chatService) : ControllerBase
             return BadRequest(new ResponseObject { Success = false, Message = "Message is too long" });
         }
 
-        await chatService.PostAsync(userId, request.Message, cancellationToken);
+        await chatService.PostAsync(userId, request.Message, request.Channel, request.TargetUserId?.ToString("N"), cancellationToken);
         return Ok(new ResponseObject { Success = true, Message = "Posted" });
     }
 

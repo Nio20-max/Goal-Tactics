@@ -281,6 +281,8 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
         {
             Success = true,
             BookedCampIndex = bookedCampIndex,
+            BookedCampIdentifier = activeIdentifier,
+            BookedCampName = activeIdentifier is null ? null : campItems.ElementAtOrDefault(bookedCampIndex)?.Name,
             UpdateCampsCost = 1000,
             IsUpdateEnabled = !state.CampActiveUntilUtc.HasValue || state.CampActiveUntilUtc.Value.Date < DateTime.UtcNow.Date,
             CampItems = campItems
@@ -291,10 +293,10 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
     {
         var position = player.Position switch
         {
-            "GK" => 1,
-            "DEF" => 2,
-            "MID" => 4,
-            "FWD" => 6,
+            "GK" => 0,
+            "DEF" => 1,
+            "MID" => 2,
+            "FWD" => 3,
             _ => 0
         };
 
@@ -330,8 +332,8 @@ public sealed class TrainingService(ITeamStore teamStore) : ITrainingService
             TransfermarketFee = Math.Max(1000m, player.Strength * 25m),
             TransfermarketMaxOffer = Math.Max(10_000m, player.Strength * 250m),
             HasIndividualTraining = hasIndividualTraining,
-            MainSkill = 0,
-            BonusSkills = [1, 2],
+            MainSkill = LegacyAppCompatibility.MainSkillIndex(player.Position),
+            BonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(player.Id),
             MarketValue = Math.Max(25_000m, player.Strength * 300m),
             Salary = Math.Max(1_000m, player.Strength * 12m),
             Origin = player.Origin,

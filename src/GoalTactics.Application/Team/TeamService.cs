@@ -53,13 +53,22 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
     public async Task<TeamDataResponse> GetMyTeamInfoAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        // Ensure training/progression ticks run before returning team info.
+        await teamStore.GetTeamResourcesAsync(team.TeamId, cancellationToken);
+
         var leagueId = await teamStore.GetLeagueIdForTeamAsync(team.TeamId, cancellationToken);
+        var leagueTable = await leagueStore.GetLeagueTableForUserAsync(userId, leagueId, cancellationToken);
+        team = team with { LeagueName = leagueTable.LeagueName };
+
         return new TeamDataResponse { Success = true, TeamData = BuildTeamData(team, leagueId, false) };
     }
 
     public async Task<ExtendedTeamDataResponse> GetMyTeamExtendedInfoAsync(string userId, CancellationToken cancellationToken = default)
     {
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+        // Ensure training/progression ticks run before returning extended info.
+        await teamStore.GetTeamResourcesAsync(team.TeamId, cancellationToken);
+
         var news = await teamStore.GetTeamNewsAsync(team.TeamId, cancellationToken);
         var stadium = await teamStore.GetStadiumStateAsync(userId, cancellationToken);
         var players = await teamStore.GetSquadPlayersAsync(userId, cancellationToken);
@@ -82,7 +91,7 @@ public sealed class TeamService(ITeamStore teamStore, ILeagueStore leagueStore) 
                 Country = LegacyAppCompatibility.NormalizeCountryCode(team.Country),
                 CountryName = team.CountryName,
                 LeagueId = leagueId,
-                LeagueName = team.LeagueName,
+                LeagueName = leagueTable.LeagueName,
                 HomeTrikot = selectedShirt ?? EquipmentCatalog.Shirts[0],
                 AwayTrikot = selectedShirt ?? EquipmentCatalog.Shirts[0],
                 MarketValue = team.MarketValue,

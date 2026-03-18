@@ -64,6 +64,7 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         var challengesBody = await challengesResponse.Content.ReadFromJsonAsync<ChallengesResponse>();
         Assert.NotNull(challengesBody);
         Assert.NotEmpty(challengesBody!.Challenges);
+        Assert.Equal(2, challengesBody.Challenges[0].MyTeam); // receiver should be team 2 (away)
 
         var challengeId = challengesBody.Challenges[0].Id;
         var replyResponse = await client.PostAsJsonAsync("/api/ReplyChallenge", new ChallengeReplyRequest { Id = challengeId, Accept = true });

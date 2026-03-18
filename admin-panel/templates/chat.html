@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}GoalTactics Chat{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Player & Bot Chat</h1>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div id="loginBox" {% if logged_in %}style="display:none;"{% endif %}>
+        <div class="toolbar" style="margin-bottom:0.75rem;">
+            <input id="email" type="text" placeholder="Account email/login" style="min-width:260px;">
+            <input id="password" type="password" placeholder="Password" style="min-width:220px;">
+            <button onclick="login()">Login</button>
+        </div>
+        <div class="card-sub">Login with your game account to chat globally, in your group, and privately with bots.</div>
+    </div>
+
+    <div id="chatBox" {% if not logged_in %}style="display:none;"{% endif %}>
+        <div class="toolbar" style="justify-content:space-between; align-items:center;">
+            <div>
+                <strong>Logged in as:</strong> <span id="managerName">{{ manager_name }}</span>
+            </div>
+            <div>
+                <button class="btn-sm" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="toolbar" style="margin-top:0.8rem;">
+            <select id="channel" onchange="channelChanged()">
+                <option value="global">Global Chat</option>
+                <option value="group">My Group Chat</option>
+                <option value="private">Private Bot Chat</option>
+            </select>
+            <select id="targetUser" style="min-width:260px; display:none;"></select>
+            <button class="btn-sm" onclick="loadContacts()">Reload Contacts</button>
+            <button class="btn-sm" onclick="loadHistory()">Refresh Chat</button>
+            <span id="groupInfo" class="card-sub"></span>
+        </div>
+
+        <div class="toolbar" style="margin-top:0.3rem;">
+            <button class="btn-sm" onclick="sendPreset('Can we schedule a friendly match?')">Ask for friendly match</button>
+            <button class="btn-sm" onclick="sendPreset('Please help me bidding on this player.')">Ask for bidding help</button>
+            <button class="btn-sm" onclick="sendPreset('Can you scout transfer targets for me?')">Ask for scouting help</button>
+        </div>
+
+        <div id="messages" class="log-container" style="max-height:55vh; margin-top:0.9rem;"></div>
+
+        <div class="toolbar" style="margin-top:0.8rem;">
+            <input id="messageInput" type="text" placeholder="Write a message..." style="flex:1; min-width:300px;">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let contacts = [];
+
+async function login() {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const res = await fetch('/chat/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if (!data.success) {
+        alert(data.message || 'Login failed');
+        return;
+    }
+
+    document.getElementById('managerName').textContent = data.managerName || '';
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('chatBox').style.display = '';
+    await loadContacts();
+    await loadHistory();
+}
+
+async function logout() {
+    await fetch('/chat/logout', {method: 'POST'});
+    document.getElementById('loginBox').style.display = '';
+    document.getElementById('chatBox').style.display = 'none';
+}
+
+async function loadContacts() {
+    const res = await fetch('/chat/api/contacts');
+    const data = await res.json();
+    if (!data.success) {
+        return;
+    }
+
+    contacts = data.contacts || [];
+    const select = document.getElementById('targetUser');
+    select.innerHTML = '';
+
+    for (const c of contacts) {
+        const opt = document.createElement('option');
+        opt.value = c.userId;
+        const suffix = c.isBot ? ' [BOT]' : '';
+        opt.textContent = `${c.name || c.userId}${suffix}${c.teamName ? ' - ' + c.teamName : ''}`;
+        select.appendChild(opt);
+    }
+
+    document.getElementById('groupInfo').textContent = data.groupKey ? `Group: ${data.groupKey}` : 'No active group detected.';
+}
+
+function channelChanged() {
+    const channel = document.getElementById('channel').value;
+    const target = document.getElementById('targetUser');
+    target.style.display = channel === 'private' ? '' : 'none';
+    loadHistory();
+}
+
+async function loadHistory() {
+    const channel = document.getElementById('channel').value;
+    const targetUser = document.getElementById('targetUser').value;
+    const qs = new URLSearchParams({channel});
+    if (channel === 'private' && targetUser) {
+        qs.set('targetUserId', targetUser);
+    }
+
+    const res = await fetch(`/chat/api/history?${qs.toString()}`);
+    const data = await res.json();
+    const box = document.getElementById('messages');
+    if (!data.success) {
+        box.textContent = data.message || 'Failed to load chat.';
+        return;
+    }
+
+    const msgs = data.messages || [];
+    box.innerHTML = msgs.map(m => {
+        const who = m.isMine ? 'You' : (m.name || 'User');
+        const when = m.date ? new Date(m.date).toLocaleString() : '';
+        return `<div class="log-line"><strong>${escapeHtml(who)}</strong> <span style="color:#6b7280">${escapeHtml(when)}</span><br>${escapeHtml(m.message || '')}</div><br>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+}
+
+async function sendMessage() {
+    const messageInput = document.getElementById('messageInput');
+    const message = messageInput.value.trim();
+    if (!message) return;
+
+    const channel = document.getElementById('channel').value;
+    const targetUserId = document.getElementById('targetUser').value;
+    const payload = {message, channel};
+    if (channel === 'private' && targetUserId) {
+        payload.targetUserId = targetUserId;
+    }
+
+    const res = await fetch('/chat/api/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data.success) {
+        alert(data.message || 'Failed to send');
+        return;
+    }
+
+    messageInput.value = '';
+    await loadHistory();
+}
+
+async function sendPreset(text) {
+    document.getElementById('messageInput').value = text;
+    await sendMessage();
+}
+
+function escapeHtml(input) {
+    return (input || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+{% if logged_in %}
+window.addEventListener('load', async () => {
+    await loadContacts();
+    await loadHistory();
+});
+{% endif %}
+</script>
+{% endblock %}

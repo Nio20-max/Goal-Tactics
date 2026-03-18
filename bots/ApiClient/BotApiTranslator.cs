@@ -39,6 +39,8 @@ public sealed class BotApiTranslator
             "SaveTeamTraining" => Build(normalized, true, SaveTrainingRequest(request), Ack("teamTrainingSaved", true)),
             "SaveIndividualTraining" => Build(normalized, true, IdRequest(request), Ack("individualTrainingSaved", true)),
             "BookTrainingCamp" => Build(normalized, true, BookTrainingCampRequest(request), Ack("trainingCampBooked", true)),
+            "UpdateCamps" => Build(normalized, true, Empty(), Ack("campsUpdated", true)),
+            "CancelCamp" => Build(normalized, true, Empty(), Ack("campCanceled", true)),
             "GetScoutedPlayers" => Build(normalized, response is ScoutedPlayersResponse r && r.Success, Empty(), ScoutedPlayersOutput(response as ScoutedPlayersResponse)),
             "InstructScout" => Build(normalized, true, InstructScoutRequest(request), Ack("scoutInstructionSent", true)),
             "RecruitScoutedPlayer" => Build(normalized, true, IdRequest(request), Ack("scoutedPlayerRecruited", true)),
@@ -373,13 +375,29 @@ public sealed class BotApiTranslator
             return Empty();
         }
 
-        return new Dictionary<string, object?>
+        var output = new Dictionary<string, object?>
         {
             ["mainSkillIndex"] = response.TeamTraining.MainSkillIndex,
             ["subSkillIndex"] = response.TeamTraining.SubSkillIndex,
             ["efficiencyValue"] = response.TeamTraining.EfficiencyValue,
             ["noTraining"] = response.TeamTraining.NoTraining
         };
+
+        if (response.TrainingCamp is not null)
+        {
+            output["trainingCamp"] = new Dictionary<string, object?>
+            {
+                ["bookedCampIdentifier"] = response.TrainingCamp.BookedCampIdentifier,
+                ["isUpdateEnabled"] = response.TrainingCamp.IsUpdateEnabled,
+                ["campItems"] = response.TrainingCamp.CampItems?.Select(item => new Dictionary<string, object?>
+                {
+                    ["identifier"] = item.Identifier,
+                    ["bookDate"] = item.BookDate
+                }).ToList() ?? new List<Dictionary<string, object?>>()
+            };
+        }
+
+        return output;
     }
 
     private static Dictionary<string, object?> SaveTrainingRequest(object? request)

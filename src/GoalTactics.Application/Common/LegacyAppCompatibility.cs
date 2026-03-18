@@ -141,12 +141,18 @@ public static class LegacyAppCompatibility
 
     public static int MapPositionCode(string position)
     {
+        // Legacy iOS/Android UI expects position codes in the range 0..3.
+        // The app interprets these codes as:
+        //   0 = Goalkeeper
+        //   1 = Defender
+        //   2 = Midfielder
+        //   3 = Forward
         return position switch
         {
             "GK" => 0,
-            "DEF" => 2,
-            "MID" => 4,
-            "FWD" => 6,
+            "DEF" => 1,
+            "MID" => 2,
+            "FWD" => 3,
             _ => 0
         };
     }
@@ -165,6 +171,8 @@ public static class LegacyAppCompatibility
 
     public static int[] BuildBonusSkills(string position)
     {
+        // Used for internal strength calculations (legacy behavior).
+        // Keep this deterministic and position-based to match existing formulas.
         return position switch
         {
             "GK" => [1, 13, 13, 12],
@@ -175,10 +183,26 @@ public static class LegacyAppCompatibility
         };
     }
 
-    public static decimal[] BuildSkills(decimal strength, string position, int talent, int age)
+    public static int[] BuildRandomBonusSkills(Guid playerId)
+    {
+        // Random but stable per player. Exclude the core "main" skill indices (0..3).
+        // Returns exactly 3 unique skill indices from 4..13.
+        var rng = new Random(HashCode.Combine(playerId, "bonus-skills"));
+        var choices = Enumerable.Range(4, 10).ToList();
+        var result = new List<int>(3);
+        for (int i = 0; i < 3; i++)
+        {
+            var index = rng.Next(choices.Count);
+            result.Add(choices[index]);
+            choices.RemoveAt(index);
+        }
+        return result.ToArray();
+    }
+
+    public static decimal[] BuildSkills(decimal strength, string position, int talent, int age, int[]? bonusSkillIndices = null)
     {
         var primarySkill = MainSkillIndex(position);
-        var bonusSkills = BuildBonusSkills(position);
+        var bonusSkills = bonusSkillIndices ?? BuildBonusSkills(position);
         var ageFactor = Math.Max(0.85m, 1.18m - (Math.Max(16, age) - 16m) / 60m);
         var talentFactor = 0.92m + (talent / 50m);
         var baseSkill = Math.Max(18m, strength * 0.48m * ageFactor * talentFactor);

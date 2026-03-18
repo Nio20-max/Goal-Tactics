@@ -1,3 +1,4 @@
+using GoalTactics.Application.Common;
 using GoalTactics.Contracts.League;
 
 namespace GoalTactics.Application.League;
@@ -122,7 +123,7 @@ public sealed class LeagueService(ILeagueStore leagueStore) : ILeagueService
                     Strength = s.Strength,
                     Talent = s.Talent,
                     Age = s.Age,
-                    Position = s.Position switch { "GK" => 0, "DEF" => 2, "MID" => 4, "FWD" => 6, _ => 4 },
+                    Position = LegacyAppCompatibility.MapPositionCode(s.Position),
                     EndDate = DateTime.UtcNow.Date.AddDays(14).ToString("O"),
                     TeamName = s.TeamName,
                     TeamLogo = s.TeamLogo,

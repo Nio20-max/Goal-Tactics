@@ -1,3 +1,4 @@
+using GoalTactics.Application.Common;
 using GoalTactics.Contracts.TransferMarket;
 using GoalTactics.Application.Team;
 
@@ -207,7 +208,7 @@ public sealed class TransferMarketService(ITeamStore teamStore, IAuctionStore au
             Bid = 0,
             BidIncrement = StartBidIncrement,
             MainSkill = 0,
-            BonusSkills = [1, 13, 13, 12],
+            BonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(auctionId),
             SellPrice = 0,
             TransfermarketFee = 0,
             TransfermarketMaxOffer = 0,
@@ -240,8 +241,9 @@ public sealed class TransferMarketService(ITeamStore teamStore, IAuctionStore au
         var mainSkill = player.Position switch
         {
             0 => 1,
-            4 => 3,
-            6 => 2,
+            1 => 0,
+            2 => 11,
+            3 => 6,
             _ => 0
         };
 
@@ -288,7 +290,7 @@ public sealed class TransferMarketService(ITeamStore teamStore, IAuctionStore au
             Origin = player.Country,
             Skills = skills,
             MainSkill = mainSkill,
-            BonusSkills = [1, 13, 13, 12],
+            BonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(player.Id),
             YellowCards = 0,
             HasRedCard = false,
             Injured = 0,

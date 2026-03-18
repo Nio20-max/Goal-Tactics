@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using GoalTactics.Bots.Client.Telemetry;
 
 namespace GoalTactics.Bots.Client.ApiClient;
 
@@ -16,6 +17,12 @@ public sealed class GoalTacticsApiClient : IDisposable
     {
         PropertyNameCaseInsensitive = true
     };
+    private SimulationAuditWriter? _auditWriter;
+    private string? _auditBotId;
+    private int? _auditSeason;
+    private int? _auditMatchday;
+    private string _auditPhase = "runtime";
+    private static readonly int[] RateLimitBackoffMs = [400, 900, 1800, 3200];
 
     public GoalTacticsApiClient(string baseUrl)
     {
@@ -30,6 +37,19 @@ public sealed class GoalTacticsApiClient : IDisposable
     public void ClearToken()
     {
         _http.DefaultRequestHeaders.Authorization = null;
+    }
+
+    public void ConfigureAuditWriter(SimulationAuditWriter? writer)
+    {
+        _auditWriter = writer;
+    }
+
+    public void SetAuditContext(string? botId, int? season, int? matchday, string phase)
+    {
+        _auditBotId = botId;
+        _auditSeason = season;
+        _auditMatchday = matchday;
+        _auditPhase = phase;
     }
 
     public void Dispose() => _http.Dispose();
@@ -72,7 +92,9 @@ public sealed class GoalTacticsApiClient : IDisposable
         }
 
         throw new HttpRequestException(
-            $"Request failed: {(int)response.StatusCode} {response.ReasonPhrase} at {endpoint}. Body: {body}");
+            $"Request failed: {(int)response.StatusCode} {response.ReasonPhrase} at {endpoint}. Body: {body}",
+            null,
+            response.StatusCode);
     }
 
     // ── Authentication (no auth required) ───────────────────────
@@ -135,7 +157,7 @@ public sealed class GoalTacticsApiClient : IDisposable
     // ── Training ────────────────────────────────────────────────
 
     public Task<TrainingResponse?> GetTeamTrainingAsync()
-        => PostAsync<TrainingResponse>("/api/GetTeamTraining");
+        => PostAsync<TrainingResponse>("/api/Training/GetTraining");
 
     public Task SaveTeamTrainingAsync(SaveTrainingRequest request)
         => PostAsync("/api/SaveTeamTraining", request);
@@ -144,7 +166,13 @@ public sealed class GoalTacticsApiClient : IDisposable
         => PostAsync("/api/SaveIndividualTraining", new IndividualTrainingRequest { Id = playerId });
 
     public Task BookTrainingCampAsync(BookTrainingCampRequest request)
-        => PostAsync("/api/BookTrainingCamp", request);
+        => PostAsync("/api/Training/BookCamp", request);
+
+    public Task UpdateCampsAsync()
+        => PostAsync("/api/Training/UpdateCamps");
+
+    public Task CancelCampAsync()
+        => PostAsync("/api/Training/CancelCamp");
 
     // ── Scouting ────────────────────────────────────────────────
 
@@ -229,59 +257,104 @@ public sealed class GoalTacticsApiClient : IDisposable
     public async Task<BotApiTranslation> ExecuteForBotAsync(string endpoint, object? request = null)
     {
         var normalized = BotApiTranslator.NormalizeEndpoint(endpoint);
+        var requestJson = SerializeForAudit(request);
 
-        return normalized switch
+        for (int attempt = 0; ; attempt++)
         {
-            "Register" => _botTranslator.Translate(normalized, request, await RegisterAsync(AsRequest<RegisterRequest>(request, normalized))),
-            "Login" => _botTranslator.Translate(normalized, request, await LoginAsync(AsRequest<LoginRequest>(request, normalized))),
-            "Ping" => _botTranslator.Translate(normalized, request, await PingAsync()),
-            "GetCountries" => _botTranslator.Translate(normalized, request, await GetCountriesAsync()),
-            "GetMyResources" => _botTranslator.Translate(normalized, request, await GetMyResourcesAsync()),
-            "GetMyTeamExtendedInfo" => _botTranslator.Translate(normalized, request, await GetMyTeamExtendedInfoAsync()),
-            "GetSquad" => _botTranslator.Translate(normalized, request, await GetSquadAsync()),
-            "GetSkillCards" => _botTranslator.Translate(normalized, request, await GetSkillCardsAsync()),
+            var started = DateTime.UtcNow;
+            try
+            {
+                var translation = normalized switch
+                {
+                    "Register" => _botTranslator.Translate(normalized, request, await RegisterAsync(AsRequest<RegisterRequest>(request, normalized))),
+                    "Login" => _botTranslator.Translate(normalized, request, await LoginAsync(AsRequest<LoginRequest>(request, normalized))),
+                    "Ping" => _botTranslator.Translate(normalized, request, await PingAsync()),
+                    "GetCountries" => _botTranslator.Translate(normalized, request, await GetCountriesAsync()),
+                    "GetMyResources" => _botTranslator.Translate(normalized, request, await GetMyResourcesAsync()),
+                    "GetMyTeamExtendedInfo" => _botTranslator.Translate(normalized, request, await GetMyTeamExtendedInfoAsync()),
+                    "GetSquad" => _botTranslator.Translate(normalized, request, await GetSquadAsync()),
+                    "GetSkillCards" => _botTranslator.Translate(normalized, request, await GetSkillCardsAsync()),
 
-            "UseSkillCard" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => UseSkillCardAsync(r.Id)),
-            "GetLineups" => _botTranslator.Translate(normalized, request, await GetLineupsAsync()),
-            "SaveLineup" => await ExecuteNoResultAsync(normalized, request, r => SaveLineupAsync(r), AsRequest<SaveLineupRequest>(request, normalized)),
+                    "UseSkillCard" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => UseSkillCardAsync(r.Id)),
+                    "GetLineups" => _botTranslator.Translate(normalized, request, await GetLineupsAsync()),
+                    "SaveLineup" => await ExecuteNoResultAsync(normalized, request, r => SaveLineupAsync(r), AsRequest<SaveLineupRequest>(request, normalized)),
 
-            "SearchTransfermarket" => _botTranslator.Translate(normalized, request, await SearchTransfermarketAsync(AsRequest<SearchTransfermarketRequest>(request, normalized))),
-            "BidPlayer" => _botTranslator.Translate(normalized, request, await BidPlayerAsync(AsRequest<BidRequest>(request, normalized))),
-            "GetTransfermarketFavourites" => _botTranslator.Translate(normalized, request, await GetTransfermarketFavouritesAsync()),
-            "UpdateTransfermarketFavourites" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => UpdateTransfermarketFavouritesAsync(r.Id)),
+                    "SearchTransfermarket" => _botTranslator.Translate(normalized, request, await SearchTransfermarketAsync(AsRequest<SearchTransfermarketRequest>(request, normalized))),
+                    "BidPlayer" => _botTranslator.Translate(normalized, request, await BidPlayerAsync(AsRequest<BidRequest>(request, normalized))),
+                    "GetTransfermarketFavourites" => _botTranslator.Translate(normalized, request, await GetTransfermarketFavouritesAsync()),
+                    "UpdateTransfermarketFavourites" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => UpdateTransfermarketFavouritesAsync(r.Id)),
 
-            "GetTeamTraining" => _botTranslator.Translate(normalized, request, await GetTeamTrainingAsync()),
-            "SaveTeamTraining" => await ExecuteNoResultAsync(normalized, request, r => SaveTeamTrainingAsync(r), AsRequest<SaveTrainingRequest>(request, normalized)),
-            "SaveIndividualTraining" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => SaveIndividualTrainingAsync(r.Id)),
-            "BookTrainingCamp" => await ExecuteNoResultAsync(normalized, request, r => BookTrainingCampAsync(r), AsRequest<BookTrainingCampRequest>(request, normalized)),
+                    "GetTeamTraining" => _botTranslator.Translate(normalized, request, await GetTeamTrainingAsync()),
+                    "SaveTeamTraining" => await ExecuteNoResultAsync(normalized, request, r => SaveTeamTrainingAsync(r), AsRequest<SaveTrainingRequest>(request, normalized)),
+                    "SaveIndividualTraining" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => SaveIndividualTrainingAsync(r.Id)),
+                    "BookTrainingCamp" => await ExecuteNoResultAsync(normalized, request, r => BookTrainingCampAsync(r), AsRequest<BookTrainingCampRequest>(request, normalized)),
+                    "UpdateCamps" => await ExecuteNoResultAsync(normalized, request, _ => UpdateCampsAsync(), new RequestObject()),
+                    "CancelCamp" => await ExecuteNoResultAsync(normalized, request, _ => CancelCampAsync(), new RequestObject()),
 
-            "GetScoutedPlayers" => _botTranslator.Translate(normalized, request, await GetScoutedPlayersAsync()),
-            "InstructScout" => await ExecuteNoResultAsync(normalized, request, r => InstructScoutAsync(r), AsRequest<InstructScoutRequest>(request, normalized)),
-            "RecruitScoutedPlayer" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => RecruitScoutedPlayerAsync(r.Id)),
+                    "GetScoutedPlayers" => _botTranslator.Translate(normalized, request, await GetScoutedPlayersAsync()),
+                    "InstructScout" => await ExecuteNoResultAsync(normalized, request, r => InstructScoutAsync(r), AsRequest<InstructScoutRequest>(request, normalized)),
+                    "RecruitScoutedPlayer" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => RecruitScoutedPlayerAsync(r.Id)),
 
-            "GetSponsorOffers" => _botTranslator.Translate(normalized, request, await GetSponsorOffersAsync()),
-            "AcceptSponsor" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => AcceptSponsorAsync(r.Id)),
+                    "GetSponsorOffers" => _botTranslator.Translate(normalized, request, await GetSponsorOffersAsync()),
+                    "AcceptSponsor" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => AcceptSponsorAsync(r.Id)),
 
-            "GetStadium" => _botTranslator.Translate(normalized, request, await GetStadiumAsync()),
-            "BuildStadium" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => BuildStadiumAsync(r.Id)),
-            "BuildPlaces" => await ExecuteNoResultAsync(normalized, request, r => BuildPlacesAsync(r), AsRequest<BuildPlacesRequest>(request, normalized)),
+                    "GetStadium" => _botTranslator.Translate(normalized, request, await GetStadiumAsync()),
+                    "BuildStadium" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => BuildStadiumAsync(r.Id)),
+                    "BuildPlaces" => await ExecuteNoResultAsync(normalized, request, r => BuildPlacesAsync(r), AsRequest<BuildPlacesRequest>(request, normalized)),
 
-            "GetFriends" => _botTranslator.Translate(normalized, request, await GetFriendsAsync(AsRequest<TextRequest>(request, normalized).Text)),
-            "Like" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => LikeAsync(r.Id)),
-            "Accept" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => AcceptFriendAsync(r.Id)),
-            "SendChallenge" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => SendChallengeAsync(r.Id)),
+                    "GetFriends" => _botTranslator.Translate(normalized, request, await GetFriendsAsync(AsRequest<TextRequest>(request, normalized).Text)),
+                    "Like" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => LikeAsync(r.Id)),
+                    "Accept" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => AcceptFriendAsync(r.Id)),
+                    "SendChallenge" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => SendChallengeAsync(r.Id)),
 
-            "PostChatMessage" => await ExecuteNoResultAsync(normalized, request, r => PostChatMessageAsync(r.Message), AsRequest<PostChatMessageRequest>(request, normalized)),
-            "GetChatHistory" => _botTranslator.Translate(normalized, request, await GetChatHistoryAsync()),
+                    "PostChatMessage" => await ExecuteNoResultAsync(normalized, request, r => PostChatMessageAsync(r.Message), AsRequest<PostChatMessageRequest>(request, normalized)),
+                    "GetChatHistory" => _botTranslator.Translate(normalized, request, await GetChatHistoryAsync()),
 
-            "GetLadder" => _botTranslator.Translate(normalized, request, await GetLadderAsync()),
-            "RunMatch" => await ExecuteNoResultAsync(normalized, request, r => RunMatchAsync(r.TeamId), AsRequest<RunMatchRequest>(request, normalized)),
-            "RestoreStamina" => await ExecuteNoResultAsync(normalized, request, _ => RestoreStaminaAsync(), new RequestObject()),
+                    "GetLadder" => _botTranslator.Translate(normalized, request, await GetLadderAsync()),
+                    "RunMatch" => await ExecuteNoResultAsync(normalized, request, r => RunMatchAsync(r.TeamId), AsRequest<RunMatchRequest>(request, normalized)),
+                    "RestoreStamina" => await ExecuteNoResultAsync(normalized, request, _ => RestoreStaminaAsync(), new RequestObject()),
 
-            "WatchAd" => _botTranslator.Translate(normalized, request, await WatchAdAsync()),
-            "ClaimDailyReward" => _botTranslator.Translate(normalized, request, await ClaimDailyRewardAsync()),
-            _ => throw new ArgumentOutOfRangeException(nameof(endpoint), endpoint, "Unsupported bot endpoint for translation.")
-        };
+                    "WatchAd" => _botTranslator.Translate(normalized, request, await WatchAdAsync()),
+                    "ClaimDailyReward" => _botTranslator.Translate(normalized, request, await ClaimDailyRewardAsync()),
+                    _ => throw new ArgumentOutOfRangeException(nameof(endpoint), endpoint, "Unsupported bot endpoint for translation.")
+                };
+
+                _auditWriter?.LogApiCall(
+                    _auditBotId,
+                    _auditSeason,
+                    _auditMatchday,
+                    _auditPhase,
+                    normalized,
+                    true,
+                    200,
+                    (long)(DateTime.UtcNow - started).TotalMilliseconds,
+                    requestJson,
+                    SerializeForAudit(translation.Output),
+                    null);
+                return translation;
+            }
+            catch (HttpRequestException ex) when (IsRateLimitException(ex) && attempt < RateLimitBackoffMs.Length)
+            {
+                await Task.Delay(RateLimitBackoffMs[attempt]);
+                continue;
+            }
+            catch (Exception ex)
+            {
+                _auditWriter?.LogApiCall(
+                    _auditBotId,
+                    _auditSeason,
+                    _auditMatchday,
+                    _auditPhase,
+                    normalized,
+                    false,
+                    ex is HttpRequestException hre && hre.StatusCode.HasValue ? (int)hre.StatusCode.Value : null,
+                    (long)(DateTime.UtcNow - started).TotalMilliseconds,
+                    requestJson,
+                    "",
+                    ex.Message);
+                throw;
+            }
+        }
     }
 
     private async Task<BotApiTranslation> ExecuteNoResultAsync<TRequest>(
@@ -313,4 +386,25 @@ public sealed class GoalTacticsApiClient : IDisposable
             $"Endpoint '{endpoint}' expects request type {typeof(TRequest).Name}, but got {request.GetType().Name}.",
             nameof(request));
     }
+
+    private static string SerializeForAudit(object? value)
+    {
+        if (value is null)
+        {
+            return "null";
+        }
+
+        try
+        {
+            return JsonSerializer.Serialize(value, JsonOptions);
+        }
+        catch
+        {
+            return JsonSerializer.Serialize(new { value = value.ToString() ?? value.GetType().Name }, JsonOptions);
+        }
+    }
+
+    private static bool IsRateLimitException(HttpRequestException ex)
+        => ex.Message.Contains("429 Too Many Requests", StringComparison.OrdinalIgnoreCase)
+           || ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests;
 }

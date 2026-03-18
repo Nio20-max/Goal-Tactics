@@ -232,10 +232,21 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
 
         var skillCards = await teamStore.GetSkillCardsAsync(userId, cancellationToken);
 
-        // If the client selected a card, try to use it; otherwise, pick the best available card.
+        // If a specific card is requested, pick that card; otherwise pick the best available.
+        // Normalize incoming skill index (legacy clients may send 1-based indexes).
+        int NormalizeSkillCardIndex(int skill)
+        {
+            if (skill >= 1 && skill <= TeamStrengthCalculator.NumberOfSkills)
+            {
+                return skill - 1;
+            }
+
+            return Math.Clamp(skill, 0, TeamStrengthCalculator.NumberOfSkills - 1);
+        }
+
         var cardToUse = selectedCard is null
             ? skillCards.OrderByDescending(c => c.Bonus).ThenByDescending(c => c.Rarity).FirstOrDefault()
-            : skillCards.FirstOrDefault(c => c.Skill == selectedCard.Skill && c.Rarity == selectedCard.Rarity && c.Bonus == selectedCard.Bonus);
+            : skillCards.FirstOrDefault(c => c.Skill == NormalizeSkillCardIndex(selectedCard.Skill) && c.Rarity == selectedCard.Rarity && c.Bonus == selectedCard.Bonus);
 
         if (cardToUse is null)
         {
@@ -317,7 +328,7 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
             Age = x.Age,
             Position = LegacyAppCompatibility.MapPositionCode(x.Position),
             EndDate = x.ContractEndUtc?.ToString("O"),
-            Experience = LegacyAppCompatibility.BuildExperience(x.Strength, x.Age, x.Matches),
+            Experience = x.Experience,
             Fitness = (int)x.Fitness,
             Body = x.Body,
             Gloves = x.Gloves,
@@ -327,7 +338,7 @@ public sealed class SquadService(ITeamStore teamStore, ContractCostService contr
             Origin = x.Origin,
             Skills = x.Skills,
             MainSkill = LegacyAppCompatibility.MainSkillIndex(x.Position),
-            BonusSkills = LegacyAppCompatibility.BuildBonusSkills(x.Position),
+            BonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(x.Id),
             YellowCards = x.YellowCards,
             HasRedCard = x.RedCards > 0,
             Injured = 0,

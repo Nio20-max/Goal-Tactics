@@ -34,6 +34,8 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
     private static readonly string[] LastNames = ["Weber", "Koch", "Müller", "Fischer", "Bauer", "Krause", "Wolf", "Braun", "Neumann", "Lang",
         "Richter", "Berger", "Schmid", "Hartmann", "Kaiser", "Peters", "Jung", "Scholz", "Roth", "Hahn"];
     private static readonly string[] Origins = ["Deutschland", "Österreich", "Schweiz", "Niederlande", "Frankreich", "England"];
+    // The API and legacy clients both use the scouting order:
+    //   0 = GK, 1 = DEF, 2 = MID, 3 = FWD
     private static readonly string[] Positions = ["GK", "DEF", "MID", "FWD"];
 
     public async Task<ScoutingPlayersResponse> GetScoutedPlayersAsync(string userId, CancellationToken cancellationToken = default)
@@ -95,7 +97,7 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
             Age = p.Age,
             Position = LegacyAppCompatibility.MapPositionCode(p.Position),
             EndDate = p.ContractEndUtc?.ToString("O"),
-            Experience = LegacyAppCompatibility.BuildExperience(p.Strength, p.Age, p.Matches),
+            Experience = p.Experience,
             Fitness = (int)p.Fitness,
             Body = p.Body,
             Gloves = p.Gloves,
@@ -105,7 +107,7 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
             Origin = p.Origin,
             Skills = p.Skills,
             MainSkill = LegacyAppCompatibility.MainSkillIndex(p.Position),
-            BonusSkills = LegacyAppCompatibility.BuildBonusSkills(p.Position),
+            BonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(p.Id),
             YellowCards = p.YellowCards,
             HasRedCard = p.RedCards > 0,
             Injured = 0,
@@ -156,13 +158,16 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
         if (request.Position.HasValue)
         {
             var posValue = request.Position.Value;
-            if (posValue >= 0 && posValue < Positions.Length)
+
+            var map = Positions;
+
+            if (posValue >= 0 && posValue < map.Length)
             {
-                posFilter = Positions[posValue];
+                posFilter = map[posValue];
             }
-            else if (posValue >= 1 && posValue <= Positions.Length)
+            else if (posValue >= 1 && posValue <= map.Length)
             {
-                posFilter = Positions[posValue - 1];
+                posFilter = map[posValue - 1];
             }
         }
 
