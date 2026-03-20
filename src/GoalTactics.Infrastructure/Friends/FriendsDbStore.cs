@@ -359,7 +359,10 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
         var homeTeam = await GetOrCreateTeamAsync(userId, cancellationToken);
         var awayTeam = await GetOrCreateTeamAsync(targetUserId, cancellationToken);
 
-        var matchDate = DateTime.UtcNow.AddHours(12);
+        var nowUtc = DateTime.UtcNow;
+        var todayAt13Utc = new DateTime(nowUtc.Year, nowUtc.Month, nowUtc.Day, 13, 0, 0, DateTimeKind.Utc);
+        var matchDate = nowUtc < todayAt13Utc ? todayAt13Utc : todayAt13Utc.AddDays(1);
+
         dbContext.FriendlyChallenges.Add(new FriendlyChallengeEntity
         {
             Id = Guid.NewGuid().ToString("N"),
@@ -370,7 +373,7 @@ public sealed class FriendsDbStore(GoalTacticsDbContext dbContext) : IFriendsSto
             Status = PendingStatus,
             MatchDateUtc = matchDate,
             EndDateUtc = matchDate.AddHours(4),
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = nowUtc
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);

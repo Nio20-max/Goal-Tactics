@@ -158,37 +158,32 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
         if (request.Position.HasValue)
         {
             var posValue = request.Position.Value;
-            var map = Positions;
 
-            // Legacy premium scout clients often use transfer-like even codes (0/2/4/6).
-            // Handle that format first to avoid misreading 2 as MID instead of DEF.
-            posFilter = posValue switch
+            // Keep a strict API format: only accept 0..3
+            // 0=GK, 1=DEF, 2=MID, 3=FWD
+            if (posValue >= 0 && posValue < Positions.Length)
             {
-                0 => "GK",
-                2 => "DEF",
-                4 => "MID",
-                6 => "FWD",
-                _ => null
-            };
-
-            if (string.IsNullOrWhiteSpace(posFilter))
-            {
-                // Some clients send 1-based values (1..4).
-                if (posValue >= 1 && posValue <= map.Length)
-                {
-                    posFilter = map[posValue - 1];
-                }
-                // Canonical API values use 0..3.
-                else if (posValue >= 0 && posValue < map.Length)
-                {
-                    posFilter = map[posValue];
-                }
+                posFilter = Positions[posValue];
             }
         }
 
-        posFilter ??= request.PositionFilter;
+        if (string.IsNullOrWhiteSpace(posFilter) && !string.IsNullOrWhiteSpace(request.PositionFilter))
+        {
+            var filter = request.PositionFilter.Trim();
+            if (int.TryParse(filter, out var filterInt) && filterInt >= 0 && filterInt < Positions.Length)
+            {
+                posFilter = Positions[filterInt];
+            }
+            else if (string.Equals(filter, "GK", StringComparison.OrdinalIgnoreCase)
+                  || string.Equals(filter, "DEF", StringComparison.OrdinalIgnoreCase)
+                  || string.Equals(filter, "MID", StringComparison.OrdinalIgnoreCase)
+                  || string.Equals(filter, "FWD", StringComparison.OrdinalIgnoreCase))
+            {
+                posFilter = filter.ToUpperInvariant();
+            }
+        }
 
-        // Premium scouts should always use a specific position; if none is provided, default to GK.
+        // Premium scouts should always use GK if no position was explicitly set.
         if (isPremium && string.IsNullOrWhiteSpace(posFilter))
         {
             posFilter = "GK";

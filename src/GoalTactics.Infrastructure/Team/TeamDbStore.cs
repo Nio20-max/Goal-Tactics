@@ -2270,7 +2270,7 @@ public sealed class TeamDbStore(
         var team = await GetOrCreateMyTeamAsync(userId, cancellationToken);
         var now = DateTime.UtcNow;
         var players = await dbContext.TeamPlayers.AsNoTracking()
-            .Where(x => x.TeamId == team.TeamId && x.IsScouted && (x.ScoutingReadyAtUtc == null || x.ScoutingReadyAtUtc <= now))
+            .Where(x => x.TeamId == team.TeamId && x.IsScouted && (x.ScoutingReadyAtUtc == null || x.ScoutingReadyAtUtc <= now) && x.ContractEndUtc.HasValue && x.ContractEndUtc > now)
             .ToListAsync(cancellationToken);
         return players.Select(MapPlayer).ToArray();
     }
@@ -2304,7 +2304,7 @@ public sealed class TeamDbStore(
             IsScouted = true,
             IsPremiumScouting = isPremiumScouting,
             ScoutingReadyAtUtc = readyAtUtc,
-            ContractEndUtc = DateTime.UtcNow.AddDays(90),
+            ContractEndUtc = DateTime.UtcNow.AddHours(48),
             Head = LegacyAppCompatibility.BuildHeadId(playerId),
             Body = LegacyAppCompatibility.BuildBodyId(playerId),
             Gloves = LegacyAppCompatibility.BuildGlovesId(playerId, position == "GK"),

@@ -1,3 +1,4 @@
+using GoalTactics.Application.Common;
 using GoalTactics.Application.TransferMarket;
 using GoalTactics.Contracts.TransferMarket;
 using GoalTactics.Infrastructure.Persistence;
@@ -13,6 +14,7 @@ public sealed class AuctionDbStoreTests : IDisposable
     private readonly SqliteConnection _connection;
     private readonly GoalTacticsDbContext _dbContext;
     private readonly AuctionDbStore _store;
+    private readonly FakeNotificationService _notificationService;
 
     public AuctionDbStoreTests()
     {
@@ -25,13 +27,31 @@ public sealed class AuctionDbStoreTests : IDisposable
 
         _dbContext = new GoalTacticsDbContext(options);
         _dbContext.Database.EnsureCreated();
-        _store = new AuctionDbStore(_dbContext);
+        _notificationService = new FakeNotificationService();
+        _store = new AuctionDbStore(_dbContext, _notificationService);
     }
 
     public void Dispose()
     {
         _dbContext.Dispose();
         _connection.Dispose();
+    }
+
+    private sealed class FakeNotificationService : INotificationService
+    {
+        public int CallCount { get; private set; }
+        public string? UserId { get; private set; }
+        public string? Subject { get; private set; }
+        public string? Message { get; private set; }
+
+        public Task SendUserNotificationAsync(string userId, string subject, string message, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            UserId = userId;
+            Subject = subject;
+            Message = message;
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]
@@ -91,6 +111,29 @@ public sealed class AuctionDbStoreTests : IDisposable
         var auction = await _dbContext.Auctions.FirstAsync(a => a.Id == auctionId.ToString("N"));
         Assert.Equal(1500, auction.CurrentBid);
         Assert.Equal("team-1", auction.CurrentBidderTeamId);
+    }
+
+    [Fact]
+    public async Task PlaceBid_SendsOutbidNotification_ToPreviousBidder()
+    {
+        // setup user, team and preferences for previous bidder
+        _dbContext.Users.Add(new UserEntity { Id = "previous-user", ManagerName = "Prev User", Email = "prev@test.com", PasswordHash = "hash", CreatedAtUtc = DateTime.UtcNow });
+        _dbContext.Teams.Add(new TeamEntity { Id = "prev-team", UserId = "previous-user", Name = "Previous FC", Country = "DE", CountryName = "Deutschland", LeagueName = "Amateur", MarketValue = 100000, Mood = 50, TeamMood = "Neutral", Wins = 0, Losses = 0, Fans = 100, Members = 100, Strength = 50, MatchTrend = "Stable", StadiumName = "Arena", GrassQuality = 100, LeagueTier = 1 });
+        _dbContext.UserPreferences.Add(new UserPreferencesEntity { UserId = "previous-user", SystemNotifications = true, AuctionOverbid = true, AuctionEnd = true, MatchResults = true, LineupIncomplete = true, FriendInvite = true, IneffectiveTraining = true, FriendlyMatch = true });
+        await _dbContext.SaveChangesAsync();
+
+        var auctionId = await SeedAuction(minimumBid: 1000, currentBid: 1000, currentBidderTeamId: "prev-team", currentBidderTeamName: "Previous FC");
+
+        var result = await _store.PlaceBidAsync(auctionId, "team-1", "Team One", null, 1500);
+
+        Assert.True(result);
+        Assert.Equal(1, _notificationService.CallCount);
+        Assert.Equal("previous-user", _notificationService.UserId);
+        Assert.Equal("Transfer market: You were outbid", _notificationService.Subject);
+        Assert.Contains("Team One", _notificationService.Message);
+
+        var mail = await _dbContext.TeamMail.FirstOrDefaultAsync(x => x.UserId == "previous-user");
+        Assert.Null(mail);
     }
 
     [Fact]
@@ -233,7 +276,9 @@ public sealed class AuctionDbStoreTests : IDisposable
         long minimumBid = 10000,
         long currentBid = 0,
         int playerAge = 25,
-        int secondsRemaining = 3600)
+        int secondsRemaining = 3600,
+        string? currentBidderTeamId = null,
+        string? currentBidderTeamName = null)
     {
         var id = Guid.NewGuid();
         _dbContext.Auctions.Add(new AuctionEntity
@@ -248,6 +293,8 @@ public sealed class AuctionDbStoreTests : IDisposable
             PlayerAge = playerAge,
             MinimumBid = minimumBid,
             CurrentBid = currentBid,
+            CurrentBidderTeamId = currentBidderTeamId,
+            CurrentBidderTeamName = currentBidderTeamName,
             EndDateUtc = DateTime.UtcNow.AddSeconds(secondsRemaining),
             Status = "Active",
             CreatedAtUtc = DateTime.UtcNow

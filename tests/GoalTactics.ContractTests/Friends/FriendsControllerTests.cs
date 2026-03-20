@@ -39,7 +39,13 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         Assert.NotNull(incomingFriendsBody);
         Assert.True(incomingFriendsBody!.Success);
         Assert.NotEmpty(incomingFriendsBody.Friends);
-        Assert.True(incomingFriendsBody.Friends[0].IsLiked);
+        if (!incomingFriendsBody.Requests.Any())
+        {
+            var debugFriends = string.Join("; ", incomingFriendsBody.Friends.Select(f => $"[IsLiked={f.IsLiked}, MyLike={f.MyLike}, LikesMe={f.LikesMe}, IsRequestIncoming={f.IsRequestIncoming}, IsRequestOutgoing={f.IsRequestOutgoing}, IsFriend={f.IsFriend}]") );
+            throw new InvalidOperationException($"No requests. friends={incomingFriendsBody.Friends.Count}, requestCount={incomingFriendsBody.Requests.Count}, friends-debug={debugFriends}");
+        }
+        var firstFriend = incomingFriendsBody.Friends[0];
+        Assert.True(firstFriend.IsLiked, $"IsLiked={firstFriend.IsLiked}, MyLike={firstFriend.MyLike}, LikesMe={firstFriend.LikesMe}, IsRequestIncoming={firstFriend.IsRequestIncoming}, IsRequestOutgoing={firstFriend.IsRequestOutgoing}, IsFriend={firstFriend.IsFriend}");
 
         var friendTeamId = incomingFriendsBody.Friends[0].ForeignTeamId;
         var acceptResponse = await client.PostAsJsonAsync("/api/Accept", new IdRequest { Id = friendTeamId });
@@ -51,6 +57,7 @@ public sealed class FriendsControllerTests : IClassFixture<WebApplicationFactory
         var friendsAfterAcceptBody = await friendsAfterAcceptResponse.Content.ReadFromJsonAsync<FriendsResponse>();
         Assert.NotNull(friendsAfterAcceptBody);
         Assert.Contains(friendsAfterAcceptBody!.Friends, x => x.ForeignTeamId == teamBId);
+        Assert.DoesNotContain(friendsAfterAcceptBody.Requests, x => x.ForeignTeamId == teamBId);
 
         var sendChallengeResponse = await client.PostAsJsonAsync("/api/SendChallenge", new IdRequest { Id = teamBId });
         Assert.Equal(HttpStatusCode.OK, sendChallengeResponse.StatusCode);

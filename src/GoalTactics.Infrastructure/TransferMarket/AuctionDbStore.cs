@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GoalTactics.Infrastructure.TransferMarket;
 
-public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionStore
+public sealed class AuctionDbStore(GoalTacticsDbContext dbContext, INotificationService? notificationService = null) : IAuctionStore
 {
     private static readonly string[] HeadVariants =
     [
@@ -651,6 +651,13 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
             {
                 return;
             }
+        }
+
+        // Prefer realtime push notifications; fallback to team mail when push service is unavailable.
+        if (notificationService is not null)
+        {
+            await notificationService.SendUserNotificationAsync(team.UserId, subject, message, ct);
+            return;
         }
 
         dbContext.TeamMail.Add(new TeamMailEntity

@@ -35,7 +35,7 @@ public sealed class SquadControllerTests : IClassFixture<WebApplicationFactory<P
         Assert.All(squadBody.Players, player => Assert.DoesNotContain("Player ", player.Name ?? string.Empty));
         Assert.All(squadBody.Players, player => Assert.False(string.IsNullOrWhiteSpace(player.Head)));
         Assert.Contains(squadBody.Players, player => player.Position == 0);
-        Assert.Contains(squadBody.Players, player => player.Position == 3);
+        Assert.Contains(squadBody.Players, player => player.Position == 6);
 
         var skillCardsResponse = await client.PostAsJsonAsync("/api/Squad/GetSkillCards", new RequestObject());
         Assert.Equal(HttpStatusCode.OK, skillCardsResponse.StatusCode);

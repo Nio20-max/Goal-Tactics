@@ -13,11 +13,22 @@ namespace GoalTactics.Bots.Client.Behaviors;
 public sealed class TrainingBehavior
 {
     private readonly BotDatabase _db;
+    private readonly BotActionNeuralPolicy _actionPolicy;
     private readonly Random _rng = new();
 
-    public TrainingBehavior(BotDatabase db)
+    public TrainingBehavior(BotDatabase db, BotActionNeuralPolicy actionPolicy)
     {
         _db = db;
+        _actionPolicy = actionPolicy;
+    }
+
+    private sealed class SquadStats
+    {
+        public int SquadSize { get; init; }
+        public double AverageAge { get; init; }
+        public double YoungPlayerShare { get; init; }
+        public double AverageTalent { get; init; }
+        public double AverageStrength { get; init; }
     }
 
     private sealed class PlayerSnapshot
@@ -56,17 +67,38 @@ public sealed class TrainingBehavior
         var training = await api.ExecuteForBotAsync("GetTeamTraining");
         if (!training.Success) return;
 
+        var resources = await api.ExecuteForBotAsync("GetMyResources");
+        var squad = await api.ExecuteForBotAsync("GetSquad");
+
         var trainingData = BotApiTranslationReader.GetObject(training, "teamTraining") ?? training.Output;
         int currentMain = BotApiTranslationReader.GetInt(trainingData, "mainSkillIndex", 0);
         int currentSub = BotApiTranslationReader.GetInt(trainingData, "subSkillIndex", 4);
+
+        var players = squad.Success
+            ? BotApiTranslationReader.GetObjectList(squad, "players").Select(ToPlayer).ToList()
+            : new List<PlayerSnapshot>();
+        var squadStats = BuildSquadStats(players);
+        var money = resources.Success ? BotApiTranslationReader.GetDecimal(resources.Output, "money") : 0;
+        var stars = resources.Success ? BotApiTranslationReader.GetDecimal(resources.Output, "gtStars") : 0;
+        var trainingIntent = _actionPolicy.PredictTrainingProbability(bot, new TrainingDecisionInput
+        {
+            Money = (double)money,
+            Stars = (double)stars,
+            SquadSize = squadStats.SquadSize,
+            AverageAge = squadStats.AverageAge,
+            YoungPlayerShare = squadStats.YoungPlayerShare,
+            AverageTalent = squadStats.AverageTalent,
+            AverageStrength = squadStats.AverageStrength
+        });
 
         // Keep main in [0..3], sub in [4..13] with deterministic daily rotation.
         int daySeed = DateTime.UtcNow.DayOfYear + Math.Abs(HashCode.Combine(bot.BotId, bot.YouthFocus));
         int desiredMain = Math.Abs(daySeed) % 4;
         int desiredSub = 4 + (Math.Abs(daySeed / 3 + bot.YouthFocus) % 10);
 
-        // Preserve occasional continuity so efficiency decay does not dominate long windows.
-        bool keepCurrent = _rng.NextDouble() < 0.30;
+        // Preserve continuity more often when the model says to stabilize training.
+        var keepChance = 0.15 + (trainingIntent * 0.55);
+        bool keepCurrent = _rng.NextDouble() < Math.Clamp(keepChance, 0.10, 0.75);
         int mainSkillIndex = keepCurrent ? Math.Clamp(currentMain, 0, 3) : desiredMain;
         int subSkillIndex = keepCurrent ? Math.Clamp(currentSub, 4, 13) : desiredSub;
 
@@ -229,6 +261,8 @@ public sealed class TrainingBehavior
             .ToList();
         if (players.Count == 0) return;
 
+        var squadStats = BuildSquadStats(players);
+
         var scoutedPriorityIds = GetRecentScoutedPlayerIds(bot);
 
         // Prioritize fresh scouted youth, then youngest players with weak core skill.
@@ -264,6 +298,23 @@ public sealed class TrainingBehavior
         }
 
         int stars = BotApiTranslationReader.GetInt(resources.Output, "gtStars");
+        int money = BotApiTranslationReader.GetInt(resources.Output, "money");
+
+        var intentInput = new TrainingDecisionInput
+        {
+            Money = money,
+            Stars = stars,
+            SquadSize = squadStats.SquadSize,
+            AverageAge = squadStats.AverageAge,
+            YoungPlayerShare = squadStats.YoungPlayerShare,
+            AverageTalent = squadStats.AverageTalent,
+            AverageStrength = squadStats.AverageStrength
+        };
+        var trainProbability = _actionPolicy.PredictTrainingProbability(bot, intentInput);
+        var modelCount = (int)Math.Round(trainProbability * 6, MidpointRounding.AwayFromZero);
+        count = Math.Max(count, modelCount);
+        count = Math.Min(count, youngPlayers.Count);
+
         int affordableTrainings = Math.Max(0, stars / 1000);
         count = Math.Min(count, affordableTrainings);
         if (count <= 0)
@@ -292,11 +343,13 @@ public sealed class TrainingBehavior
             }
 
             int skillIndex = ChooseIndividualSkillIndex(latestTarget, i);
-            await api.ExecuteForBotAsync("SaveIndividualTraining", new IndividualTrainingRequest
+            var saveResult = await api.ExecuteForBotAsync("SaveIndividualTraining", new IndividualTrainingRequest
             {
                 Id = targetId,
                 SkillIndex = skillIndex
             });
+
+            _actionPolicy.LearnFromTrainingOutcome(bot, intentInput, saveResult.Success);
         }
     }
 
@@ -310,20 +363,33 @@ public sealed class TrainingBehavior
             return;
         }
 
-        // Probability of scouting scales with youth focus
-        double scoutChance = bot.YouthFocus / 99.0;
-        if (nightPlan is not null)
-        {
-            scoutChance = Math.Clamp((nightPlan.ScoutIntensity / 100.0 + scoutChance) / 2.0, 0.05, 0.98);
-        }
-
-        if (_rng.NextDouble() > scoutChance) return;
-
         var scouted = await api.ExecuteForBotAsync("GetScoutedPlayers");
         if (!scouted.Success) return;
 
+        var resources = await api.ExecuteForBotAsync("GetMyResources");
+        var squad = await api.ExecuteForBotAsync("GetSquad");
+        var squadStats = squad.Success
+            ? BuildSquadStats(BotApiTranslationReader.GetObjectList(squad, "players").Select(ToPlayer).ToList())
+            : new SquadStats();
+
         int pendingScoutCount = BotApiTranslationReader.GetInt(scouted.Output, "pendingScoutCount");
         int maxSimultaneousScouts = BotApiTranslationReader.GetInt(scouted.Output, "maxSimultaneousScouts", 3);
+        var scoutInput = new ScoutDecisionInput
+        {
+            Money = resources.Success ? (double)BotApiTranslationReader.GetDecimal(resources.Output, "money") : 0,
+            Stars = resources.Success ? (double)BotApiTranslationReader.GetDecimal(resources.Output, "gtStars") : 0,
+            SquadSize = squadStats.SquadSize,
+            AverageAge = squadStats.AverageAge,
+            YoungPlayerShare = squadStats.YoungPlayerShare,
+            PendingScouts = pendingScoutCount,
+            MaxScouts = maxSimultaneousScouts,
+            ScoutIntensitySignal = nightPlan is null ? bot.YouthFocus / 100.0 : nightPlan.ScoutIntensity / 100.0
+        };
+
+        // Probability of scouting uses both heuristics and action-network output.
+        double scoutChance = _actionPolicy.PredictScoutProbability(bot, scoutInput);
+        if (_rng.NextDouble() > Math.Clamp(scoutChance, 0.05, 0.98)) return;
+
         if (pendingScoutCount < maxSimultaneousScouts)
         {
             await api.ExecuteForBotAsync("InstructScout", new InstructScoutRequest());
@@ -349,7 +415,6 @@ public sealed class TrainingBehavior
         if (players.Count == 0) return;
 
         // Determine current squad composition to set recruitment standards.
-        var squad = await api.ExecuteForBotAsync("GetSquad");
         double avgAge = 0;
         double pctYoung = 0;
 
@@ -385,8 +450,12 @@ public sealed class TrainingBehavior
             return;
         }
 
-        await api.ExecuteForBotAsync("RecruitScoutedPlayer", new IdRequest { Id = best.Id });
-        RememberScoutedRecruit(bot, best.Id);
+        var recruitResult = await api.ExecuteForBotAsync("RecruitScoutedPlayer", new IdRequest { Id = best.Id });
+        _actionPolicy.LearnFromScoutOutcome(bot, scoutInput, recruitResult.Success);
+        if (recruitResult.Success)
+        {
+            RememberScoutedRecruit(bot, best.Id);
+        }
     }
 
     private HashSet<string> GetRecentScoutedPlayerIds(BotRecord bot)
@@ -509,4 +578,28 @@ public sealed class TrainingBehavior
             Talent = BotApiTranslationReader.GetInt(data, "talent"),
             Strength = BotApiTranslationReader.GetInt(data, "strength")
         };
+
+    private static SquadStats BuildSquadStats(IReadOnlyList<PlayerSnapshot> players)
+    {
+        if (players.Count == 0)
+        {
+            return new SquadStats
+            {
+                SquadSize = 0,
+                AverageAge = 0,
+                YoungPlayerShare = 0,
+                AverageTalent = 0,
+                AverageStrength = 0
+            };
+        }
+
+        return new SquadStats
+        {
+            SquadSize = players.Count,
+            AverageAge = players.Average(p => Math.Max(0, p.Age)),
+            YoungPlayerShare = players.Count(p => p.Age is > 0 and <= 23) / (double)players.Count,
+            AverageTalent = players.Average(p => Math.Max(0, p.Talent)),
+            AverageStrength = players.Average(p => (double)Math.Max(0, p.Strength))
+        };
+    }
 }

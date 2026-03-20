@@ -44,16 +44,16 @@ public sealed class LineupControllerTests : IClassFixture<WebApplicationFactory<
         Assert.NotEmpty(matchLineupBody.Systems);
         Assert.NotEmpty(matchLineupBody.Players);
 
-        // Legacy lineup payload uses 0..3 for GK/DEF/MID/FWD.
-        var allowedPositionCodes = new HashSet<int> { 0, 1, 2, 3 };
+        // Lineup payload uses the transfer-style position codes: 0=GK, 2=DEF, 4=MID, 6=FWD.
+        var allowedPositionCodes = new HashSet<int> { 0, 2, 4, 6 };
         Assert.All(matchLineupBody.Players, p => Assert.Contains(p.Position, allowedPositionCodes));
 
         // Starting lineup should show a 4-3-3 composition (1 GK, 4 DEF, 3 MID, 3 FWD) in the first 11 players.
         var starters = matchLineupBody.Players.Take(11).ToList();
         Assert.Equal(1, starters.Count(p => p.Position == 0));
-        Assert.Equal(4, starters.Count(p => p.Position == 1));
-        Assert.Equal(3, starters.Count(p => p.Position == 2));
-        Assert.Equal(3, starters.Count(p => p.Position == 3));
+        Assert.Equal(4, starters.Count(p => p.Position == 2));
+        Assert.Equal(3, starters.Count(p => p.Position == 4));
+        Assert.Equal(3, starters.Count(p => p.Position == 6));
 
         // All returned players should have a non-zero strength.
         Assert.All(matchLineupBody.Players, p => Assert.True(p.Strength > 0));
@@ -70,6 +70,9 @@ public sealed class LineupControllerTests : IClassFixture<WebApplicationFactory<
             Guid.Parse("16768A3B-38C8-444A-B2EB-24BACA5C40EA")  // Striker
         };
         Assert.All(firstPlayer.Positions!, p => Assert.True(validPositionIds.Contains(p.PositionId)));
+        Assert.All(firstPlayer.PositionStrengths!, p => Assert.Contains(p.Position, new[] { 0, 2, 4, 6 }));
+        Assert.Equal(firstPlayer.Strength,
+            firstPlayer.PositionStrengths!.Single(p => p.Position == firstPlayer.Position).Strength);
 
         // The formation should include a MatchStandardPositionID collection (may be empty if no special roles are assigned).
         Assert.All(matchLineupBody.FormationData!.Players, p => Assert.NotNull(p.MatchStandardPositionID));

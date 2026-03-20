@@ -480,25 +480,26 @@ public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore
 
     private static MatchLineupPlayerData MapLineupPlayer(SquadPlayerRecord x)
     {
-        // Legacy lineup payload expects canonical position codes in range 0..3.
-        // (0=GK, 1=DEF, 2=MID, 3=FWD)
-        var posCode = x.Position switch
-        {
-            "GK" => 0,
-            "DEF" => 1,
-            "MID" => 2,
-            "FWD" => 3,
-            _ => 0
-        };
+        // Lineup position codes need to match the same legacy transfer-style mapping used across
+        // the API: 0=GK, 2=DEF, 4=MID, 6=FWD.
+        var posCode = LegacyAppCompatibility.MapLineupPositionCode(x.Position);
 
         var baseStrength = x.Strength;
         var fallbackStrength = Math.Max(10m, baseStrength * 0.6m);
         var positions = new List<PositionStrengthById>
         {
             new() { PositionId = PosGK, Strength = posCode == 0 ? baseStrength : fallbackStrength },
-            new() { PositionId = PosDEF, Strength = posCode == 1 ? baseStrength : fallbackStrength },
-            new() { PositionId = PosMID, Strength = posCode == 2 ? baseStrength : fallbackStrength },
-            new() { PositionId = PosFWD, Strength = posCode == 3 ? baseStrength : fallbackStrength }
+            new() { PositionId = PosDEF, Strength = posCode == 2 ? baseStrength : fallbackStrength },
+            new() { PositionId = PosMID, Strength = posCode == 4 ? baseStrength : fallbackStrength },
+            new() { PositionId = PosFWD, Strength = posCode == 6 ? baseStrength : fallbackStrength }
+        };
+
+        var positionStrengths = new List<PositionStrength>
+        {
+            new() { Position = 0, Strength = posCode == 0 ? baseStrength : fallbackStrength },
+            new() { Position = 2, Strength = posCode == 2 ? baseStrength : fallbackStrength },
+            new() { Position = 4, Strength = posCode == 4 ? baseStrength : fallbackStrength },
+            new() { Position = 6, Strength = posCode == 6 ? baseStrength : fallbackStrength }
         };
 
         return new MatchLineupPlayerData
@@ -537,11 +538,7 @@ public sealed class LineupService(ILeagueStore leagueStore, ITeamStore teamStore
             Shirt = x.ShirtNumber <= 0 ? -1 : x.ShirtNumber,
             CanExtendContract = true,
             HasIndividualTraining = !string.IsNullOrWhiteSpace(x.IndividualTrainingSkill),
-            PositionStrengths = Enumerable.Range(0, 4).Select(p => new PositionStrength
-            {
-                Position = p,
-                Strength = p == posCode ? baseStrength : fallbackStrength
-            }).ToList(),
+            PositionStrengths = positionStrengths,
             Positions = positions
         };
     }

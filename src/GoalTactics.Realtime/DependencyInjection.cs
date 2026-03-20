@@ -10,6 +10,7 @@ public static class DependencyInjection
         services.AddSignalR();
         services.AddSingleton<HubState.UserConnectionRegistry>();
         services.AddSingleton<IMatchEventBroadcaster, SignalRMatchEventBroadcaster>();
+        services.AddSingleton<GoalTactics.Application.Common.INotificationService, SignalRNotificationService>();
         return services;
     }
 }

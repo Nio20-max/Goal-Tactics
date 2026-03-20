@@ -86,7 +86,8 @@ public sealed class BotSimulationRunner(
             await ExecuteBotLoopAsync(bots, report, hasTrainingTick: false, hasLeagueMatch: true, hasFriendlyMatch: false, cancellationToken);
 
             await ResolveLeagueMatchesAsync(bots, report);
-            ApplyDailyStadiumIncome(bots, DateOnly.FromDateTime(clock.CurrentUtc));
+            var isFriendlyDay = options.EnableFriendlies;
+            ApplyDailyStadiumIncome(bots, DateOnly.FromDateTime(clock.CurrentUtc), isFriendlyDay);
             ApplyDailyConstructionProgress(bots);
             clock.AdvanceDay();
             clock.AdvanceMatchday();
@@ -387,7 +388,7 @@ public sealed class BotSimulationRunner(
         }
     }
 
-    private void ApplyDailyStadiumIncome(IReadOnlyList<BotClubProfile> bots, DateOnly day)
+    private void ApplyDailyStadiumIncome(IReadOnlyList<BotClubProfile> bots, DateOnly day, bool isFriendlyDay)
     {
         foreach (var bot in bots)
         {
@@ -411,6 +412,12 @@ public sealed class BotSimulationRunner(
             var facilityBonus = (bot.FanShopLevel * 450m) + (bot.ParkingLevel * 300m);
             var facilityCost = (bot.OfficeLevel * 250m) + (bot.FanShopLevel * 180m) + (bot.ParkingLevel * 150m);
             var net = Math.Max(0m, gross + facilityBonus - facilityCost);
+
+            // On friendly match days, stadium revenue is shared between host and guest club.
+            if (isFriendlyDay)
+            {
+                net /= 2m;
+            }
 
             bot.Money += net;
             bot.MoneyInSeason += net;

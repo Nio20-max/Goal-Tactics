@@ -33,10 +33,15 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
         var pageSize = request.SafePageSize;
         var paged = friends.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
 
+        var mapped = paged.Select(MapFriend).ToArray();
+        var accepted = mapped.Where(x => x.IsFriend).ToArray();
+        var pending = mapped.Where(x => !x.IsFriend).ToArray();
+
         return new FriendsResponse
         {
             Success = true,
-            Friends = paged.Select(MapFriend).ToArray(),
+            Friends = mapped,
+            Requests = pending,
             FriendName = friendName,
             TotalCount = totalCount,
             CurrentPage = page,
@@ -76,11 +81,13 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
     {
         await friendsStore.AcceptAsync(userId, id, cancellationToken);
         var friends = await friendsStore.GetFriendsAsync(userId, queryText: null, cancellationToken);
+        var mapped = friends.Select(MapFriend).ToArray();
 
         return new FriendsResponse
         {
             Success = true,
-            Friends = friends.Select(MapFriend).ToArray()
+            Friends = mapped,
+            Requests = mapped.Where(x => !x.IsFriend).ToArray()
         };
     }
 
@@ -88,11 +95,13 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
     {
         await friendsStore.DeclineAsync(userId, id, cancellationToken);
         var friends = await friendsStore.GetFriendsAsync(userId, queryText: null, cancellationToken);
+        var mapped = friends.Select(MapFriend).ToArray();
 
         return new FriendsResponse
         {
             Success = true,
-            Friends = friends.Select(MapFriend).ToArray()
+            Friends = mapped,
+            Requests = mapped.Where(x => !x.IsFriend).ToArray()
         };
     }
 
@@ -109,7 +118,7 @@ public sealed class FriendsService(IFriendsStore friendsStore) : IFriendsService
             IsFriend = x.IsFriend,
             IsRequestIncoming = x.IsRequestIncoming,
             IsRequestOutgoing = x.IsRequestOutgoing,
-            IsLiked = x.IsLiked,
+            IsLiked = x.IsRequestIncoming || x.IsFriend,
             // Xamarin fields
             TeamId = teamId,
             UserName = x.Name,

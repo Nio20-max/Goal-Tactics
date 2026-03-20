@@ -22,6 +22,7 @@ public sealed class BotRunner : IDisposable
     private readonly BotFactory _factory;
     private readonly BotNeuralDecisionEngine _neural;
     private readonly BotHumanizationService _human;
+    private readonly BotActionNeuralPolicy _actionPolicy;
     private SimulationAuditWriter? _simulationAudit;
 
     // Behaviors
@@ -45,11 +46,12 @@ public sealed class BotRunner : IDisposable
         _factory = new BotFactory(config, _db, _api);
         _neural = new BotNeuralDecisionEngine(config, _db);
         _human = new BotHumanizationService(config, _db);
+        _actionPolicy = new BotActionNeuralPolicy(_db);
 
         _social = new SocialBehavior(_db, config, _human, _neural);
-        _transferMarket = new TransferMarketBehavior(_db, _social, _neural, _human, _config);
+        _transferMarket = new TransferMarketBehavior(_db, _social, _neural, _human, _actionPolicy, _config);
         _stadium = new StadiumBehavior();
-        _training = new TrainingBehavior(_db);
+        _training = new TrainingBehavior(_db, _actionPolicy);
         _dailyRoutine = new DailyRoutineBehavior();
         _lineup = new LineupBehavior();
         _skillCard = new SkillCardBehavior();
@@ -95,6 +97,12 @@ public sealed class BotRunner : IDisposable
     {
         string runDir = Path.Combine(_config.SimulationOutputRoot, $"bots_client_sim_{DateTime.UtcNow:yyyyMMdd_HHmmss}");
         Directory.CreateDirectory(runDir);
+        var simulationModelKey = Path.GetFileName(runDir);
+
+        foreach (var bot in _db.GetAllBots())
+        {
+            _actionPolicy.EnsureBotModels(bot, simulationModelKey, forceReset: true);
+        }
 
         _simulationAudit?.Dispose();
         _simulationAudit = _config.EnableSimulationAudit ? new SimulationAuditWriter(runDir) : null;
@@ -191,6 +199,9 @@ public sealed class BotRunner : IDisposable
                     {
                         reasonSamples.Add($"season={season},matchday={matchday},bot={bot.BotId},team={bot.TeamName},reason={result.DecisionReason}");
                     }
+
+                    // Light pacing to avoid bursting the API under higher bot counts.
+                    await Task.Delay(75, ct);
                 }
 
                 totalSessions += daySessions;
@@ -220,6 +231,7 @@ public sealed class BotRunner : IDisposable
         report.AppendLine($"- Auth failures: {totalAuthFailures}");
         report.AppendLine($"- Night sessions: {totalNightSessions}");
         report.AppendLine($"- Groups observed: {groups.Count}");
+        report.AppendLine($"- Action NN pretraining: {_actionPolicy.TrainingReport}");
         report.AppendLine();
 
         report.AppendLine("## Top Executed Actions");
@@ -325,6 +337,7 @@ public sealed class BotRunner : IDisposable
             var bot = await _factory.CreateBotAsync();
             if (bot is not null)
             {
+                _actionPolicy.EnsureBotModels(bot);
                 // Schedule the bot's first online time (shortly in the future)
                 _scheduler.ScheduleNextOnline(bot);
             }
@@ -356,6 +369,8 @@ public sealed class BotRunner : IDisposable
                 var bot = _db.GetBot(botId);
                 if (bot is null) continue;
 
+                _actionPolicy.EnsureBotModels(bot);
+
                 try
                 {
                     await ExecuteBotSessionAsync(bot);
@@ -384,6 +399,7 @@ public sealed class BotRunner : IDisposable
     {
         Console.WriteLine($"[Bot {bot.BotId}] Waking up ({bot.TeamName})...");
         var result = new BotSessionResult();
+        _actionPolicy.EnsureBotModels(bot);
 
         var sessionPlan = _human.BuildSessionPlan(bot);
         var emotion = _human.GetEmotionalState(bot);

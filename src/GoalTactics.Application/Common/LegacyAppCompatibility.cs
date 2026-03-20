@@ -153,6 +153,19 @@ public static class LegacyAppCompatibility
         };
     }
 
+    public static int MapLineupPositionCode(string position)
+    {
+        // Lineup API uses the same transfer-style code mapping.
+        return position switch
+        {
+            "GK" => 0,
+            "DEF" => 2,
+            "MID" => 4,
+            "FWD" => 6,
+            _ => 0
+        };
+    }
+
     public static int MainSkillIndex(string position)
     {
         return position switch

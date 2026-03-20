@@ -16,6 +16,7 @@ public sealed class TransferMarketBehavior
     private readonly SocialBehavior _social;
     private readonly BotNeuralDecisionEngine _neural;
     private readonly BotHumanizationService _human;
+    private readonly BotActionNeuralPolicy _actionPolicy;
     private readonly BotConfig _config;
     private readonly Random _rng = new();
 
@@ -31,12 +32,20 @@ public sealed class TransferMarketBehavior
         public string BidTeamName { get; init; } = "";
     }
 
-    public TransferMarketBehavior(BotDatabase db, SocialBehavior social, BotNeuralDecisionEngine neural, BotHumanizationService human, BotConfig config)
+    private sealed class SquadContext
+    {
+        public int SquadSize { get; init; }
+        public double AverageAge { get; init; }
+        public double YoungPlayerShare { get; init; }
+    }
+
+    public TransferMarketBehavior(BotDatabase db, SocialBehavior social, BotNeuralDecisionEngine neural, BotHumanizationService human, BotActionNeuralPolicy actionPolicy, BotConfig config)
     {
         _db = db;
         _social = social;
         _neural = neural;
         _human = human;
+        _actionPolicy = actionPolicy;
         _config = config;
     }
 
@@ -54,6 +63,9 @@ public sealed class TransferMarketBehavior
         decimal availableMoney = BotApiTranslationReader.GetDecimal(resources.Output, "money");
         decimal availableStars = BotApiTranslationReader.GetDecimal(resources.Output, "gtStars");
         var envelope = _human.BuildTransferEnvelope(bot, availableMoney, availableStars);
+
+        var squad = await api.ExecuteForBotAsync("GetSquad");
+        var squadContext = BuildSquadContext(squad);
 
         // Search for players that match team needs
         var searchRequest = BuildSearchRequest(bot);
@@ -94,8 +106,9 @@ public sealed class TransferMarketBehavior
 
             if (!_human.CanTakeRiskyAction(bot))
             {
-                _db.AddActionLog(bot.BotId, "transfer", "Guardrail: max risky actions reached", false, bot.Risk);
-                continue;
+                // This is an intentional safety guardrail, not a failed transfer attempt.
+                _db.AddActionLog(bot.BotId, "transfer-guardrail", "Max risky actions reached; skipping remaining bids this session", true, bot.Risk);
+                break;
             }
 
             if (availableStars < BidStarsCost)
@@ -105,6 +118,31 @@ public sealed class TransferMarketBehavior
             }
 
             int maxBid = CalculateMaxBid(bot, envelope.MoneyBudget, envelope.StarsBudget, nightPlan);
+
+            var bidInput = new BidDecisionInput
+            {
+                Money = (double)availableMoney,
+                Stars = (double)availableStars,
+                SquadSize = squadContext.SquadSize,
+                AverageAge = squadContext.AverageAge,
+                YoungPlayerShare = squadContext.YoungPlayerShare,
+                PlayerTalent = player.Talent,
+                PlayerStrength = (double)player.Strength,
+                PlayerAge = player.Age,
+                CurrentBid = player.Bid,
+                EstimatedBudgetCap = Math.Max(1000, maxBid),
+                NightBidAggression = nightPlan?.BidAggression ?? bot.Risk
+            };
+
+            var bidProbability = _actionPolicy.PredictBidProbability(bot, bidInput);
+            if (_rng.NextDouble() > Math.Clamp(bidProbability, 0.05, 0.98))
+            {
+                _db.AddActionLog(bot.BotId, "transfer", $"NN skip bid ({bidProbability:F2}) for {player.Name}", true, bot.Risk);
+                continue;
+            }
+
+            var nnBoost = 0.80 + (0.55 * bidProbability);
+            maxBid = (int)Math.Max(0, Math.Round(maxBid * nnBoost, MidpointRounding.AwayFromZero));
             if (player.Bid >= maxBid) continue;
 
             int bidAmount = CalculateBidAmount(player.Bid, maxBid);
@@ -127,10 +165,12 @@ public sealed class TransferMarketBehavior
                 _human.MarkAuctionBid(bot, player.AuctionId);
                 _human.CountRiskyAction(bot);
                 _db.AddActionLog(bot.BotId, "transfer", $"Bid accepted on {player.Name}, envelope={envelope.Phase}", true, bot.Risk);
+                _actionPolicy.LearnFromBidOutcome(bot, bidInput, success: true);
             }
             else
             {
                 _db.AddActionLog(bot.BotId, "transfer", $"Bid rejected on {player.Name}", false, bot.Risk);
+                _actionPolicy.LearnFromBidOutcome(bot, bidInput, success: false);
             }
         }
     }
@@ -272,4 +312,29 @@ public sealed class TransferMarketBehavior
             IsFrozen = BotApiTranslationReader.GetBool(data, "isFrozen"),
             BidTeamName = BotApiTranslationReader.GetString(data, "bidTeamName")
         };
+
+    private static SquadContext BuildSquadContext(BotApiTranslation squad)
+    {
+        var players = BotApiTranslationReader.GetObjectList(squad, "players");
+        if (players.Count == 0)
+        {
+            return new SquadContext
+            {
+                SquadSize = 0,
+                AverageAge = 0,
+                YoungPlayerShare = 0
+            };
+        }
+
+        var ages = players
+            .Select(p => Math.Max(0, BotApiTranslationReader.GetInt(p, "age")))
+            .ToList();
+
+        return new SquadContext
+        {
+            SquadSize = players.Count,
+            AverageAge = ages.Count == 0 ? 0 : ages.Average(),
+            YoungPlayerShare = ages.Count == 0 ? 0 : ages.Count(a => a is > 0 and <= 23) / (double)ages.Count
+        };
+    }
 }
