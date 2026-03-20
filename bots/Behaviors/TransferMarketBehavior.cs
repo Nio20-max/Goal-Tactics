@@ -11,6 +11,7 @@ namespace GoalTactics.Bots.Client.Behaviors;
 /// </summary>
 public sealed class TransferMarketBehavior
 {
+    private const int BidStarsCost = 200;
     private readonly BotDatabase _db;
     private readonly SocialBehavior _social;
     private readonly BotNeuralDecisionEngine _neural;
@@ -97,6 +98,12 @@ public sealed class TransferMarketBehavior
                 continue;
             }
 
+            if (availableStars < BidStarsCost)
+            {
+                _db.AddActionLog(bot.BotId, "transfer", "Skipped bidding: insufficient GT Stars", false, bot.Risk);
+                break;
+            }
+
             int maxBid = CalculateMaxBid(bot, envelope.MoneyBudget, envelope.StarsBudget, nightPlan);
             if (player.Bid >= maxBid) continue;
 
@@ -113,9 +120,10 @@ public sealed class TransferMarketBehavior
                 Bid = bidAmount
             });
 
-            if (result.Success && BotApiTranslationReader.GetBool(result.Output, "bidAccepted"))
+            if (result.Success)
             {
                 availableMoney -= bidAmount;
+                availableStars = Math.Max(0, availableStars - BidStarsCost);
                 _human.MarkAuctionBid(bot, player.AuctionId);
                 _human.CountRiskyAction(bot);
                 _db.AddActionLog(bot.BotId, "transfer", $"Bid accepted on {player.Name}, envelope={envelope.Phase}", true, bot.Risk);
@@ -247,7 +255,8 @@ public sealed class TransferMarketBehavior
 
         await api.ExecuteForBotAsync("PostChatMessage", new PostChatMessageRequest
         {
-            Message = $"[Group {bot.GroupId.Value}] {message}"
+            Message = message,
+            Channel = "group"
         });
     }
 

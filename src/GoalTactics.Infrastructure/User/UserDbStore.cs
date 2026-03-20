@@ -2,6 +2,7 @@ using GoalTactics.Application.User;
 using GoalTactics.Infrastructure.Persistence;
 using GoalTactics.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace GoalTactics.Infrastructure.User;
 
@@ -127,6 +128,21 @@ public sealed class UserDbStore(GoalTacticsDbContext dbContext) : IUserStore
         }
 
         user.DeletedAtUtc = DateTime.UtcNow;
+
+        var deletedStamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+        var idPrefix = user.Id.Length >= 8 ? user.Id[..8] : user.Id;
+        user.Email = $"deleted_{deletedStamp}_{idPrefix}@deleted.goaltactics.local";
+        user.ManagerName = $"Deleted {idPrefix}";
+
+        var sessions = await dbContext.UserSessions
+            .Where(x => x.UserId == userId && x.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var session in sessions)
+        {
+            session.RevokedAtUtc = now;
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

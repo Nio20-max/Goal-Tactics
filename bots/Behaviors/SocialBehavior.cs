@@ -231,8 +231,36 @@ public sealed class SocialBehavior
         var llmMessage = await _neural.BuildSocialMessageAsync(bot, plan, contactNames, recentGlobal);
         var contextTag = relationships.Count >= 4 ? "promotion" : "default";
         var styled = _human.BuildStyledMessage(bot, llmMessage, contextTag);
+        if (string.IsNullOrWhiteSpace(styled))
+        {
+            return;
+        }
 
-        await api.ExecuteForBotAsync("PostChatMessage", new PostChatMessageRequest { Message = styled });
+        if (bot.GroupId.HasValue)
+        {
+            await api.ExecuteForBotAsync("PostChatMessage", new PostChatMessageRequest
+            {
+                Message = styled,
+                Channel = "group"
+            });
+
+            if (_rng.NextDouble() < 0.45)
+            {
+                await api.ExecuteForBotAsync("PostChatMessage", new PostChatMessageRequest
+                {
+                    Message = styled,
+                    Channel = "global"
+                });
+            }
+        }
+        else
+        {
+            await api.ExecuteForBotAsync("PostChatMessage", new PostChatMessageRequest
+            {
+                Message = styled,
+                Channel = "global"
+            });
+        }
         _db.AddActionLog(bot.BotId, "social", "Posted neural social message", true, bot.Risk);
 
         if (bot.GroupId.HasValue)

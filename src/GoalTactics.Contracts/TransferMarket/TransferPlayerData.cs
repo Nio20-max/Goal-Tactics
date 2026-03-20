@@ -15,8 +15,12 @@ public sealed class TransferPlayerData
 
     // Xamarin auction fields
     public Guid AuctionId { get; init; }
+    public Guid BidTeamId { get; init; }
     public string BidTeamName { get; init; } = string.Empty;
     public string BidTeamLogo { get; init; } = string.Empty;
+    public Guid SellerTeamId { get; init; }
+    public string SellerTeamName { get; init; } = string.Empty;
+    public string SellerTeamLogo { get; init; } = string.Empty;
     public long Bid { get; init; }
     public bool IsFrozen { get; init; }
 

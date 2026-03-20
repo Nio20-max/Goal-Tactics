@@ -1,0 +1,17 @@
+rank,season,tier,group,team_name,bot_id,persona,wins,draws,losses,points,team_strength,money_balance,stars_balance
+1,5,3,13,PL Club 206,0e00ad8c-6d93-4e4a-8724-fa03fad4db12,ConservativeBot,29,1,0,88,105,64250310,11899
+2,5,3,13,CH Club 38,e2316c34-1225-495b-ba72-38fdc02f33d3,ConservativeBot,24,6,0,78,106,65225374,8733
+3,5,3,13,IT Club 303,291681e3-6df4-4397-9f82-ed7058381110,AggressiveTraderBot,16,6,8,54,92,36343375,524
+4,5,3,13,NL Club 305,7f215d67-612d-4222-8c78-13ebe8a96342,LadderGrinderBot,15,9,6,54,91,27157153,657
+5,5,3,13,PL Club 296,7e794bdb-3053-43a0-bf3e-d660f1bd8908,ConservativeBot,13,11,6,50,105,55609599,17238
+6,5,3,13,BE Club 289,27ee8ac1-d92f-4258-9176-90d41ff8648c,NewManagerBot,10,13,7,43,79,10749855,11580
+7,5,3,13,AT Club 57,2ff9aabc-41f2-40f9-9c59-f0a3d2da9596,AggressiveTraderBot,10,12,8,42,102,16350289,1779
+8,5,3,13,CH Club 298,069ff971-69d3-40b8-b8bb-0a33994677fb,YouthFocusedBot,8,14,8,38,89,25937669,534
+9,5,3,13,DE Club 291,c5b59ffd-40e0-450b-a8ac-0be715c6008c,AggressiveTraderBot,8,14,8,38,85,40545765,1392
+10,5,3,13,ES Club 334,edf15092-280a-4ad3-89f4-534a88171560,YouthFocusedBot,8,12,10,36,114,29446957,1370
+11,5,3,13,FR Club 302,dd04329c-a549-432f-a804-cf2c044e94af,ConservativeBot,7,13,10,34,95,11116227,13251
+12,5,3,13,IT Club 293,344b676f-5b60-4fe0-a4ed-67f73fa332bf,LadderGrinderBot,8,6,16,30,92,20954793,320
+13,5,3,13,FR Club 12,6b258a80-a54c-42ac-8d59-b406ddca0ffd,SocialBot,6,11,13,29,89,63579683,1477
+14,5,3,13,PT Club 290,490425b1-1e4e-44c3-9420-c0d841da5e24,ConservativeBot,6,9,15,27,102,36614197,16595
+15,5,3,13,AT Club 87,f91d7011-73d9-47b4-a76d-18f10e8a8f34,AggressiveTraderBot,0,6,24,6,76,52135053,1313
+16,5,3,13,BE Club 299,2770a000-db39-4db3-9e78-83271e65a32a,LadderGrinderBot,0,1,29,1,79,37928315,1125

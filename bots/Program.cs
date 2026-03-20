@@ -57,6 +57,12 @@ static BotConfig ParseConfig(string[] args)
     if (map.TryGetValue("neural-api-url", out var neuralApiUrl))
         config.NeuralApiUrl = neuralApiUrl;
 
+    if (map.TryGetValue("neural-model", out var neuralModel) && !string.IsNullOrWhiteSpace(neuralModel))
+        config.NeuralModel = neuralModel;
+
+    if (map.TryGetValue("require-llm-for-chat", out var requireLlmForChat) && bool.TryParse(requireLlmForChat, out var requireLlm))
+        config.RequireLlmForChat = requireLlm;
+
     if (map.TryGetValue("neural-max-concurrency", out var neuralConcurrency) && int.TryParse(neuralConcurrency, out var c))
         config.NeuralMaxConcurrentRequests = Math.Max(1, c);
 

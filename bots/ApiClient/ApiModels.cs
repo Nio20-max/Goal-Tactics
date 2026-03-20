@@ -199,6 +199,12 @@ public sealed class PlayerDto
     [JsonPropertyName("country")]
     public string? Country { get; set; }
 
+    [JsonPropertyName("origin")]
+    public string? Origin { get; set; }
+
+    [JsonPropertyName("experience")]
+    public decimal Experience { get; set; }
+
     [JsonPropertyName("hasIndividualTraining")]
     public bool HasIndividualTraining { get; set; }
 
@@ -460,7 +466,14 @@ public sealed class SaveTrainingRequest : RequestObject
     public int SubSkillIndex { get; set; }
 }
 
-public sealed class IndividualTrainingRequest : IdRequest { }
+public sealed class IndividualTrainingRequest : IdRequest
+{
+    [JsonPropertyName("skillType")]
+    public string? SkillType { get; set; }
+
+    [JsonPropertyName("skillIndex")]
+    public int? SkillIndex { get; set; }
+}
 
 public sealed class BookTrainingCampRequest : RequestObject
 {
@@ -714,6 +727,12 @@ public sealed class PostChatMessageRequest : RequestObject
 {
     [JsonPropertyName("message")]
     public string Message { get; set; } = "";
+
+    [JsonPropertyName("channel")]
+    public string? Channel { get; set; }
+
+    [JsonPropertyName("targetUserId")]
+    public string? TargetUserId { get; set; }
 }
 
 public sealed class ChatHistoryResponse

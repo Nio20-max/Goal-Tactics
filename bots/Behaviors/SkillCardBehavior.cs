@@ -45,8 +45,12 @@ public sealed class SkillCardBehavior
             .ThenByDescending(p => bot.YouthFocus >= 50 ? p.Talent : 0)
             .ToList();
 
-        // Use up to 3 cards per session to avoid API spam
-        int plannedCap = nightPlan is null ? 3 : Math.Clamp(nightPlan.IndividualTrainingSlots + 1, 1, 3);
+        // Spread boosts across a broader set so progression doesn't concentrate on the same few players.
+        int spreadCount = Math.Max(1, candidates.Count / 2);
+        candidates = candidates.Take(spreadCount).OrderBy(_ => Guid.NewGuid()).ToList();
+
+        // Use more cards per session in simulation to produce measurable progression across most players.
+        int plannedCap = nightPlan is null ? 8 : Math.Clamp(nightPlan.IndividualTrainingSlots + 4, 2, 8);
         int maxUses = Math.Min(plannedCap, availableCards);
         int used = 0;
 

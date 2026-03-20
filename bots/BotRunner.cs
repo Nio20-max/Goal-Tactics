@@ -33,7 +33,7 @@ public sealed class BotRunner : IDisposable
     private readonly LineupBehavior _lineup;
     private readonly SkillCardBehavior _skillCard;
 
-    // Rate-limit tracking (action type → last execution UTC)
+    // Rate-limit tracking ((botId:action) → last execution UTC)
     private readonly Dictionary<string, DateTime> _rateLimits = new(StringComparer.Ordinal);
 
     public BotRunner(BotConfig config)
@@ -49,7 +49,7 @@ public sealed class BotRunner : IDisposable
         _social = new SocialBehavior(_db, config, _human, _neural);
         _transferMarket = new TransferMarketBehavior(_db, _social, _neural, _human, _config);
         _stadium = new StadiumBehavior();
-        _training = new TrainingBehavior();
+        _training = new TrainingBehavior(_db);
         _dailyRoutine = new DailyRoutineBehavior();
         _lineup = new LineupBehavior();
         _skillCard = new SkillCardBehavior();
@@ -394,6 +394,7 @@ public sealed class BotRunner : IDisposable
             Console.Error.WriteLine($"[Bot {bot.BotId}] Authentication failed, skipping session.");
             result.AuthFailed = true;
             result.DecisionReason = "authentication-failed";
+            _human.UpdateLearningAfterSession(bot, success: false, nightSession: false, interrupted: false, executedActions: 0, authFailed: true);
             return result;
         }
 
@@ -401,8 +402,8 @@ public sealed class BotRunner : IDisposable
 
         if (_human.ShouldRollbackToSafeMode(bot))
         {
-            await ExecuteWithRateLimit("lineup", () => _lineup.ExecuteAsync(_api, bot, null));
-            await ExecuteWithRateLimit("daily", () => _dailyRoutine.ExecuteAsync(_api, bot, null));
+            await ExecuteWithRateLimit(bot.BotId, "lineup", () => _lineup.ExecuteAsync(_api, bot, null));
+            await ExecuteWithRateLimit(bot.BotId, "daily", () => _dailyRoutine.ExecuteAsync(_api, bot, null));
             _db.AddActionLog(bot.BotId, "rollback", "Safe mode active after repeated neural failures", true, bot.Risk);
             _api.ClearToken();
             Console.WriteLine($"[Bot {bot.BotId}] Safe-mode session complete.");
@@ -410,6 +411,7 @@ public sealed class BotRunner : IDisposable
             result.ActionsExecuted.Add("lineup");
             result.ActionsExecuted.Add("daily");
             result.DecisionReason = "rollback-safe-mode";
+            _human.UpdateLearningAfterSession(bot, success: true, nightSession: false, interrupted: false, executedActions: result.ActionsExecuted.Count, authFailed: false);
             return result;
         }
 
@@ -425,6 +427,7 @@ public sealed class BotRunner : IDisposable
             result.NightSession = true;
             result.ActionsExecuted.AddRange(["night-lineup", "night-training", "night-skillcard", "night-transfer", "night-social"]);
             result.DecisionReason = "night-cycle";
+            _human.UpdateLearningAfterSession(bot, success: true, nightSession: true, interrupted: false, executedActions: result.ActionsExecuted.Count, authFailed: false);
             return result;
         }
 
@@ -432,6 +435,7 @@ public sealed class BotRunner : IDisposable
         {
             _api.ClearToken();
             result.DecisionReason = $"skipped-low-confidence-{confidence:F2}";
+            _human.UpdateLearningAfterSession(bot, success: false, nightSession: false, interrupted: false, executedActions: 0, authFailed: false);
             return result;
         }
 
@@ -461,22 +465,22 @@ public sealed class BotRunner : IDisposable
         }
 
         // Execute behaviors in priority order with rate-limit checks
-        await ExecuteWithRateLimit("daily", () => _dailyRoutine.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "daily", () => _dailyRoutine.ExecuteAsync(_api, bot, nightPlan));
         result.ActionsExecuted.Add("daily");
-        await ExecuteWithRateLimit("lineup", () => _lineup.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "lineup", () => _lineup.ExecuteAsync(_api, bot, nightPlan));
         result.ActionsExecuted.Add("lineup");
-        await ExecuteWithRateLimit("training", () => _training.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "training", () => _training.ExecuteAsync(_api, bot, nightPlan));
         result.ActionsExecuted.Add("training");
-        await ExecuteWithRateLimit("skillcard", () => _skillCard.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "skillcard", () => _skillCard.ExecuteAsync(_api, bot, nightPlan));
         result.ActionsExecuted.Add("skillcard");
         if (_config.SimulateSeasons <= 0)
         {
-            await ExecuteWithRateLimit("stadium", () => _stadium.ExecuteAsync(_api, bot, nightPlan));
+            await ExecuteWithRateLimit(bot.BotId, "stadium", () => _stadium.ExecuteAsync(_api, bot, nightPlan));
             result.ActionsExecuted.Add("stadium");
         }
-        await ExecuteWithRateLimit("transfer", () => _transferMarket.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "transfer", () => _transferMarket.ExecuteAsync(_api, bot, nightPlan));
         result.ActionsExecuted.Add("transfer");
-        await ExecuteWithRateLimit("social", () => _social.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "social", () => _social.ExecuteAsync(_api, bot, nightPlan));
         result.ActionsExecuted.Add("social");
 
         if (sessionPlan.Interrupted)
@@ -488,6 +492,7 @@ public sealed class BotRunner : IDisposable
         Console.WriteLine($"[Bot {bot.BotId}] Session complete.");
         result.Success = true;
         result.DecisionReason = $"confidence={confidence:F2};interrupted={sessionPlan.Interrupted}";
+        _human.UpdateLearningAfterSession(bot, success: true, nightSession: false, interrupted: sessionPlan.Interrupted, executedActions: result.ActionsExecuted.Count, authFailed: false);
         return result;
     }
 
@@ -502,11 +507,11 @@ public sealed class BotRunner : IDisposable
         Console.WriteLine($"[Bot {bot.BotId}] Running night cycle ({localDate})...");
 
         // Night cycle focuses on strategic actions decided by the nightly plan.
-        await ExecuteWithRateLimit("night-lineup", () => _lineup.ExecuteAsync(_api, bot, nightPlan));
-        await ExecuteWithRateLimit("night-training", () => _training.ExecuteAsync(_api, bot, nightPlan));
-        await ExecuteWithRateLimit("night-skillcard", () => _skillCard.ExecuteAsync(_api, bot, nightPlan));
-        await ExecuteWithRateLimit("night-transfer", () => _transferMarket.ExecuteAsync(_api, bot, nightPlan));
-        await ExecuteWithRateLimit("night-social", () => _social.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "night-lineup", () => _lineup.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "night-training", () => _training.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "night-skillcard", () => _skillCard.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "night-transfer", () => _transferMarket.ExecuteAsync(_api, bot, nightPlan));
+        await ExecuteWithRateLimit(bot.BotId, "night-social", () => _social.ExecuteAsync(_api, bot, nightPlan));
 
         _db.MarkNightCycleRun(bot.BotId, localDate);
     }
@@ -562,8 +567,9 @@ public sealed class BotRunner : IDisposable
         return true;
     }
 
-    private async Task ExecuteWithRateLimit(string action, Func<Task> execute)
+    private async Task ExecuteWithRateLimit(string botId, string action, Func<Task> execute)
     {
+        var rateLimitKey = $"{botId}:{action}";
         int cooldown = action switch
         {
             "transfer" => _config.Rates.BidCooldownSeconds,
@@ -571,7 +577,7 @@ public sealed class BotRunner : IDisposable
             _ => _config.Rates.DefaultCooldownSeconds
         };
 
-        if (_rateLimits.TryGetValue(action, out var lastRun))
+        if (_rateLimits.TryGetValue(rateLimitKey, out var lastRun))
         {
             double elapsed = (DateTime.UtcNow - lastRun).TotalSeconds;
             if (elapsed < cooldown) return;
@@ -594,7 +600,7 @@ public sealed class BotRunner : IDisposable
             Console.Error.WriteLine($"[ActionError] {action}: {ex.Message}");
         }
 
-        _rateLimits[action] = DateTime.UtcNow;
+        _rateLimits[rateLimitKey] = DateTime.UtcNow;
     }
 
     private bool IsNightTime(BotRecord bot)

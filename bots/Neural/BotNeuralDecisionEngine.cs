@@ -91,17 +91,39 @@ public sealed class BotNeuralDecisionEngine
             {string.Join("\n", recent)}
             """;
 
-        try
+        var blocked = recentMessages
+            .TakeLast(8)
+            .Select(m => m.Message?.Trim())
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            var text = await RequestTextCompletionAsync(systemPrompt, userPrompt, 120, 0.35, ct);
-            if (!string.IsNullOrWhiteSpace(text))
+            var avoidPrompt = blocked.Count == 0
+                ? userPrompt
+                : $"{userPrompt}\nAvoid repeating these exact messages:\n{string.Join("\n", blocked.Take(6))}";
+
+            try
             {
-                return text.Trim();
+                var text = await RequestTextCompletionAsync(systemPrompt, avoidPrompt, 120, 0.35 + (attempt * 0.15), ct);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    var candidate = text.Trim();
+                    if (!blocked.Contains(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+            }
+            catch
+            {
+                // Retry with slightly different temperature.
             }
         }
-        catch
+
+        if (_config.RequireLlmForChat)
         {
-            // Fall back to deterministic text when model/API is unavailable.
+            return string.Empty;
         }
 
         return BuildFallbackGroupMessage(plan, desiredPlayers);
@@ -137,17 +159,39 @@ public sealed class BotNeuralDecisionEngine
             {string.Join("\n", recentGlobalMessages.TakeLast(4))}
             """;
 
-        try
+        var blocked = recentGlobalMessages
+            .TakeLast(10)
+            .Select(m => m?.Trim())
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            var text = await RequestTextCompletionAsync(systemPrompt, userPrompt, 120, 0.45, ct);
-            if (!string.IsNullOrWhiteSpace(text))
+            var avoidPrompt = blocked.Count == 0
+                ? userPrompt
+                : $"{userPrompt}\nAvoid repeating these exact messages:\n{string.Join("\n", blocked.Take(6))}";
+
+            try
             {
-                return text.Trim();
+                var text = await RequestTextCompletionAsync(systemPrompt, avoidPrompt, 120, 0.45 + (attempt * 0.15), ct);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    var candidate = text.Trim();
+                    if (!blocked.Contains(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+            }
+            catch
+            {
+                // Retry with slightly different temperature.
             }
         }
-        catch
+
+        if (_config.RequireLlmForChat)
         {
-            // Fall back when model/API is unavailable.
+            return string.Empty;
         }
 
         return BuildFallbackSocialMessage(plan, closeContacts);
@@ -291,7 +335,7 @@ public sealed class BotNeuralDecisionEngine
         {
             var request = new
             {
-                model = "lfm25-local",
+                model = _config.NeuralModel,
                 messages = new[]
                 {
                     new { role = "system", content = systemPrompt },

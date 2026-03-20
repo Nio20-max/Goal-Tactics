@@ -1,0 +1,17 @@
+team_name,season,bot_id,manager_name,country_iso,time_zone,persona,tier,group,position,season_wins,season_losses,season_draws,season_points,stadium_level,vip_seats,sit_seats,stand_seats,training_center_level,office_level,fan_shop_level,parking_level,team_strength,money_balance,stars_balance,money_in,money_out,stars_in,stars_out
+CH Club 258,3,ef52adc4-814b-40ef-a680-c30116584649,SocialBot_258,CH,Europe/Warsaw,SocialBot,3,11,2,28,0,2,86,3,590,7950,9600,6,6,5,3,97,24495591,1135,12656430,4188529,21200,21700
+FR Club 272,3,c4dde019-83e3-400d-ba8c-b284f97df8ab,ConservativeBot_272,FR,Europe/Paris,ConservativeBot,3,11,13,14,8,8,50,2,460,6100,7500,6,6,3,5,72,13788576,14471,9813350,7402093,15000,11800
+DE Club 261,3,4baa7405-4c02-40ce-a733-6d13b772747b,AggressiveTraderBot_261,DE,Europe/Rome,AggressiveTraderBot,3,11,10,13,10,7,46,1,330,4250,5300,5,10,2,5,85,791806,1708,6900380,7795028,21900,21300
+IT Club 263,3,31595175-aa7a-49fd-94e8-93098b1e1f2f,LadderGrinderBot_263,IT,Europe/Amsterdam,LadderGrinderBot,3,11,5,12,8,10,46,1,330,4250,5300,4,5,4,2,68,8034401,288,6933230,5940729,21600,22900
+ES Club 264,3,667a6255-a6ac-4524-ab0a-01857f3eb68c,SocialBot_264,ES,Europe/Warsaw,SocialBot,3,11,7,12,9,9,45,4,720,9500,11900,3,6,2,3,62,29435256,599,15349680,7062030,21200,20900
+CH Club 268,3,371ade83-2ba6-4a5f-864a-12f7c03902db,YouthFocusedBot_268,CH,Europe/Madrid,YouthFocusedBot,3,11,4,12,10,8,44,2,460,6000,7500,2,8,5,6,91,15568674,1354,9755780,3468676,21400,21200
+BE Club 9,3,ef42753c-80d6-4691-9d81-3256e965edcd,AggressiveTraderBot_9,BE,Europe/Rome,AggressiveTraderBot,3,11,12,11,8,11,44,2,460,6000,7500,4,7,4,6,89,17157588,713,9756450,6946620,21900,22200
+BE Club 259,3,9f903b42-874c-43ff-b34d-fac05649c097,NewManagerBot_259,BE,Europe/Berlin,NewManagerBot,3,11,3,10,12,8,38,3,590,7750,9700,5,9,3,4,79,26548869,11623,12528450,3546761,15000,12700
+PT Club 260,3,b88724d9-6595-4064-82b6-939419e685ec,ConservativeBot_260,PT,Europe/Paris,ConservativeBot,3,11,15,8,8,14,38,2,460,6000,7400,7,9,2,4,74,14246239,9115,9686130,5122391,15000,14660
+FR Club 262,3,8e2fa78b-8c83-4934-b4c0-4d3f1d168eae,YouthFocusedBot_262,FR,Europe/Madrid,YouthFocusedBot,3,11,16,8,8,14,38,1,340,4350,5200,6,11,3,2,65,4905381,256,7000080,6973296,21200,22800
+AT Club 257,3,97f39fbf-683f-43e4-a5fd-2a7bada102f2,LadderGrinderBot_257,AT,Europe/Amsterdam,LadderGrinderBot,3,11,9,10,13,7,37,4,720,9500,11900,3,5,1,4,95,30818971,216,15361350,5555817,21500,21400
+AT Club 267,3,504ee900-9608-4d35-9f0f-7b85335f1fcd,AggressiveTraderBot_267,AT,Europe/Rome,AggressiveTraderBot,3,11,8,9,12,9,36,2,460,6000,7400,5,9,2,4,74,10539748,283,9686250,4811547,21700,21800
+NL Club 95,3,9fc9b381-8fb7-4660-b834-0587e43e56f1,LadderGrinderBot_95,NL,Europe/Amsterdam,LadderGrinderBot,3,11,11,8,11,11,35,3,590,7850,9700,4,10,4,3,78,26482510,694,12592680,5258419,21300,22100
+PL Club 266,3,88018614-ddd0-45ea-b515-95a8f1bd5fd9,ConservativeBot_266,PL,Europe/Paris,ConservativeBot,3,11,6,8,12,10,34,2,460,6100,7500,6,6,1,1,87,16594029,15671,9779300,4654375,15000,11400
+IT Club 43,3,cc5e0c17-f5a5-4328-9ab1-09684da9f2df,NewManagerBot_43,IT,Europe/Berlin,NewManagerBot,3,11,14,8,14,8,32,4,720,9500,11900,7,9,3,2,72,41749091,9916,15338550,4833866,15000,12400
+NL Club 265,3,fefd58ec-aa7b-4fec-b9b6-0baebf7229c1,NewManagerBot_265,NL,Europe/Berlin,NewManagerBot,3,11,1,0,28,2,2,3,590,7850,9700,6,7,2,3,67,22843243,4259,12600500,5875704,15000,15080

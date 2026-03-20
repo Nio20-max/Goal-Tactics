@@ -158,16 +158,31 @@ public sealed class ScoutingService(ITeamStore teamStore) : IScoutingService
         if (request.Position.HasValue)
         {
             var posValue = request.Position.Value;
-
             var map = Positions;
 
-            if (posValue >= 0 && posValue < map.Length)
+            // Legacy premium scout clients often use transfer-like even codes (0/2/4/6).
+            // Handle that format first to avoid misreading 2 as MID instead of DEF.
+            posFilter = posValue switch
             {
-                posFilter = map[posValue];
-            }
-            else if (posValue >= 1 && posValue <= map.Length)
+                0 => "GK",
+                2 => "DEF",
+                4 => "MID",
+                6 => "FWD",
+                _ => null
+            };
+
+            if (string.IsNullOrWhiteSpace(posFilter))
             {
-                posFilter = map[posValue - 1];
+                // Some clients send 1-based values (1..4).
+                if (posValue >= 1 && posValue <= map.Length)
+                {
+                    posFilter = map[posValue - 1];
+                }
+                // Canonical API values use 0..3.
+                else if (posValue >= 0 && posValue < map.Length)
+                {
+                    posFilter = map[posValue];
+                }
             }
         }
 

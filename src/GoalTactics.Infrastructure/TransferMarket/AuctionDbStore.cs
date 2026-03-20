@@ -57,9 +57,12 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
         "Rossi", "Ricci", "Colombo", "De Vries", "Bakker", "Jansen", "O'Brien", "Murphy", "Walsh", "Kelly"
     ];
 
-    // Position codes matching the transfer market convention: 0=GK, 2=DEF, 4=MID, 6=FWD
+    // Internal transfer rows historically used legacy codes: 0=GK, 2=DEF, 4=MID, 6=FWD.
+    // Public API responses are normalized to canonical 0=GK, 1=DEF, 2=MID, 3=FWD.
     private static readonly int[] PositionCodes = [0, 2, 4, 6];
     private static readonly string[] PositionNames = ["GK", "DEF", "MID", "FWD"];
+    private const string SystemSellerName = "Goal Tactics";
+    private const string DefaultSellerLogo = "trikot0";
 
     public async Task<(IReadOnlyList<TransferPlayerData> Items, int TotalCount)> SearchAsync(TransferSearchRequest request, CancellationToken ct = default)
     {
@@ -118,7 +121,8 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
             .Take(pageSize)
             .ToListAsync(ct);
 
-        return (auctions.Select(ToTransferPlayerData).ToArray(), totalCount);
+        var mapped = await MapAuctionsAsync(auctions, ct);
+        return (mapped, totalCount);
     }
 
     public async Task<TransferPlayerData?> GetAuctionAsync(Guid auctionId, CancellationToken ct = default)
@@ -127,7 +131,13 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
 
         var auction = await dbContext.Auctions.AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == auctionId.ToString("N"), ct);
-        return auction is null ? null : ToTransferPlayerData(auction);
+        if (auction is null)
+        {
+            return null;
+        }
+
+        var mapped = await MapAuctionsAsync([auction], ct);
+        return mapped.Count > 0 ? mapped[0] : null;
     }
 
     public async Task<bool> PlaceBidAsync(Guid auctionId, string teamId, string teamName, string? teamLogo,
@@ -153,6 +163,8 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
         if (auction.SellerTeamId == teamId)
             return false;
 
+        var previousBidderTeamId = auction.CurrentBidderTeamId;
+
         // Record bid
         auction.CurrentBid = amount;
         auction.CurrentBidderTeamId = teamId;
@@ -176,6 +188,18 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
             CreatedAtUtc = DateTime.UtcNow
         });
 
+        if (!string.IsNullOrWhiteSpace(previousBidderTeamId)
+            && !string.Equals(previousBidderTeamId, teamId, StringComparison.Ordinal))
+        {
+            await AddAuctionMailForTeamAsync(
+                previousBidderTeamId,
+                subject: "Transfer market: You were outbid",
+                message: $"Your bid for {auction.PlayerName} was outbid by {teamName}.",
+                requiresAuctionOverbid: true,
+                requiresAuctionEnd: false,
+                ct);
+        }
+
         await dbContext.SaveChangesAsync(ct);
         return true;
     }
@@ -194,7 +218,7 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
             .Where(a => a.Status == "Active" || (a.Status == "Sold" && a.EndDateUtc >= now.AddMinutes(-5)))
             .ToListAsync(ct);
 
-        return favorites.Select(ToTransferPlayerData).ToArray();
+        return await MapAuctionsAsync(favorites, ct);
     }
 
     public async Task ToggleFavoriteAsync(string userId, Guid auctionId, CancellationToken ct = default)
@@ -228,7 +252,7 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
             .Where(a => a.SellerTeamId == teamId && (a.Status == "Active" || (a.Status == "Sold" && a.EndDateUtc >= now.AddMinutes(-5))))
             .ToListAsync(ct);
 
-        return sellings.Select(ToTransferPlayerData).ToArray();
+        return await MapAuctionsAsync(sellings, ct);
     }
 
     public async Task<int> SettleExpiredAuctionsAsync(CancellationToken ct = default)
@@ -318,11 +342,41 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
                         sellerResources.Money += auction.CurrentBid;
                     }
                 }
+
+                await AddAuctionMailForTeamAsync(
+                    auction.CurrentBidderTeamId,
+                    subject: "Transfer market: Auction won",
+                    message: $"You won {auction.PlayerName} for {auction.CurrentBid:N0}.",
+                    requiresAuctionOverbid: false,
+                    requiresAuctionEnd: true,
+                    ct);
+
+                if (!string.IsNullOrWhiteSpace(auction.SellerTeamId))
+                {
+                    await AddAuctionMailForTeamAsync(
+                        auction.SellerTeamId,
+                        subject: "Transfer market: Player sold",
+                        message: $"{auction.PlayerName} was sold for {auction.CurrentBid:N0}.",
+                        requiresAuctionOverbid: false,
+                        requiresAuctionEnd: true,
+                        ct);
+                }
             }
             else
             {
                 // No bids — auction expired without sale
                 auction.Status = "Expired";
+
+                if (!string.IsNullOrWhiteSpace(auction.SellerTeamId))
+                {
+                    await AddAuctionMailForTeamAsync(
+                        auction.SellerTeamId,
+                        subject: "Transfer market: Auction ended",
+                        message: $"No bids were placed for {auction.PlayerName}.",
+                        requiresAuctionOverbid: false,
+                        requiresAuctionEnd: true,
+                        ct);
+                }
             }
         }
 
@@ -455,19 +509,59 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
         await dbContext.SaveChangesAsync(ct);
     }
 
-    private static TransferPlayerData ToTransferPlayerData(AuctionEntity a)
+    private async Task<IReadOnlyList<TransferPlayerData>> MapAuctionsAsync(IReadOnlyList<AuctionEntity> auctions, CancellationToken ct)
+    {
+        if (auctions.Count == 0)
+        {
+            return [];
+        }
+
+        var sellerIds = auctions
+            .Select(a => a.SellerTeamId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        var sellers = sellerIds.Length == 0
+            ? new Dictionary<string, TeamEntity>(StringComparer.Ordinal)
+            : await dbContext.Teams.AsNoTracking()
+                .Where(t => sellerIds.Contains(t.Id))
+                .ToDictionaryAsync(t => t.Id, t => t, StringComparer.Ordinal, ct);
+
+        return auctions
+            .Select(a => ToTransferPlayerData(a, sellers))
+            .ToArray();
+    }
+
+    private static TransferPlayerData ToTransferPlayerData(AuctionEntity a, IReadOnlyDictionary<string, TeamEntity> sellers)
     {
         var auctionGuid = Guid.TryParse(a.Id, out var g) ? g : Guid.Empty;
-        var country = "de";
-        var head = "01_head-A01";
+        var bidTeamId = Guid.TryParse(a.CurrentBidderTeamId, out var parsedBidTeamId) ? parsedBidTeamId : Guid.Empty;
+        var sellerTeamId = Guid.TryParse(a.SellerTeamId, out var parsedSellerTeamId) ? parsedSellerTeamId : Guid.Empty;
+
+        TeamEntity? seller = null;
+        if (!string.IsNullOrWhiteSpace(a.SellerTeamId))
+        {
+            sellers.TryGetValue(a.SellerTeamId, out seller);
+        }
+
+        var sellerName = seller?.Name;
+        if (string.IsNullOrWhiteSpace(sellerName))
+        {
+            sellerName = SystemSellerName;
+        }
+
+        var sellerLogo = !string.IsNullOrWhiteSpace(seller?.SelectedShirt)
+            ? seller.SelectedShirt
+            : DefaultSellerLogo;
 
         return new TransferPlayerData
         {
             Id = auctionGuid,
             AuctionId = auctionGuid,
             Name = a.PlayerName ?? string.Empty,
-            Country = country,
-            Head = head,
+            Country = NormalizeCountry(a.PlayerCountry),
+            Head = NormalizeHead(a.PlayerHead),
             Position = NormalizePosition(a.PlayerPosition),
             Strength = a.PlayerStrength,
             Talent = a.PlayerTalent,
@@ -475,8 +569,12 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
             Bid = a.CurrentBid > 0 ? a.CurrentBid : a.MinimumBid,
             EndDate = a.EndDateUtc.ToString("O"),
             IsFrozen = a.Status != "Active",
+            BidTeamId = bidTeamId,
             BidTeamName = a.CurrentBidderTeamName ?? string.Empty,
-            BidTeamLogo = a.CurrentBidderTeamLogo ?? string.Empty
+            BidTeamLogo = a.CurrentBidderTeamLogo ?? string.Empty,
+            SellerTeamId = sellerTeamId,
+            SellerTeamName = sellerName,
+            SellerTeamLogo = sellerLogo
         };
     }
 
@@ -504,17 +602,67 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext) : IAuctionSto
     private static int NormalizePosition(int value) => value switch
     {
         0 => 0,
-        2 => 2,
-        4 => 4,
-        6 => 6,
-        _ => 4
+        1 => 1,
+        2 => 1,
+        3 => 2,
+        4 => 2,
+        5 => 3,
+        6 => 3,
+        _ => 2
     };
 
     private static int PositionCodeFromSkillIndex(int skillIndex) => skillIndex switch
     {
-        1 => 0,  // keeper
-        2 => 4,  // midfielder
-        3 => 6,  // striker/forward
+        0 => 2,  // defender (main skill = defence)
+        1 => 0,  // goalkeeper (main skill = keeping)
+        2 => 6,  // forward (main skill = shots)
+        3 => 4,  // midfielder (main skill = playmaking)
         _ => -1
     };
+
+    private async Task AddAuctionMailForTeamAsync(
+        string teamId,
+        string subject,
+        string message,
+        bool requiresAuctionOverbid,
+        bool requiresAuctionEnd,
+        CancellationToken ct)
+    {
+        var team = await dbContext.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.Id == teamId, ct);
+        if (team is null)
+        {
+            return;
+        }
+
+        var preferences = await dbContext.UserPreferences.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == team.UserId, ct);
+        if (preferences is not null)
+        {
+            if (!preferences.SystemNotifications)
+            {
+                return;
+            }
+
+            if (requiresAuctionOverbid && !preferences.AuctionOverbid)
+            {
+                return;
+            }
+
+            if (requiresAuctionEnd && !preferences.AuctionEnd)
+            {
+                return;
+            }
+        }
+
+        dbContext.TeamMail.Add(new TeamMailEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            UserId = team.UserId,
+            DateText = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+            Subject = subject,
+            Sender = "Transfermarket",
+            Message = message,
+            IsNew = true,
+            SenderType = 0
+        });
+    }
 }

@@ -50,14 +50,18 @@ def db_query(db_path: str, sql: str, params: tuple = ()) -> list[dict]:
         return []
 
 
-def api_post_json(path: str, payload: dict) -> dict:
+def api_post_json(path: str, payload: dict, bearer_token: str | None = None) -> dict:
     """POST JSON to GoalTactics API and return decoded JSON object."""
     url = f"{API_BASE_URL.rstrip('/')}{path}"
     body = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if bearer_token:
+        headers["Authorization"] = f"Bearer {bearer_token}"
+
     req = urllib.request.Request(
         url,
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
 
@@ -394,23 +398,28 @@ def chat_page():
 @app.route("/chat/login", methods=["POST"])
 def chat_login():
     payload = request.get_json(silent=True) or {}
-    email = (payload.get("email") or "").strip()
+    username = (payload.get("username") or payload.get("email") or "").strip()
     password = payload.get("password") or ""
 
-    if not email or not password:
-        return jsonify({"success": False, "message": "Email and password are required."}), 400
+    if not username or not password:
+        return jsonify({"success": False, "message": "Username/login and password are required."}), 400
 
-    result = api_post_json("/api/Login", {
-        "email": email,
+    login_payload = {
+        "login": username,
         "password": password,
-    })
+    }
+    # If input looks like an email, include the legacy Email field as well.
+    if "@" in username:
+        login_payload["email"] = username
+
+    result = api_post_json("/api/Login", login_payload)
 
     if not result.get("success") or not result.get("token"):
         return jsonify({"success": False, "message": result.get("message", "Login failed")}), 401
 
     session["chat_token"] = result.get("token")
     session["chat_user_id"] = str(result.get("userId") or "")
-    session["chat_manager_name"] = result.get("managerName") or email
+    session["chat_manager_name"] = result.get("managerName") or username
 
     return jsonify({"success": True, "managerName": session["chat_manager_name"]})
 
@@ -425,7 +434,7 @@ def chat_logout():
 
 def _chat_auth_payload(extra: dict | None = None) -> dict:
     token = session.get("chat_token")
-    data = {"token": token}
+    data = {"Token": token, "token": token}
     if extra:
         data.update(extra)
     return data
@@ -437,7 +446,7 @@ def chat_api_contacts():
     if not token:
         return jsonify({"success": False, "message": "Not logged in"}), 401
 
-    result = api_post_json("/api/GetChatContacts", _chat_auth_payload())
+    result = api_post_json("/api/GetChatContacts", _chat_auth_payload(), token)
     return jsonify(result)
 
 
@@ -454,7 +463,7 @@ def chat_api_history():
     if target:
         payload["targetUserId"] = target
 
-    result = api_post_json("/api/GetChatHistory", payload)
+    result = api_post_json("/api/GetChatHistory", payload, token)
     return jsonify(result)
 
 
@@ -479,7 +488,7 @@ def chat_api_send():
     if target:
         payload["targetUserId"] = target
 
-    result = api_post_json("/api/PostChatMessage", payload)
+    result = api_post_json("/api/PostChatMessage", payload, token)
     return jsonify(result)
 
 

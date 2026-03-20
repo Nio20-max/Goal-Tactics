@@ -589,6 +589,8 @@ public sealed class BotApiTranslator
         return new Dictionary<string, object?>
         {
             ["message"] = r.Message,
+            ["channel"] = r.Channel,
+            ["targetUserId"] = r.TargetUserId,
             ["length"] = r.Message.Length
         };
     }
@@ -714,10 +716,12 @@ public sealed class BotApiTranslator
             ["strength"] = p.Strength,
             ["talent"] = p.Talent,
             ["age"] = p.Age,
+            ["experience"] = p.Experience,
             ["fitness"] = p.Fitness,
             ["salary"] = p.Salary,
             ["marketValue"] = p.MarketValue,
             ["country"] = p.Country,
+            ["origin"] = p.Origin,
             ["hasIndividualTraining"] = p.HasIndividualTraining,
             ["mainSkill"] = p.MainSkill,
             ["bonusSkills"] = p.BonusSkills,

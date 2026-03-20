@@ -220,10 +220,12 @@ public sealed class GoalTacticsApiClient : IDisposable
 
     // ── Chat ────────────────────────────────────────────────────
 
-    public Task PostChatMessageAsync(string message)
+    public Task PostChatMessageAsync(string message, string? channel = null, string? targetUserId = null)
         => PostAsync("/api/PostChatMessage", new PostChatMessageRequest
         {
-            Message = message
+            Message = message,
+            Channel = channel,
+            TargetUserId = targetUserId
         });
 
     public Task<ChatHistoryResponse?> GetChatHistoryAsync()

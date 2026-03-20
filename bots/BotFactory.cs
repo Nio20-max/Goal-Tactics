@@ -37,8 +37,10 @@ public sealed class BotFactory
         string premiumGamertags = FindFile("premium_gamertags.txt", botsDir);
 
         _teamNames = LoadNames(gamertags);
-        _managerNames = LoadNames(gamertags);
         _premiumManagerNames = LoadNames(premiumGamertags);
+        _managerNames = _premiumManagerNames.Count > 0
+            ? _premiumManagerNames
+            : LoadNames(gamertags);
 
         // Mark existing names as used
         foreach (var bot in _db.GetAllBots())
@@ -54,10 +56,10 @@ public sealed class BotFactory
     public async Task<BotRecord?> CreateBotAsync(string? countryId = null)
     {
         var personality = BotPersonality.GenerateRandom(_rng);
-
-        string teamName = PickUniqueName(_teamNames, _usedTeamNames);
-        string managerName = GenerateManagerName(personality);
-        string password = GenerateSecurePassword();
+        string teamName = "pending";
+        string managerName = string.Empty;
+        string password = string.Empty;
+        string email = string.Empty;
 
         // Fetch countries if no countryId provided
         if (countryId is null)
@@ -85,31 +87,45 @@ public sealed class BotFactory
             }
         }
 
-        string email = SanitizeEmail(teamName);
+        BotApiTranslation registerResult = new() { Success = false };
 
-        BotApiTranslation registerResult;
-        try
+        for (int attempt = 1; attempt <= 4; attempt++)
         {
-            registerResult = await _api.ExecuteForBotAsync("Register", new RegisterRequest
+            teamName = PickUniqueName(_teamNames, _usedTeamNames);
+            managerName = GenerateManagerName(personality, teamName);
+            password = GenerateSecurePassword();
+            email = SanitizeEmail(teamName);
+
+            try
             {
-                IsGuest = false,
-                Email = email,
-                Login = email,
-                Password = password,
-                ManagerName = managerName,
-                TeamName = teamName,
-                CountryId = countryId
-            });
-        }
-        catch (HttpRequestException ex)
-        {
-            Console.Error.WriteLine($"[BotFactory] Registration failed for {teamName}: {ex.Message}");
-            return null;
+                registerResult = await _api.ExecuteForBotAsync("Register", new RegisterRequest
+                {
+                    IsGuest = false,
+                    Email = email,
+                    Login = email,
+                    Password = password,
+                    ManagerName = managerName,
+                    TeamName = teamName,
+                    CountryId = countryId
+                });
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.Error.WriteLine($"[BotFactory] Registration failed for {teamName} (attempt {attempt}/4): {ex.Message}");
+                continue;
+            }
+
+            if (registerResult.Success)
+            {
+                break;
+            }
+
+            Console.Error.WriteLine($"[BotFactory] Registration rejected for {teamName} (attempt {attempt}/4). Retrying with fresh identity...");
         }
 
         if (!registerResult.Success)
         {
-            Console.Error.WriteLine($"[BotFactory] Registration failed for {teamName}");
+            Console.Error.WriteLine("[BotFactory] Registration failed after 4 attempts.");
             return null;
         }
 
@@ -162,7 +178,7 @@ public sealed class BotFactory
         };
 
         _db.InsertBot(record);
-        Console.WriteLine($"[BotFactory] Created bot: {teamName} (ID {record.BotId}, Activity={record.Activity}, Risk={record.Risk})");
+        Console.WriteLine($"[BotFactory] Created bot: {teamName} / manager {managerName} (ID {record.BotId}, Activity={record.Activity}, Risk={record.Risk})");
 
         return record;
     }
@@ -219,7 +235,7 @@ public sealed class BotFactory
     /// Premium gamertags are used for bots with high activity, high social score, and many daily stars.
     /// Regular gamertags are used for all other bots.
     /// </summary>
-    private string GenerateManagerName(BotPersonality personality)
+    private string GenerateManagerName(BotPersonality personality, string teamName)
     {
         // Elite bots (high activity >= 70, high social >= 70, high daily stars >= 20000) get premium names
         bool isElite = personality.Activity >= 70 && personality.SocialScore >= 70 && personality.StarsDaily >= 20000;
@@ -232,15 +248,30 @@ public sealed class BotFactory
                 string first = namePool[_rng.Next(namePool.Count)];
                 string last = namePool[_rng.Next(namePool.Count)];
                 string fullName = $"{first} {last}";
+                if (string.Equals(fullName, teamName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 if (_usedManagerNames.Add(fullName))
                     return fullName;
             }
         }
 
         // Fallback
-        string fallback = $"Manager {Guid.NewGuid():N}"[..20];
-        _usedManagerNames.Add(fallback);
-        return fallback;
+        for (int attempt = 0; attempt < 100; attempt++)
+        {
+            var alias = namePool.Count > 0 ? namePool[_rng.Next(namePool.Count)] : "Coach";
+            var fallback = $"Coach {alias}";
+            if (!string.Equals(fallback, teamName, StringComparison.OrdinalIgnoreCase) && _usedManagerNames.Add(fallback))
+            {
+                return fallback;
+            }
+        }
+
+        var finalFallback = $"Coach_{Guid.NewGuid():N}"[..20];
+        _usedManagerNames.Add(finalFallback);
+        return finalFallback;
     }
 
     /// <summary>

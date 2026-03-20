@@ -119,7 +119,11 @@ public sealed class UserService(IUserStore userStore, ITeamStore teamStore, IPas
 
         async Task<EnableMatchPushResponse> SaveAndBuildResponseAsync()
         {
-            await userStore.SaveMatchPushSubscriptionAsync(userId, matchId, cancellationToken);
+            if (matchId != Guid.Empty)
+            {
+                await userStore.SaveMatchPushSubscriptionAsync(userId, matchId, cancellationToken);
+            }
+
             return new EnableMatchPushResponse
             {
                 Success = true,

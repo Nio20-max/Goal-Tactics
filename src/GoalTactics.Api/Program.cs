@@ -57,6 +57,12 @@ if (!builder.Environment.IsDevelopment())
 
 builder.Services
     .AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Legacy clients use PascalCase JSON property names and expect case-insensitive deserialization.
+        options.JsonSerializerOptions.PropertyNamingPolicy = null;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    })
     .ConfigureApiBehaviorOptions(options =>
     {
         options.InvalidModelStateResponseFactory = ValidationErrorFactory.Create;

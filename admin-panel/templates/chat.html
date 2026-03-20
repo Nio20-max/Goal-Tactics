@@ -10,7 +10,7 @@
 <div class="card" style="margin-bottom:1rem;">
     <div id="loginBox" {% if logged_in %}style="display:none;"{% endif %}>
         <div class="toolbar" style="margin-bottom:0.75rem;">
-            <input id="email" type="text" placeholder="Account email/login" style="min-width:260px;">
+            <input id="username" type="text" placeholder="Account username or email" style="min-width:260px;">
             <input id="password" type="password" placeholder="Password" style="min-width:220px;">
             <button onclick="login()">Login</button>
         </div>
@@ -58,12 +58,12 @@
 let contacts = [];
 
 async function login() {
-    const email = document.getElementById('email').value.trim();
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
     const res = await fetch('/chat/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({email, password})
+        body: JSON.stringify({username, password})
     });
     const data = await res.json();
     if (!data.success) {

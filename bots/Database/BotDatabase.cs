@@ -588,6 +588,28 @@ public sealed class BotDatabase : IDisposable
         return Convert.ToInt32(cmd.ExecuteScalar());
     }
 
+    public int CountRecentActions(string botId, string action, int minutes, bool? success = null)
+    {
+        using var cmd = _connection.CreateCommand();
+        var successClause = success.HasValue ? " AND Success = @success" : string.Empty;
+        cmd.CommandText = $"""
+            SELECT COUNT(*) FROM BotActionLogs
+            WHERE BotId = @botId
+              AND Action = @action
+              AND CreatedAt >= @since
+            {successClause}
+            """;
+        cmd.Parameters.AddWithValue("@botId", botId);
+        cmd.Parameters.AddWithValue("@action", action);
+        cmd.Parameters.AddWithValue("@since", DateTime.UtcNow.AddMinutes(-Math.Max(1, minutes)).ToString("o"));
+        if (success.HasValue)
+        {
+            cmd.Parameters.AddWithValue("@success", success.Value ? 1 : 0);
+        }
+
+        return Convert.ToInt32(cmd.ExecuteScalar());
+    }
+
     // ── Transfer shortlist / auction memory ───────────────────
 
     public void AddTransferShortlistItem(string botId, string auctionId, string playerName, string priority, DateTime expiresAtUtc, string profile)

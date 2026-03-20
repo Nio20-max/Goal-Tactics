@@ -24,8 +24,8 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
     public async Task<AuthUserRecord?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == email, cancellationToken)
-                ?? await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.ManagerName == email, cancellationToken);
+        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == email && x.DeletedAtUtc == null, cancellationToken)
+            ?? await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.ManagerName == email && x.DeletedAtUtc == null, cancellationToken);
         return user is null
             ? null
             : new AuthUserRecord(user.Id, user.Email, user.PasswordHash, user.ManagerName,
@@ -34,7 +34,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
     public async Task<AuthUserRecord?> GetUserByIdAsync(string userId, CancellationToken cancellationToken = default)
     {
-        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == userId && x.DeletedAtUtc == null, cancellationToken);
         return user is null
             ? null
             : new AuthUserRecord(user.Id, user.Email, user.PasswordHash, user.ManagerName,
@@ -43,15 +43,21 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
     public async Task<bool> IsManagerNameTakenAsync(string managerName, CancellationToken cancellationToken = default)
     {
-        return await dbContext.Users.AnyAsync(x => x.ManagerName == managerName, cancellationToken);
+        return await dbContext.Users.AnyAsync(x => x.ManagerName == managerName && x.DeletedAtUtc == null, cancellationToken);
     }
 
     public async Task<bool> AddUserAsync(AuthUserRecord user, CancellationToken cancellationToken = default)
     {
-        var exists = await dbContext.Users.AnyAsync(x => x.Email == user.Email, cancellationToken);
-        if (exists)
+        var existing = await dbContext.Users.FirstOrDefaultAsync(x => x.Email == user.Email, cancellationToken);
+        if (existing is not null && existing.DeletedAtUtc is null)
         {
             return false;
+        }
+
+        if (existing is not null)
+        {
+            TombstoneDeletedUser(existing);
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         await using var tx = await dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -71,6 +77,15 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 
         await tx.CommitAsync(cancellationToken);
         return true;
+    }
+
+    private static void TombstoneDeletedUser(UserEntity user)
+    {
+        var deletedStamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+        var idPrefix = user.Id.Length >= 8 ? user.Id[..8] : user.Id;
+
+        user.Email = $"deleted_{deletedStamp}_{idPrefix}@deleted.goaltactics.local";
+        user.ManagerName = $"Deleted {idPrefix}";
     }
 
     public async Task AddSessionAsync(AuthSessionRecord session, CancellationToken cancellationToken = default)
@@ -325,8 +340,8 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         dbContext.TeamTrainingStates.Add(new TeamTrainingStateEntity
         {
             TeamId = botTeamId,
-            MainSkillIndex = random.Next(0, 5),
-            SubSkillIndex = random.Next(0, 5),
+            MainSkillIndex = random.Next(0, 4),
+            SubSkillIndex = random.Next(4, 14),
             CampType = string.Empty,
             CampActiveUntilUtc = null
         });
@@ -494,7 +509,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
     {
         return tier switch
         {
-            1 => 0,
+            1 => 2,
             2 => 1,
             3 => 2,
             4 => 2,
@@ -506,7 +521,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
     {
         return tier switch
         {
-            1 => 5,
+            1 => 6,
             2 => 6,
             3 => 6,
             4 => 0,

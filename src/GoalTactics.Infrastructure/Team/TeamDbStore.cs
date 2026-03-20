@@ -1198,7 +1198,7 @@ public sealed class TeamDbStore(
         var state = await EnsureTrainingStateAsync(team.TeamId, cancellationToken);
 
         state.MainSkillIndex = Math.Clamp(mainSkillIndex, 0, 3);
-        state.SubSkillIndex = Math.Clamp(subSkillIndex, 0, 9);
+        state.SubSkillIndex = Math.Clamp(subSkillIndex, 0, TeamStrengthCalculator.NumberOfSkills - 1);
         state.TrainingChangedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -1922,20 +1922,23 @@ public sealed class TeamDbStore(
         }
 
         var key = skillName.Trim().ToLowerInvariant();
-        if (key.Contains("parade") || key.Contains("goalkeeping") || key.Contains("keeper")) { index = 0; return true; }
-        if (key.Contains("manndeckung") || key.Contains("deck") || key.Contains("defend")) { index = 1; return true; }
-        if (key.Contains("zweikampf") || key.Contains("duell") || key.Contains("tackle")) { index = 2; return true; }
-        if (key.Contains("abschluss") || key.Contains("finish") || key.Contains("shot")) { index = 3; return true; }
-        if (key.Contains("dribbel")) { index = 4; return true; }
-        if (key.Contains("pass")) { index = 5; return true; }
-        if (key.Contains("flanke") || key.Contains("cross")) { index = 6; return true; }
-        if (key.Contains("lauf") || key.Contains("tempo") || key.Contains("speed")) { index = 7; return true; }
-        if (key.Contains("ausdauer") || key.Contains("stamina")) { index = 8; return true; }
-        if (key.Contains("technik") || key.Contains("tech")) { index = 9; return true; }
-        if (key.Contains("einsatz") || key.Contains("aggress")) { index = 10; return true; }
-        if (key.Contains("kopf") || key.Contains("header")) { index = 11; return true; }
-        if (key.Contains("freisto") || key.Contains("freekick")) { index = 12; return true; }
-        if (key.Contains("elfmeter") || key.Contains("penalty") || key.Contains("eckb") || key.Contains("corner")) { index = 13; return true; }
+        // Canonical order:
+        // 0 Defence, 1 Keeping, 2 Shots, 3 Playmaking, 4 Passing, 5 BallControl,
+        // 6 Duel, 7 OneOnOne, 8 Header, 9 Speed, 10 Flanks, 11 Cornerkick, 12 Freekick, 13 Penalty.
+        if (key.Contains("defence") || key.Contains("defense") || key.Contains("manndeckung") || key.Contains("deck") || key.Contains("defend")) { index = 0; return true; }
+        if (key.Contains("keeping") || key.Contains("goalkeeping") || key.Contains("keeper") || key.Contains("parade")) { index = 1; return true; }
+        if (key.Contains("shots") || key.Contains("shot") || key.Contains("abschluss") || key.Contains("finish")) { index = 2; return true; }
+        if (key.Contains("playmaking") || key.Contains("spielaufbau") || key.Contains("spielmacher")) { index = 3; return true; }
+        if (key.Contains("passing") || key.Contains("pass")) { index = 4; return true; }
+        if (key.Contains("ballcontrol") || key.Contains("ball control") || key.Contains("dribbel")) { index = 5; return true; }
+        if (key.Contains("duel") || key.Contains("duell") || key.Contains("zweikampf") || key.Contains("tackle")) { index = 6; return true; }
+        if (key.Contains("oneonone") || key.Contains("one on one")) { index = 7; return true; }
+        if (key.Contains("header") || key.Contains("kopf")) { index = 8; return true; }
+        if (key.Contains("speed") || key.Contains("tempo") || key.Contains("lauf")) { index = 9; return true; }
+        if (key.Contains("flanks") || key.Contains("flanke") || key.Contains("cross")) { index = 10; return true; }
+        if (key.Contains("cornerkick") || key.Contains("corner") || key.Contains("eckb")) { index = 11; return true; }
+        if (key.Contains("freekick") || key.Contains("freisto")) { index = 12; return true; }
+        if (key.Contains("penalty") || key.Contains("elfmeter")) { index = 13; return true; }
 
         return false;
     }

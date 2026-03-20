@@ -17,11 +17,13 @@ public sealed class BotConfig
     public int SchedulerBatchSize { get; set; } = 10;
     public bool NeuralEnabled { get; set; } = true;
     public string NeuralApiUrl { get; set; } = "http://127.0.0.1:5057";
+    public string NeuralModel { get; set; } = "lfm25-local";
+    public bool RequireLlmForChat { get; set; } = true;
     public int NeuralMaxConcurrentRequests { get; set; } = 4;
     public int NeuralRequestTimeoutSeconds { get; set; } = 20;
     public int NightPlanningStartHourLocal { get; set; } = 22;
     public int NightPlanningEndHourLocal { get; set; } = 6;
-    public double DecisionConfidenceThreshold { get; set; } = 0.45;
+    public double DecisionConfidenceThreshold { get; set; } = 0.22;
     public int MaxRiskyActionsPerDay { get; set; } = 4;
     public double MaxBidPercentOfMoney { get; set; } = 0.35;
     public int MinStarsReserve { get; set; } = 1000;

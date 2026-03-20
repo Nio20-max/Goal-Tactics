@@ -12,7 +12,13 @@ namespace GoalTactics.Bots.Client.Behaviors;
 /// </summary>
 public sealed class TrainingBehavior
 {
+    private readonly BotDatabase _db;
     private readonly Random _rng = new();
+
+    public TrainingBehavior(BotDatabase db)
+    {
+        _db = db;
+    }
 
     private sealed class PlayerSnapshot
     {
@@ -20,11 +26,14 @@ public sealed class TrainingBehavior
         public decimal Strength { get; init; }
         public int Talent { get; init; }
         public int Age { get; init; }
-        public string Position { get; init; } = "";
+        public int PositionIndex { get; init; }
+        public string PositionLabel { get; init; } = "";
         public bool HasIndividualTraining { get; init; }
         public bool HasRedCard { get; init; }
         public int Injured { get; init; }
         public int MainSkill { get; init; }
+        public decimal Experience { get; init; }
+        public string Origin { get; init; } = "";
         public decimal[] Skills { get; init; } = [];
     }
 
@@ -44,13 +53,27 @@ public sealed class TrainingBehavior
 
     private async Task HandleTeamTrainingAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan)
     {
-        // All bots save team training; details depend on server-side options
         var training = await api.ExecuteForBotAsync("GetTeamTraining");
         if (!training.Success) return;
 
-        int mainSkillIndex = BotApiTranslationReader.GetInt(training.Output, "mainSkillIndex", -1);
-        int subSkillIndex = BotApiTranslationReader.GetInt(training.Output, "subSkillIndex", -1);
-        if (mainSkillIndex < 0 || subSkillIndex < 0) return;
+        var trainingData = BotApiTranslationReader.GetObject(training, "teamTraining") ?? training.Output;
+        int currentMain = BotApiTranslationReader.GetInt(trainingData, "mainSkillIndex", 0);
+        int currentSub = BotApiTranslationReader.GetInt(trainingData, "subSkillIndex", 4);
+
+        // Keep main in [0..3], sub in [4..13] with deterministic daily rotation.
+        int daySeed = DateTime.UtcNow.DayOfYear + Math.Abs(HashCode.Combine(bot.BotId, bot.YouthFocus));
+        int desiredMain = Math.Abs(daySeed) % 4;
+        int desiredSub = 4 + (Math.Abs(daySeed / 3 + bot.YouthFocus) % 10);
+
+        // Preserve occasional continuity so efficiency decay does not dominate long windows.
+        bool keepCurrent = _rng.NextDouble() < 0.30;
+        int mainSkillIndex = keepCurrent ? Math.Clamp(currentMain, 0, 3) : desiredMain;
+        int subSkillIndex = keepCurrent ? Math.Clamp(currentSub, 4, 13) : desiredSub;
+
+        if (subSkillIndex == mainSkillIndex)
+        {
+            subSkillIndex = 4 + ((subSkillIndex - 3) % 10);
+        }
 
         await api.ExecuteForBotAsync("SaveTeamTraining", new SaveTrainingRequest
         {
@@ -162,7 +185,9 @@ public sealed class TrainingBehavior
             return desired;
         }
 
-        var posCounts = players.GroupBy(p => p.Position)
+        var posCounts = players
+            .Select(p => PositionGroup(p.PositionIndex, p.PositionLabel))
+            .GroupBy(p => p)
             .ToDictionary(g => g.Key, g => g.Count());
 
         // Determine most common position for the team.
@@ -190,7 +215,10 @@ public sealed class TrainingBehavior
     /// </summary>
     private async Task HandleIndividualTrainingAsync(GoalTacticsApiClient api, BotRecord bot, BotNightPlan? nightPlan)
     {
-        if (bot.YouthFocus < 30 && (nightPlan?.IndividualTrainingSlots ?? 0) <= 0) return; // Low focus: skip individual training
+        if (bot.YouthFocus < 20 && (nightPlan?.IndividualTrainingSlots ?? 0) <= 0)
+        {
+            return;
+        }
 
         var squad = await api.ExecuteForBotAsync("GetSquad");
         if (!squad.Success) return;
@@ -201,10 +229,14 @@ public sealed class TrainingBehavior
             .ToList();
         if (players.Count == 0) return;
 
-        // Pick youngest players, preferring those with the weakest main skill
+        var scoutedPriorityIds = GetRecentScoutedPlayerIds(bot);
+
+        // Prioritize fresh scouted youth, then youngest players with weak core skill.
         var youngPlayers = players
             .Where(p => p.Age <= 22 && !p.HasIndividualTraining && !p.HasRedCard && p.Injured == 0)
-            .OrderBy(p => p.Skills is not null && p.MainSkill >= 0 && p.MainSkill < p.Skills.Length
+            .OrderByDescending(p => scoutedPriorityIds.Contains(p.Id))
+            .ThenBy(p => p.Experience)
+            .ThenBy(p => p.Skills is not null && p.MainSkill >= 0 && p.MainSkill < p.Skills.Length
                         ? p.Skills[p.MainSkill]
                         : p.Strength)
             .ThenByDescending(p => p.Talent)
@@ -213,9 +245,11 @@ public sealed class TrainingBehavior
         // Number of players to train scales with youth focus
         int count = bot.YouthFocus switch
         {
-            >= 80 => Math.Min(3, youngPlayers.Count),
-            >= 50 => Math.Min(2, youngPlayers.Count),
-            _ => Math.Min(1, youngPlayers.Count)
+            >= 85 => Math.Min(6, youngPlayers.Count),
+            >= 65 => Math.Min(5, youngPlayers.Count),
+            >= 45 => Math.Min(4, youngPlayers.Count),
+            >= 25 => Math.Min(3, youngPlayers.Count),
+            _ => Math.Min(2, youngPlayers.Count)
         };
 
         if (nightPlan is not null)
@@ -257,7 +291,12 @@ public sealed class TrainingBehavior
                 continue;
             }
 
-            await api.ExecuteForBotAsync("SaveIndividualTraining", new IdRequest { Id = targetId });
+            int skillIndex = ChooseIndividualSkillIndex(latestTarget, i);
+            await api.ExecuteForBotAsync("SaveIndividualTraining", new IndividualTrainingRequest
+            {
+                Id = targetId,
+                SkillIndex = skillIndex
+            });
         }
     }
 
@@ -347,6 +386,102 @@ public sealed class TrainingBehavior
         }
 
         await api.ExecuteForBotAsync("RecruitScoutedPlayer", new IdRequest { Id = best.Id });
+        RememberScoutedRecruit(bot, best.Id);
+    }
+
+    private HashSet<string> GetRecentScoutedPlayerIds(BotRecord bot)
+    {
+        var raw = _db.GetBotState(bot.BotId, "recent-scouted-recruits");
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return [];
+        }
+
+        var now = DateTime.UtcNow;
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var cleaned = new List<string>();
+        var entries = raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var entry in entries)
+        {
+            var parts = entry.Split('|', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length != 2)
+            {
+                continue;
+            }
+
+            if (!DateTime.TryParse(parts[1], out var ts) || now - ts > TimeSpan.FromDays(14))
+            {
+                continue;
+            }
+
+            ids.Add(parts[0]);
+            cleaned.Add($"{parts[0]}|{ts:o}");
+        }
+
+        _db.UpsertBotState(bot.BotId, "recent-scouted-recruits", string.Join(';', cleaned));
+        return ids;
+    }
+
+    private void RememberScoutedRecruit(BotRecord bot, string playerId)
+    {
+        if (string.IsNullOrWhiteSpace(playerId))
+        {
+            return;
+        }
+
+        var ids = GetRecentScoutedPlayerIds(bot)
+            .Select(id => $"{id}|{DateTime.UtcNow:o}")
+            .ToList();
+
+        ids.Add($"{playerId}|{DateTime.UtcNow:o}");
+        _db.UpsertBotState(bot.BotId, "recent-scouted-recruits", string.Join(';', ids.Distinct(StringComparer.Ordinal)));
+    }
+
+    private int ChooseIndividualSkillIndex(PlayerSnapshot player, int iteration)
+    {
+        var candidates = PositionGroup(player.PositionIndex, player.PositionLabel) switch
+        {
+            "GK" => new[] { 1, 9, 4, 5, 12 },
+            "DEF" => new[] { 0, 6, 8, 9, 4 },
+            "MID" => new[] { 3, 4, 5, 9, 10, 6 },
+            "FWD" => new[] { 2, 7, 8, 9, 13, 4 },
+            _ => Enumerable.Range(0, 14).ToArray()
+        };
+
+        if (player.Skills.Length >= 14)
+        {
+            var ordered = candidates
+                .OrderBy(idx => player.Skills[idx])
+                .ThenBy(_ => _rng.Next(0, 4))
+                .ToArray();
+
+            int rotated = Math.Abs(HashCode.Combine(player.Id, DateTime.UtcNow.DayOfYear, iteration)) % Math.Max(1, Math.Min(3, ordered.Length));
+            return ordered[rotated];
+        }
+
+        return candidates[Math.Abs(HashCode.Combine(player.Id, iteration)) % candidates.Length];
+    }
+
+    private static string PositionGroup(int positionIndex, string positionLabel)
+    {
+        if (positionIndex >= 0)
+        {
+            return positionIndex switch
+            {
+                0 => "GK",
+                1 => "DEF",
+                2 => "MID",
+                3 => "FWD",
+                _ => "UNK"
+            };
+        }
+
+        var normalized = positionLabel.Trim().ToUpperInvariant();
+        if (normalized is "GK" or "GOALKEEPER" or "TOR") return "GK";
+        if (normalized is "DEF" or "DEFENDER" or "ABWEHR") return "DEF";
+        if (normalized is "MID" or "MIDFIELDER" or "MITTELFELD") return "MID";
+        if (normalized is "FWD" or "ST" or "ATT" or "STRIKER" or "ANGRIFF") return "FWD";
+        return "UNK";
     }
 
     private static PlayerSnapshot ToPlayer(Dictionary<string, object?> data)
@@ -356,11 +491,14 @@ public sealed class TrainingBehavior
             Strength = BotApiTranslationReader.GetDecimal(data, "strength"),
             Talent = BotApiTranslationReader.GetInt(data, "talent"),
             Age = BotApiTranslationReader.GetInt(data, "age"),
-            Position = BotApiTranslationReader.GetString(data, "position"),
+            PositionIndex = BotApiTranslationReader.GetInt(data, "position", -1),
+            PositionLabel = BotApiTranslationReader.GetString(data, "position"),
             HasIndividualTraining = BotApiTranslationReader.GetBool(data, "hasIndividualTraining"),
             HasRedCard = BotApiTranslationReader.GetBool(data, "hasRedCard"),
             Injured = BotApiTranslationReader.GetInt(data, "injured"),
             MainSkill = BotApiTranslationReader.GetInt(data, "mainSkill"),
+            Experience = BotApiTranslationReader.GetDecimal(data, "experience"),
+            Origin = BotApiTranslationReader.GetString(data, "origin"),
             Skills = BotApiTranslationReader.GetDecimalArray(data, "skills")
         };
 

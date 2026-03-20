@@ -51,7 +51,6 @@ public sealed class TransferMarketController(
 
     [HttpPost("GetTransferDetails")]
     [HttpPost("GetDetails")]
-    [HttpPost("GetBid")]
     public async Task<ActionResult<TransferDetailsResponse>> GetTransferDetails([FromBody] TransferDetailsRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
@@ -67,6 +66,41 @@ public sealed class TransferMarketController(
         }
 
         return Ok(await transferMarketService.GetDetailsAsync(userId, auctionId, cancellationToken));
+    }
+
+    [HttpPost("GetBid")]
+    public async Task<ActionResult<LegacyTransferBidResponse>> GetBid([FromBody] TransferDetailsRequest request, CancellationToken cancellationToken)
+    {
+        var userId = HttpContext.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized(new LegacyTransferBidResponse { Success = false, Message = "Invalid token context" });
+        }
+
+        var auctionId = request.ResolvedAuctionId;
+        if (auctionId == Guid.Empty)
+        {
+            return Ok(new LegacyTransferBidResponse { Success = false, Message = "Invalid transfermarket id" });
+        }
+
+        var details = await transferMarketService.GetDetailsAsync(userId, auctionId, cancellationToken);
+        var player = details.Player;
+        return Ok(new LegacyTransferBidResponse
+        {
+            Success = details.Success,
+            Message = details.Message,
+            ID = player.AuctionId,
+            PlayerID = player.Id,
+            TeamID = player.TeamId,
+            Offer = player.Offer,
+            OfferTeamID = player.OfferTeamId,
+            Bid = player.Bid,
+            EndDate = player.EndDate,
+            BidTeamLogo = player.BidTeamLogo,
+            HasUpgrade = false,
+            IsSuccessfulBid = false,
+            Player = player
+        });
     }
 
     [HttpPost("BidPlayer")]
@@ -86,38 +120,60 @@ public sealed class TransferMarketController(
             return Ok(new ResponseObject { Success = false, Message = "Invalid transfermarket id" });
         }
 
-        await transferMarketService.BidAsync(userId, request, cancellationToken);
-
-        var details = await transferMarketService.GetDetailsAsync(userId, auctionId, cancellationToken);
-        var player = details.Player;
-
-        var realtimeBid = new JsonRealtimeBid
+        try
         {
-            AuctionID = auctionId,
-            EndDate = player.EndDate,
-            BidTeamId = details.MyTeamId,
-            BidTeamName = player.BidTeamName,
-            BidTeamLogo = player.BidTeamLogo,
-            Bid = player.Bid,
-            BidIncrement = player.BidIncrement
-        };
+            await transferMarketService.BidAsync(userId, request, cancellationToken);
 
-        await auctionHub.Clients.All.SendAsync("Bidded", realtimeBid, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Bid placed" });
+            var details = await transferMarketService.GetDetailsAsync(userId, auctionId, cancellationToken);
+            var player = details.Player;
+
+            var realtimeBid = new JsonRealtimeBid
+            {
+                AuctionID = auctionId,
+                EndDate = player.EndDate,
+                BidTeamId = player.BidTeamId,
+                BidTeamName = player.BidTeamName,
+                BidTeamLogo = player.BidTeamLogo,
+                Bid = player.Bid,
+                BidIncrement = player.BidIncrement
+            };
+
+            await auctionHub.Clients.All.SendAsync("Bidded", realtimeBid, cancellationToken);
+
+            return Ok(new ResponseObject { Success = true, Message = "Bid placed" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Ok(new ResponseObject { Success = false, Message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "BidPlayer failed for user {UserId} and auction {AuctionId}", userId, auctionId);
+            return Ok(new ResponseObject { Success = false, Message = "Bid failed" });
+        }
     }
 
     [HttpPost("UpdateTransfermarketFavourites")]
     [EnableRateLimiting("mutation-write")]
-    public async Task<ActionResult<ResponseObject>> UpdateTransfermarketFavourites([FromBody] IdRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<TransferSearchResponse>> UpdateTransfermarketFavourites([FromBody] IdRequest request, CancellationToken cancellationToken)
     {
         var userId = HttpContext.GetCurrentUserId();
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
+            return Unauthorized(new TransferSearchResponse
+            {
+                Success = false,
+                Message = "Invalid token context",
+                Players = [],
+                Favorites = [],
+                Sellings = [],
+                MyTeamId = Guid.Empty
+            });
         }
 
         await transferMarketService.UpdateFavoriteAsync(userId, request.Id, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = "Updated" });
+        var updated = await transferMarketService.GetFavoritesAsync(userId, cancellationToken);
+        return Ok(updated);
     }
 
     [HttpPost("GetTransfermarketFavourites")]
@@ -198,7 +254,19 @@ public sealed class TransferMarketController(
             return Unauthorized(new ResponseObject { Success = false, Message = "Invalid token context" });
         }
 
-        var auctionId = await transferMarketService.ListPlayerForSaleAsync(userId, request, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = $"Player listed with auction {auctionId}" });
+        try
+        {
+            var auctionId = await transferMarketService.ListPlayerForSaleAsync(userId, request, cancellationToken);
+            return Ok(new ResponseObject { Success = true, Message = $"Player listed with auction {auctionId}" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Ok(new ResponseObject { Success = false, Message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "SellPlayer failed for user {UserId}", userId);
+            return Ok(new ResponseObject { Success = false, Message = "Could not list player" });
+        }
     }
 }

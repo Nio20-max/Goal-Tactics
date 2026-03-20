@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Globalization;
 using GoalTactics.Bots.Client.Database;
 using GoalTactics.Bots.Client.Neural;
 
@@ -116,12 +117,43 @@ public sealed class BotHumanizationService
 
     public bool ShouldExecuteByConfidence(BotRecord bot, string action, double confidence)
     {
-        if (confidence >= _config.DecisionConfidenceThreshold)
+        var streakKey = $"confidence-skip-streak:{action}";
+        int.TryParse(_db.GetBotState(bot.BotId, streakKey), out var skipStreak);
+
+        // Use a softer adaptive threshold so sessions do not collapse late-season.
+        var riskBoost = Math.Clamp(bot.Risk / 2000.0, 0.0, 0.08);
+        var confidenceSkill = ReadDoubleState(bot.BotId, "learn.confidenceSkill", 0.5);
+        var learningBoost = (confidenceSkill - 0.5) * 0.18;
+        var adaptiveThreshold = Math.Clamp(_config.DecisionConfidenceThreshold - riskBoost - learningBoost, 0.08, 0.8);
+
+        if (confidence >= adaptiveThreshold)
         {
+            if (skipStreak > 0)
+            {
+                _db.UpsertBotState(bot.BotId, streakKey, "0");
+            }
             return true;
         }
 
-        _db.AddActionLog(bot.BotId, action, $"Skipped by low confidence ({confidence:F2})", false, bot.Risk);
+        skipStreak++;
+
+        // Guardrail: force execution after repeated low-confidence skips to keep bots active.
+        if (skipStreak >= 3)
+        {
+            _db.UpsertBotState(bot.BotId, streakKey, "0");
+            _db.AddActionLog(bot.BotId, action,
+                $"Forced execution after low-confidence streak ({confidence:F2} < {adaptiveThreshold:F2})",
+                true,
+                bot.Risk);
+            return true;
+        }
+
+        _db.UpsertBotState(bot.BotId, streakKey, skipStreak.ToString());
+
+        _db.AddActionLog(bot.BotId, action,
+            $"Skipped by low confidence ({confidence:F2} < {adaptiveThreshold:F2}, streak={skipStreak})",
+            false,
+            bot.Risk);
         return false;
     }
 
@@ -172,6 +204,10 @@ public sealed class BotHumanizationService
             "mid-season-patching" => 0.30m,
             _ => 0.38m
         };
+
+        var transferSkill = ReadDoubleState(bot.BotId, "learn.transferSkill", 0.5);
+        var learnFactor = 1m + (decimal)((transferSkill - 0.5) * 0.40);
+        percent *= Math.Clamp(learnFactor, 0.8m, 1.2m);
 
         decimal safePercent = Math.Min(percent, (decimal)Math.Clamp(_config.MaxBidPercentOfMoney, 0.05, 0.95));
 
@@ -248,6 +284,13 @@ public sealed class BotHumanizationService
         int next = (idx + 1) % groupBots.Count;
         _db.UpsertGroupCoordinationValue(bot.GroupId.Value, topic, next.ToString());
 
+        var socialSkill = ReadDoubleState(bot.BotId, "learn.socialSkill", 0.5);
+        var talkProbability = Math.Clamp(0.45 + ((bot.SocialScore - 50) / 200.0) + ((socialSkill - 0.5) * 0.35), 0.15, 0.90);
+        if (_rng.NextDouble() > talkProbability)
+        {
+            return false;
+        }
+
         string delayTopic = $"chat-delay-until:{bot.BotId}";
         var untilRaw = _db.GetGroupCoordinationValue(bot.GroupId.Value, delayTopic);
         if (DateTime.TryParse(untilRaw, out var untilUtc) && DateTime.UtcNow < untilUtc)
@@ -295,6 +338,11 @@ public sealed class BotHumanizationService
 
     public string BuildStyledMessage(BotRecord bot, string baseMessage, string contextTag)
     {
+        if (string.IsNullOrWhiteSpace(baseMessage))
+        {
+            return string.Empty;
+        }
+
         var style = GetOrCreateWritingStyle(bot);
         string msg = baseMessage;
 
@@ -361,6 +409,35 @@ public sealed class BotHumanizationService
         _db.UpsertBotState(bot.BotId, "academy-pipeline-targets", JsonSerializer.Serialize(academyTargets));
     }
 
+    public void UpdateLearningAfterSession(BotRecord bot, bool success, bool nightSession, bool interrupted, int executedActions, bool authFailed)
+    {
+        var confidenceTarget = success ? 1.0 : 0.35;
+        if (authFailed)
+        {
+            confidenceTarget = 0.15;
+        }
+        if (interrupted)
+        {
+            confidenceTarget = Math.Max(0.20, confidenceTarget - 0.10);
+        }
+
+        UpdateEma(bot.BotId, "learn.confidenceSkill", confidenceTarget, 0.06);
+
+        var acceptedTransferActions = _db.CountRecentActions(bot.BotId, "transfer", 180, success: true);
+        var failedTransferActions = _db.CountRecentActions(bot.BotId, "transfer", 180, success: false);
+        var transferTarget = acceptedTransferActions + failedTransferActions == 0
+            ? 0.50
+            : Math.Clamp((double)acceptedTransferActions / (acceptedTransferActions + failedTransferActions), 0.1, 0.9);
+        UpdateEma(bot.BotId, "learn.transferSkill", transferTarget, 0.05);
+
+        var socialTarget = nightSession ? 0.65 : (executedActions >= 6 ? 0.58 : 0.45);
+        if (success && !authFailed)
+        {
+            socialTarget += 0.05;
+        }
+        UpdateEma(bot.BotId, "learn.socialSkill", Math.Clamp(socialTarget, 0.1, 0.95), 0.04);
+    }
+
     public bool ShouldRunSelfAudit(BotRecord bot)
     {
         if (!_config.EnableSelfAudit)
@@ -424,6 +501,21 @@ public sealed class BotHumanizationService
         {
             return DateTime.UtcNow;
         }
+    }
+
+    private double ReadDoubleState(string botId, string key, double fallback)
+    {
+        var raw = _db.GetBotState(botId, key);
+        return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : fallback;
+    }
+
+    private void UpdateEma(string botId, string key, double target, double alpha)
+    {
+        var current = ReadDoubleState(botId, key, 0.5);
+        var updated = (1.0 - alpha) * current + alpha * target;
+        _db.UpsertBotState(botId, key, updated.ToString("0.0000", CultureInfo.InvariantCulture));
     }
 }
 

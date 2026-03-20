@@ -141,18 +141,14 @@ public static class LegacyAppCompatibility
 
     public static int MapPositionCode(string position)
     {
-        // Legacy iOS/Android UI expects position codes in the range 0..3.
-        // The app interprets these codes as:
-        //   0 = Goalkeeper
-        //   1 = Defender
-        //   2 = Midfielder
-        //   3 = Forward
+        // Legacy iOS/Android UI expects transfer-style even position codes:
+        //   0 = Goalkeeper, 2 = Defender, 4 = Midfielder, 6 = Forward.
         return position switch
         {
             "GK" => 0,
-            "DEF" => 1,
-            "MID" => 2,
-            "FWD" => 3,
+            "DEF" => 2,
+            "MID" => 4,
+            "FWD" => 6,
             _ => 0
         };
     }
@@ -163,8 +159,8 @@ public static class LegacyAppCompatibility
         {
             "GK" => 1,
             "DEF" => 0,
-            "MID" => 11,
-            "FWD" => 6,
+            "MID" => 3,
+            "FWD" => 2,
             _ => 0
         };
     }
