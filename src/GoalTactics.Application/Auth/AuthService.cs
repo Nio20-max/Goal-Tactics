@@ -28,6 +28,7 @@ public interface IAuthService
 
 public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHasher, ITokenService tokenService) : IAuthService
 {
+    private const string BotRegistrationTag = "GT_BOT";
     private const int MaxFailedAttempts = 5;
     private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
@@ -41,6 +42,7 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
         var managerName = request.ResolvedManagerName;
+        var isBotRegistration = string.Equals(request.BotTag?.Trim(), BotRegistrationTag, StringComparison.OrdinalIgnoreCase);
 
         // For guest registration, generate credentials server-side.
         string email;
@@ -75,7 +77,7 @@ public sealed class AuthService(IAuthStore authStore, IPasswordHasher passwordHa
             passwordHasher.Hash(password),
             managerName!);
 
-        var added = await authStore.AddUserAsync(user, cancellationToken);
+        var added = await authStore.AddUserAsync(user, isBotRegistration, cancellationToken);
         if (!added)
         {
             return new RegisterResponse

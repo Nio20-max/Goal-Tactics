@@ -11,7 +11,8 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
 {
     private const int ClubsPerLeague = 16;
     private const int PreferredHumanTier = 3;
-    private const int StartingMoney = 10_000_000;
+    private const int StartingMoneyHuman = 10_000_000;
+    private const int StartingMoneyBot = 50_000_000;
     private const int StartingMedipacks = 3;
     private const int StartingGtStars = 5_000;
     private static readonly IReadOnlyDictionary<int, int> LeagueGroupsPerTier = new Dictionary<int, int>
@@ -46,7 +47,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         return await dbContext.Users.AnyAsync(x => x.ManagerName == managerName && x.DeletedAtUtc == null, cancellationToken);
     }
 
-    public async Task<bool> AddUserAsync(AuthUserRecord user, CancellationToken cancellationToken = default)
+    public async Task<bool> AddUserAsync(AuthUserRecord user, bool isBotRegistration = false, CancellationToken cancellationToken = default)
     {
         var existing = await dbContext.Users.FirstOrDefaultAsync(x => x.Email == user.Email, cancellationToken);
         if (existing is not null && existing.DeletedAtUtc is null)
@@ -73,7 +74,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await EnsureLeaguePyramidSeededAsync(cancellationToken);
-        await AssignUserToNextAvailableBotSlotAsync(user.UserId, cancellationToken);
+        await AssignUserToNextAvailableBotSlotAsync(user.UserId, isBotRegistration, cancellationToken);
 
         await tx.CommitAsync(cancellationToken);
         return true;
@@ -384,7 +385,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         }
     }
 
-    private async Task AssignUserToNextAvailableBotSlotAsync(string userId, CancellationToken cancellationToken)
+    private async Task AssignUserToNextAvailableBotSlotAsync(string userId, bool isBotRegistration, CancellationToken cancellationToken)
     {
         var existingTeam = await dbContext.Teams.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
         if (existingTeam is not null)
@@ -437,7 +438,7 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
         var resources = await dbContext.TeamResources.FirstOrDefaultAsync(x => x.TeamId == team.Id, cancellationToken);
         if (resources is not null)
         {
-            resources.Money = StartingMoney;
+            resources.Money = isBotRegistration ? StartingMoneyBot : StartingMoneyHuman;
             resources.Medipacks = StartingMedipacks;
             resources.GTStars = StartingGtStars;
             resources.OfficeLevel = 1;

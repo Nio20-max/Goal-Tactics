@@ -181,10 +181,20 @@ public sealed class TransferMarketService(ITeamStore teamStore, IAuctionStore au
         if (request.ResolvedPlayerId == Guid.Empty)
             throw new InvalidOperationException("Player id is required.");
 
-        if (request.ResolvedMinimumBid <= 0)
+        if (request.ResolvedMinimumBid <= 0 && !request.IsDirectSale)
             throw new InvalidOperationException("Minimum bid must be positive.");
 
         var team = await teamStore.GetOrCreateMyTeamAsync(userId, cancellationToken);
+
+        if (request.IsDirectSale)
+        {
+            await auctionStore.DirectSellPlayerAsync(
+                team.TeamId,
+                request.ResolvedPlayerId.ToString("N"),
+                request.ResolvedMinimumBid,
+                cancellationToken);
+            return Guid.Empty;
+        }
 
         var durationHours = Math.Clamp(request.ResolvedDurationHours, 1, 24);
         var auctionId = await auctionStore.ListPlayerAsync(

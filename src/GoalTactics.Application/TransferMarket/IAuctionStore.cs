@@ -28,6 +28,9 @@ public interface IAuctionStore
     /// <summary>List a player for sale by a team.</summary>
     Task<Guid> ListPlayerAsync(string sellerTeamId, string playerId, long minimumBid, TimeSpan duration, CancellationToken ct = default);
 
+    /// <summary>Sell a player instantly to the market (no auction), returning the credited amount.</summary>
+    Task<long> DirectSellPlayerAsync(string sellerTeamId, string playerId, long desiredPrice, CancellationToken ct = default);
+
     /// <summary>Ensure the market has at least <paramref name="minimumCount"/> active system auctions; generates new ones if needed.</summary>
     Task EnsureSystemAuctionsAsync(int minimumCount, CancellationToken ct = default);
 }

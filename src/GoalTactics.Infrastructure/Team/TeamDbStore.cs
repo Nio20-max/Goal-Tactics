@@ -21,6 +21,19 @@ public sealed class TeamDbStore(
     private readonly IConfiguration _configuration = configuration;
     private readonly ILeagueStore _leagueStore = leagueStore;
 
+    private bool ForceDailyTrainingTick
+    {
+        get
+        {
+            var raw = _configuration["Simulation:ForceDailyTrainingTicks"];
+            if (!string.IsNullOrWhiteSpace(raw) && bool.TryParse(raw, out var enable) && enable)
+            {
+                return true;
+            }
+            return string.Equals(Environment.GetEnvironmentVariable("GT_SIMULATION_FORCE_DAY_TICK"), "1", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     private const int FacilityMaxLevel = 20;
     private const int SeasonLengthDays = 30;
     private const int IndividualTrainingWeeklyStars = 1_000;
@@ -1501,6 +1514,11 @@ public sealed class TeamDbStore(
         }
 
         var economyDays = FullDaysElapsed(resources.LastEconomyTickUtc, now);
+        if (ForceDailyTrainingTick && economyDays == 0)
+        {
+            economyDays = 1;
+        }
+
         if (economyDays > 0)
         {
             var totalIncome = 0m;
@@ -1592,6 +1610,11 @@ public sealed class TeamDbStore(
         }
 
         var sponsorDays = resources.LastSponsorPayoutUtc is null ? 1 : FullDaysElapsed(resources.LastSponsorPayoutUtc, now);
+        if (ForceDailyTrainingTick && sponsorDays == 0)
+        {
+            sponsorDays = 1;
+        }
+
         if (sponsorDays > 0)
         {
             resources.GTStars += sponsorDays * (DailyMainSponsorStars + DailySecondarySponsorStars);
@@ -1599,6 +1622,11 @@ public sealed class TeamDbStore(
         }
 
         var trainingDays = FullDaysElapsed(resources.LastTrainingTickUtc, now);
+        if (ForceDailyTrainingTick && trainingDays == 0)
+        {
+            trainingDays = 1;
+        }
+
         if (trainingDays > 0)
         {
             for (var i = 0; i < trainingDays; i++)
@@ -1635,12 +1663,20 @@ public sealed class TeamDbStore(
                 }
             }
 
+            AdvanceConstructionBySimulatedDays(resources, trainingDays);
+            CompleteConstructionIfFinished(resources, now, team.Id);
+
             resources.LastTrainingTickUtc = now.Date;
+
+            RemoveOveragePlayers(players, team, now);
+
             team.Strength = RecalculateTeamStrength(players);
             team.MarketValue = RecalculateTeamMarketValue(players);
         }
         else if (players.Count > 0)
         {
+            RemoveOveragePlayers(players, team, now);
+
             team.Strength = RecalculateTeamStrength(players);
             team.MarketValue = RecalculateTeamMarketValue(players);
         }
@@ -1649,6 +1685,58 @@ public sealed class TeamDbStore(
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private void AdvanceConstructionBySimulatedDays(TeamResourcesEntity resources, int simulatedDays)
+    {
+        if (!ForceDailyTrainingTick || simulatedDays <= 0 || !resources.ActiveConstructionEndUtc.HasValue)
+        {
+            return;
+        }
+
+        resources.ActiveConstructionEndUtc = resources.ActiveConstructionEndUtc.Value.AddDays(-simulatedDays);
+    }
+
+    private void RemoveOveragePlayers(List<TeamPlayerEntity> players, TeamEntity team, DateTime now)
+    {
+        var retirees = players
+            .Where(p => !p.IsScouted && p.Age >= 35)
+            .ToList();
+
+        if (retirees.Count == 0)
+        {
+            return;
+        }
+
+        var retireeIds = retirees
+            .Select(p => p.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var activeAuctions = dbContext.Auctions
+            .Where(a => a.Status == "Active" && a.PlayerId != null && retireeIds.Contains(a.PlayerId))
+            .ToList();
+        foreach (var auction in activeAuctions)
+        {
+            auction.Status = "Expired";
+            auction.EndDateUtc = now;
+        }
+
+        foreach (var retiree in retirees)
+        {
+            dbContext.TeamPlayers.Remove(retiree);
+            players.Remove(retiree);
+        }
+
+        dbContext.TeamNews.Add(new TeamNewsEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            TeamId = team.Id,
+            DateText = now.ToString("O"),
+            Title = "Karriereende",
+            Text = retirees.Count == 1
+                ? $"{retirees[0].Name} hat mit 35 Jahren seine Karriere beendet."
+                : $"{retirees.Count} Spieler haben mit 35 Jahren ihre Karriere beendet."
+        });
     }
 
     private void ApplyDailyTrainingTick(

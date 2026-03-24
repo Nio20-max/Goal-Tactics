@@ -21,11 +21,12 @@ public sealed class LineupBehavior
         ("3-4-3", 3, 4, 3)
     ];
 
-    // Position indices: 0=GK, 1=DEF, 2=MID, 3=FWD
+    // Legacy API position codes: 0=GK, 2=DEF, 4=MID, 6=FWD.
+    // Some endpoints may still expose 0..3, so we normalize both forms.
     private const int PositionGK = 0;
-    private const int PositionDEF = 1;
-    private const int PositionMID = 2;
-    private const int PositionFWD = 3;
+    private const int PositionDEF = 2;
+    private const int PositionMID = 4;
+    private const int PositionFWD = 6;
 
     private sealed class PlayerSnapshot
     {
@@ -213,10 +214,23 @@ public sealed class LineupBehavior
         => new()
         {
             Id = BotApiTranslationReader.GetString(data, "id"),
-            Position = BotApiTranslationReader.GetInt(data, "position"),
+            Position = NormalizePositionCode(BotApiTranslationReader.GetInt(data, "position")),
             Strength = BotApiTranslationReader.GetDecimal(data, "strength"),
             HasRedCard = BotApiTranslationReader.GetBool(data, "hasRedCard"),
             Injured = BotApiTranslationReader.GetInt(data, "injured")
+        };
+
+    private static int NormalizePositionCode(int code)
+        => code switch
+        {
+            0 => PositionGK,
+            1 => PositionDEF,
+            2 => PositionDEF,
+            3 => PositionMID,
+            4 => PositionMID,
+            5 => PositionFWD,
+            6 => PositionFWD,
+            _ => PositionMID
         };
 
     private static LineupSnapshot ToLineup(Dictionary<string, object?> data)

@@ -60,6 +60,9 @@ public sealed class RegisterRequest : RequestObject
 
     [JsonPropertyName("countryId")]
     public string? CountryId { get; set; }
+
+    [JsonPropertyName("botTag")]
+    public string? BotTag { get; set; }
 }
 
 public sealed class RegisterResponse
@@ -388,6 +391,21 @@ public sealed class BidRequest : IdRequest
 {
     [JsonPropertyName("bid")]
     public int Bid { get; set; }
+}
+
+public sealed class SellPlayerRequest : RequestObject
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
+    [JsonPropertyName("offer")]
+    public decimal Offer { get; set; }
+
+    [JsonPropertyName("hours")]
+    public int Hours { get; set; } = 4;
+
+    [JsonPropertyName("directSale")]
+    public bool DirectSale { get; set; }
 }
 
 public sealed class BidResponse

@@ -384,6 +384,7 @@
         <a href="/logs" {% if '/logs' in request.path %}class="active"{% endif %}>Logs</a>
         <a href="/bots" {% if '/bots' in request.path %}class="active"{% endif %}>Bots</a>
         <a href="/analytics" {% if request.path == '/analytics' %}class="active"{% endif %}>Analytics</a>
+        <a href="/snapshot" {% if '/snapshot' in request.path %}class="active"{% endif %}>Snapshot</a>
         <a href="/backups" {% if request.path == '/backups' %}class="active"{% endif %}>Backups</a>
         <a href="/chat" {% if '/chat' in request.path %}class="active"{% endif %}>Chat</a>
     </nav>

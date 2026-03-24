@@ -38,6 +38,21 @@ public sealed class BotConfig
     public bool EnableSimulationAudit { get; set; } = true;
     public bool CaptureSimulationSnapshots { get; set; } = true;
     public int SimulationSnapshotStride { get; set; } = 1;
+    public bool EnableHistoricalBootstrap { get; set; } = false;
+    public bool HistoricalBootstrapCentralBrain { get; set; } = true;
+    public string GameDatabasePath { get; set; } = "/mnt/website/goal_tactics/data/goaltactics.db";
+    public int HistoricalBootstrapFastSeasons { get; set; } = 29;
+    public int HistoricalBootstrapNormalSeasonCount { get; set; } = 1;
+    public int HistoricalBootstrapRealSimulationSeasons { get; set; } = 1;
+    public int HistoricalBootstrapSeasons { get; set; } = 30;
+    public int HistoricalBootstrapBotsPerSeason { get; set; } = 16;
+    public int CentralBrainBotsPerMatchday { get; set; } = 16;
+    public int HistoricalBootstrapAnchorSeason { get; set; } = 31;
+    public string HistoricalBootstrapAnchorDayOneUtc { get; set; } = "2026-03-23";
+    public string HistoricalBootstrapStatusPath { get; set; } = "/mnt/website/goal_tactics/simulations/historical-bootstrap-status.json";
+    public bool EnableSeasonalBotGrowth { get; set; } = true;
+    public int SeasonalBotsPerSeason { get; set; } = 16;
+    public int SeasonalGrowthCheckMinutes { get; set; } = 30;
 
     /// <summary>Rate limits expressed as minimum seconds between successive calls.</summary>
     public RateLimits Rates { get; set; } = new();

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Team Snapshot — GoalTactics Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Team Snapshot: {{ team.name }}</h1>
+    <a href="/snapshot" class="btn">Back to snapshot</a>
+</div>
+
+<div class="card-grid">
+    <div class="card"><div class="card-label">Country</div><div class="card-value">{{ team.country }}</div></div>
+    <div class="card"><div class="card-label">League</div><div class="card-value">{{ team.league_name }}</div></div>
+    <div class="card"><div class="card-label">Strength</div><div class="card-value">{{ team.strength }}</div></div>
+    <div class="card"><div class="card-label">Wins</div><div class="card-value">{{ team.wins }}</div></div>
+    <div class="card"><div class="card-label">Losses</div><div class="card-value">{{ team.losses }}</div></div>
+    <div class="card"><div class="card-label">Fans</div><div class="card-value">{{ team.fans }}</div></div>
+</div>
+
+<div class="table-wrapper">
+    <div class="table-header"><h2>Players</h2></div>
+    <table>
+        <thead><tr><th>Name</th><th>Pos</th><th>Age</th><th>Strength</th><th>Talent</th><th>Fitness</th><th>Matches</th><th>Goals</th></tr></thead>
+        <tbody>
+            {% for p in players %}
+            <tr>
+                <td>{{ p.name }}</td>
+                <td>{{ p.position }}</td>
+                <td>{{ p.age }}</td>
+                <td>{{ p.strength }}</td>
+                <td>{{ p.talent }}</td>
+                <td>{{ p.fitness }}</td>
+                <td>{{ p.matches }}</td>
+                <td>{{ p.goals }}</td>
+            </tr>
+            {% endfor %}
+            {% if not players %}
+            <tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No players found</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="table-wrapper">
+    <div class="table-header"><h2>Transfer involvement</h2></div>
+    <table>
+        <thead><tr><th>Player</th><th>Pos</th><th>Current Bid</th><th>Bidder</th><th>End Date</th><th>Status</th></tr></thead>
+        <tbody>
+            {% for a in team_auctions %}
+            <tr>
+                <td>{{ a.player_name }}</td>
+                <td>{{ a.player_position }}</td>
+                <td>{{ a.current_bid }}</td>
+                <td>{{ a.current_bidder_team_name }}</td>
+                <td>{{ a.end_date_utc }}</td>
+                <td>{{ a.status }}</td>
+            </tr>
+            {% endfor %}
+            {% if not team_auctions %}
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No auction involvement</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="table-wrapper">
+    <div class="table-header"><h2>Recent matches</h2></div>
+    <table>
+        <thead><tr><th>Date</th><th>Home</th><th>Away</th><th>Score</th><th>Played</th></tr></thead>
+        <tbody>
+            {% for m in recent_matches %}
+            <tr>
+                <td>{{ m.scheduled_date_utc }}</td>
+                <td>{{ m.home_team_name }}</td>
+                <td>{{ m.away_team_name }}</td>
+                <td>{{ m.home_score if m.home_score is not none else '-' }} : {{ m.away_score if m.away_score is not none else '-' }}</td>
+                <td>{{ 'Y' if m.is_played else 'N' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not recent_matches %}
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No matches found</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

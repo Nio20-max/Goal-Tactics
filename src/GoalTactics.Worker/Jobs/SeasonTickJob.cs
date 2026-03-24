@@ -59,6 +59,28 @@ public sealed class SeasonTickJob(
                     // NOTE: Fitness decay was removed per design; players no longer lose fitness over time.
                     // (Previous behavior: -1 fitness per tick when not in camp/individual training.)
                 }
+
+                var retirees = players
+                    .Where(p => !p.IsScouted && p.Age >= 35)
+                    .ToList();
+                if (retirees.Count > 0)
+                {
+                    var retireeIds = retirees
+                        .Select(p => p.Id)
+                        .ToHashSet(StringComparer.Ordinal);
+
+                    var activeAuctions = await dbContext.Auctions
+                        .Where(a => a.Status == "Active" && a.PlayerId != null && retireeIds.Contains(a.PlayerId))
+                        .ToListAsync(cancellationToken);
+
+                    foreach (var auction in activeAuctions)
+                    {
+                        auction.Status = "Expired";
+                        auction.EndDateUtc = now;
+                    }
+
+                    dbContext.TeamPlayers.RemoveRange(retirees);
+                }
             }
 
             resources.LastEconomyTickUtc = now;

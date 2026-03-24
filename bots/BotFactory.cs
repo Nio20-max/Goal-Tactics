@@ -21,6 +21,7 @@ public sealed class BotFactory
     private readonly HashSet<string> _usedTeamNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _usedManagerNames = new(StringComparer.OrdinalIgnoreCase);
 
+    private const string BotRegistrationTag = "GT_BOT";
     private const string PasswordChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     private const int PasswordLength = 32;
 
@@ -106,7 +107,8 @@ public sealed class BotFactory
                     Password = password,
                     ManagerName = managerName,
                     TeamName = teamName,
-                    CountryId = countryId
+                    CountryId = countryId,
+                    BotTag = BotRegistrationTag
                 });
             }
             catch (HttpRequestException ex)

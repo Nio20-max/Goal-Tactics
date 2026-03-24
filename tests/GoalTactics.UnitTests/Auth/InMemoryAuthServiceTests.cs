@@ -169,7 +169,7 @@ public sealed class InMemoryAuthServiceTests
             return Task.FromResult<AuthUserRecord?>(user);
         }
 
-        public Task<bool> AddUserAsync(AuthUserRecord user, CancellationToken cancellationToken = default)
+        public Task<bool> AddUserAsync(AuthUserRecord user, bool isBotRegistration = false, CancellationToken cancellationToken = default)
         {
             if (usersByEmail.ContainsKey(user.Email))
             {

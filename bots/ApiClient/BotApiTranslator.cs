@@ -33,11 +33,12 @@ public sealed class BotApiTranslator
             "SaveLineup" => Build(normalized, true, SaveLineupRequest(request), Ack("lineupSaved", true)),
             "SearchTransfermarket" => Build(normalized, response is TransfermarketResponse r && r.Success, SearchTransfermarketRequest(request), TransferOutput(response as TransfermarketResponse)),
             "BidPlayer" => Build(normalized, response is BidResponse r && r.Success, BidRequest(request), BidOutput(response as BidResponse)),
+            "SellPlayer" => Build(normalized, true, SellPlayerRequest(request), Ack("playerListedOrSold", true)),
             "GetTransfermarketFavourites" => Build(normalized, response is FavouritesResponse r && r.Success, Empty(), FavouritesOutput(response as FavouritesResponse)),
             "UpdateTransfermarketFavourites" => Build(normalized, true, IdRequest(request), Ack("favouritesUpdated", true)),
             "GetTeamTraining" => Build(normalized, response is TrainingResponse r && r.Success, Empty(), TrainingOutput(response as TrainingResponse)),
             "SaveTeamTraining" => Build(normalized, true, SaveTrainingRequest(request), Ack("teamTrainingSaved", true)),
-            "SaveIndividualTraining" => Build(normalized, true, IdRequest(request), Ack("individualTrainingSaved", true)),
+            "SaveIndividualTraining" => Build(normalized, true, IndividualTrainingRequest(request), Ack("individualTrainingSaved", true)),
             "BookTrainingCamp" => Build(normalized, true, BookTrainingCampRequest(request), Ack("trainingCampBooked", true)),
             "UpdateCamps" => Build(normalized, true, Empty(), Ack("campsUpdated", true)),
             "CancelCamp" => Build(normalized, true, Empty(), Ack("campCanceled", true)),
@@ -103,7 +104,8 @@ public sealed class BotApiTranslator
             ["login"] = r.Login,
             ["managerName"] = r.ManagerName,
             ["teamName"] = r.TeamName,
-            ["countryId"] = r.CountryId
+            ["countryId"] = r.CountryId,
+            ["botTag"] = r.BotTag
         };
     }
 
@@ -342,6 +344,22 @@ public sealed class BotApiTranslator
         };
     }
 
+    private static Dictionary<string, object?> SellPlayerRequest(object? request)
+    {
+        if (request is not SellPlayerRequest r)
+        {
+            return Empty();
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["id"] = r.Id,
+            ["offer"] = r.Offer,
+            ["hours"] = r.Hours,
+            ["directSale"] = r.DirectSale
+        };
+    }
+
     private static Dictionary<string, object?> BidOutput(BidResponse? response)
     {
         if (response is null)
@@ -411,6 +429,20 @@ public sealed class BotApiTranslator
         {
             ["mainSkillIndex"] = r.MainSkillIndex,
             ["subSkillIndex"] = r.SubSkillIndex
+        };
+    }
+
+    private static Dictionary<string, object?> IndividualTrainingRequest(object? request)
+    {
+        if (request is not IndividualTrainingRequest r)
+        {
+            return Empty();
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["id"] = r.Id,
+            ["skillIndex"] = r.SkillIndex
         };
     }
 

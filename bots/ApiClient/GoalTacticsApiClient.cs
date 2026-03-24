@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net;
 using System.Text.Json;
 using GoalTactics.Bots.Client.Telemetry;
 
@@ -107,8 +108,18 @@ public sealed class GoalTacticsApiClient : IDisposable
 
     // ── Common (no auth required) ───────────────────────────────
 
-    public Task<PingResponse?> PingAsync()
-        => GetAsync<PingResponse>("/api/Ping");
+    public async Task<PingResponse?> PingAsync()
+    {
+        try
+        {
+            return await GetAsync<PingResponse>("/api/Ping");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            // Local API deployments expose health at /health instead of /api/Ping.
+            return await GetAsync<PingResponse>("/health");
+        }
+    }
 
     public Task<CountriesResponse?> GetCountriesAsync()
         => PostAsync<CountriesResponse>("/api/GetCountries");
@@ -148,6 +159,9 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task<BidResponse?> BidPlayerAsync(BidRequest request)
         => PostAsync<BidResponse>("/api/BidPlayer", request);
 
+    public Task SellPlayerAsync(SellPlayerRequest request)
+        => PostAsync("/api/Transfermarket/SellPlayer", request);
+
     public Task<FavouritesResponse?> GetTransfermarketFavouritesAsync()
         => PostAsync<FavouritesResponse>("/api/GetTransfermarketFavourites");
 
@@ -162,8 +176,8 @@ public sealed class GoalTacticsApiClient : IDisposable
     public Task SaveTeamTrainingAsync(SaveTrainingRequest request)
         => PostAsync("/api/SaveTeamTraining", request);
 
-    public Task SaveIndividualTrainingAsync(string playerId)
-        => PostAsync("/api/SaveIndividualTraining", new IndividualTrainingRequest { Id = playerId });
+    public Task SaveIndividualTrainingAsync(IndividualTrainingRequest request)
+        => PostAsync("/api/SaveIndividualTraining", request);
 
     public Task BookTrainingCampAsync(BookTrainingCampRequest request)
         => PostAsync("/api/Training/BookCamp", request);
@@ -283,12 +297,17 @@ public sealed class GoalTacticsApiClient : IDisposable
 
                     "SearchTransfermarket" => _botTranslator.Translate(normalized, request, await SearchTransfermarketAsync(AsRequest<SearchTransfermarketRequest>(request, normalized))),
                     "BidPlayer" => _botTranslator.Translate(normalized, request, await BidPlayerAsync(AsRequest<BidRequest>(request, normalized))),
+                    "SellPlayer" => await ExecuteNoResultAsync(normalized, request, r => SellPlayerAsync(r), AsRequest<SellPlayerRequest>(request, normalized)),
                     "GetTransfermarketFavourites" => _botTranslator.Translate(normalized, request, await GetTransfermarketFavouritesAsync()),
                     "UpdateTransfermarketFavourites" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => UpdateTransfermarketFavouritesAsync(r.Id)),
 
                     "GetTeamTraining" => _botTranslator.Translate(normalized, request, await GetTeamTrainingAsync()),
                     "SaveTeamTraining" => await ExecuteNoResultAsync(normalized, request, r => SaveTeamTrainingAsync(r), AsRequest<SaveTrainingRequest>(request, normalized)),
-                    "SaveIndividualTraining" => await ExecuteNoResultAsync<IdRequest>(normalized, request, r => SaveIndividualTrainingAsync(r.Id)),
+                    "SaveIndividualTraining" => await ExecuteNoResultAsync(
+                        normalized,
+                        request,
+                        r => SaveIndividualTrainingAsync(r),
+                        AsRequest<IndividualTrainingRequest>(request, normalized)),
                     "BookTrainingCamp" => await ExecuteNoResultAsync(normalized, request, r => BookTrainingCampAsync(r), AsRequest<BookTrainingCampRequest>(request, normalized)),
                     "UpdateCamps" => await ExecuteNoResultAsync(normalized, request, _ => UpdateCampsAsync(), new RequestObject()),
                     "CancelCamp" => await ExecuteNoResultAsync(normalized, request, _ => CancelCampAsync(), new RequestObject()),

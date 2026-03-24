@@ -8,6 +8,16 @@ Console.WriteLine($"  API URL:   {config.ApiBaseUrl}");
 Console.WriteLine($"  Neural:    {(config.NeuralEnabled ? "enabled" : "disabled")} ({config.NeuralApiUrl})");
 Console.WriteLine($"  Database:  {config.DatabasePath}");
 Console.WriteLine($"  Bot count: {config.BotCount}");
+if (config.EnableHistoricalBootstrap)
+{
+    Console.WriteLine($"  Bootstrap: enabled ({config.HistoricalBootstrapSeasons} seasons, +{config.HistoricalBootstrapBotsPerSeason}/season)");
+    Console.WriteLine($"  Brain:     {(config.HistoricalBootstrapCentralBrain ? "central-fast" : "session-by-session")}");
+    Console.WriteLine($"  Fast/Real: {config.HistoricalBootstrapFastSeasons} fast + {config.HistoricalBootstrapRealSimulationSeasons} real");
+    Console.WriteLine($"  Brain/day: {config.CentralBrainBotsPerMatchday} bots");
+    Console.WriteLine($"  Game DB:   {config.GameDatabasePath}");
+    Console.WriteLine($"  Anchor:    season {config.HistoricalBootstrapAnchorSeason} day1 @ {config.HistoricalBootstrapAnchorDayOneUtc}");
+    Console.WriteLine($"  Status:    {config.HistoricalBootstrapStatusPath}");
+}
 if (config.SimulateSeasons > 0)
 {
     Console.WriteLine($"  Sim mode:  {config.SimulateSeasons} seasons x {config.SimulateMatchdaysPerSeason} matchdays");
@@ -119,6 +129,59 @@ static BotConfig ParseConfig(string[] args)
 
     if (map.TryGetValue("simulation-snapshot-stride", out var simulationSnapshotStride) && int.TryParse(simulationSnapshotStride, out var stride))
         config.SimulationSnapshotStride = Math.Max(1, stride);
+
+    if (map.TryGetValue("enable-historical-bootstrap", out var bootstrapEnabled) && bool.TryParse(bootstrapEnabled, out var bootEnabled))
+        config.EnableHistoricalBootstrap = bootEnabled;
+
+    if (map.TryGetValue("historical-bootstrap-central-brain", out var centralBrain) && bool.TryParse(centralBrain, out var useCentralBrain))
+        config.HistoricalBootstrapCentralBrain = useCentralBrain;
+
+    if (map.TryGetValue("game-db-path", out var gameDbPath) && !string.IsNullOrWhiteSpace(gameDbPath))
+        config.GameDatabasePath = gameDbPath;
+
+    if (map.TryGetValue("historical-bootstrap-fast-seasons", out var fastSeasons) && int.TryParse(fastSeasons, out var fSeasons))
+        config.HistoricalBootstrapFastSeasons = Math.Max(0, fSeasons);
+
+    if (map.TryGetValue("historical-bootstrap-normal-season-count", out var normalSeasonCount) && int.TryParse(normalSeasonCount, out var nSeasons))
+    {
+        var normalized = Math.Max(0, nSeasons);
+        config.HistoricalBootstrapNormalSeasonCount = normalized;
+        config.HistoricalBootstrapRealSimulationSeasons = normalized;
+    }
+
+    if (map.TryGetValue("historical-bootstrap-real-simulation-seasons", out var realSimulationSeasons) && int.TryParse(realSimulationSeasons, out var rSeasons))
+        config.HistoricalBootstrapRealSimulationSeasons = Math.Max(0, rSeasons);
+
+    // Keep backward compatibility with an alternate legacy key.
+    if (map.TryGetValue("historical-bootstrap-real-season-count", out var realSeasonCountAlias) && int.TryParse(realSeasonCountAlias, out var rSeasonAlias))
+        config.HistoricalBootstrapRealSimulationSeasons = Math.Max(0, rSeasonAlias);
+
+    if (map.TryGetValue("central-brain-bots-per-matchday", out var centralBrainBotsPerMatchday) && int.TryParse(centralBrainBotsPerMatchday, out var brainBots))
+        config.CentralBrainBotsPerMatchday = Math.Max(1, brainBots);
+
+    if (map.TryGetValue("historical-bootstrap-seasons", out var bootstrapSeasons) && int.TryParse(bootstrapSeasons, out var bSeasons))
+        config.HistoricalBootstrapSeasons = Math.Max(1, bSeasons);
+
+    if (map.TryGetValue("historical-bootstrap-bots-per-season", out var bootstrapBots) && int.TryParse(bootstrapBots, out var bBots))
+        config.HistoricalBootstrapBotsPerSeason = Math.Max(0, bBots);
+
+    if (map.TryGetValue("historical-bootstrap-anchor-season", out var anchorSeason) && int.TryParse(anchorSeason, out var aSeason))
+        config.HistoricalBootstrapAnchorSeason = Math.Max(1, aSeason);
+
+    if (map.TryGetValue("historical-bootstrap-anchor-day1-utc", out var anchorDay1) && !string.IsNullOrWhiteSpace(anchorDay1))
+        config.HistoricalBootstrapAnchorDayOneUtc = anchorDay1;
+
+    if (map.TryGetValue("historical-bootstrap-status-path", out var bootstrapStatusPath) && !string.IsNullOrWhiteSpace(bootstrapStatusPath))
+        config.HistoricalBootstrapStatusPath = bootstrapStatusPath;
+
+    if (map.TryGetValue("enable-seasonal-bot-growth", out var seasonalGrowth) && bool.TryParse(seasonalGrowth, out var sGrowth))
+        config.EnableSeasonalBotGrowth = sGrowth;
+
+    if (map.TryGetValue("seasonal-bots-per-season", out var seasonalBots) && int.TryParse(seasonalBots, out var sBots))
+        config.SeasonalBotsPerSeason = Math.Max(0, sBots);
+
+    if (map.TryGetValue("seasonal-growth-check-minutes", out var seasonalCheck) && int.TryParse(seasonalCheck, out var sCheck))
+        config.SeasonalGrowthCheckMinutes = Math.Max(1, sCheck);
 
     return config;
 }

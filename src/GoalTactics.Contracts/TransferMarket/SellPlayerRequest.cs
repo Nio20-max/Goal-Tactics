@@ -17,8 +17,16 @@ public sealed class SellPlayerRequest : RequestObject
     public decimal? Offer { get; init; }
     public int? Hours { get; init; }
 
+    /// <summary>When true, sells the player instantly instead of creating an auction listing.</summary>
+    public bool DirectSale { get; init; }
+
+    /// <summary>Legacy alias used by some clients.</summary>
+    public bool? SellDirect { get; init; }
+
     /// <summary>Duration in hours (1–24). Defaults to 4.</summary>
     public int DurationHours { get; init; } = 4;
+
+    public bool IsDirectSale => DirectSale || (SellDirect ?? false) || (Hours.HasValue && Hours.Value <= 0);
 
     public Guid ResolvedPlayerId => PlayerId != Guid.Empty ? PlayerId : Id;
 
@@ -50,5 +58,16 @@ public sealed class SellPlayerRequest : RequestObject
         }
     }
 
-    public int ResolvedDurationHours => Hours.HasValue && Hours.Value > 0 ? Hours.Value : DurationHours;
+    public int ResolvedDurationHours
+    {
+        get
+        {
+            if (IsDirectSale)
+            {
+                return 0;
+            }
+
+            return Hours.HasValue && Hours.Value > 0 ? Hours.Value : DurationHours;
+        }
+    }
 }

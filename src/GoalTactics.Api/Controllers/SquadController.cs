@@ -188,7 +188,10 @@ public sealed class SquadController(ISquadService squadService, ICountryCatalog 
         }
 
         var auctionId = await transferMarketService.ListPlayerForSaleAsync(userId, request, cancellationToken);
-        return Ok(new ResponseObject { Success = true, Message = $"Player listed with auction {auctionId}" });
+        var message = auctionId == Guid.Empty
+            ? "Player sold directly"
+            : $"Player listed with auction {auctionId}";
+        return Ok(new ResponseObject { Success = true, Message = message });
     }
 
     private async Task<ActionResult<ResponseObject>> ExecuteMutation(

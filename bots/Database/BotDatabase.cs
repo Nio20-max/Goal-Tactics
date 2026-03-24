@@ -14,10 +14,22 @@ public sealed class BotDatabase : IDisposable
     {
         _connection = new SqliteConnection($"Data Source={databasePath}");
         _connection.Open();
+        ConfigureSqlitePragmas();
         EnsureSchema();
     }
 
     public void Dispose() => _connection.Dispose();
+
+    private void ConfigureSqlitePragmas()
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=NORMAL;
+            PRAGMA busy_timeout=5000;
+            """;
+        cmd.ExecuteNonQuery();
+    }
 
     // ── Schema ──────────────────────────────────────────────────
 

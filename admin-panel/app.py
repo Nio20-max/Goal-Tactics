@@ -27,10 +27,14 @@ app.secret_key = os.environ.get("GT_ADMIN_SECRET", "gt-admin-dev-secret")
 DATA_ROOT   = os.environ.get("GT_DATA_ROOT", "/mnt/website/goal_tactics")
 DB_PATH     = f"{DATA_ROOT}/data/goaltactics.db"
 BOT_DB_PATH = f"{DATA_ROOT}/data/bots.db"
+SNAPSHOT_DIR = f"{DATA_ROOT}/simulations/snapshots"
+SNAPSHOT_DB_PATH = os.environ.get("GT_SNAPSHOT_DB_PATH", f"{SNAPSHOT_DIR}/goaltactics_snapshot.db")
+BOT_SNAPSHOT_DB_PATH = os.environ.get("GT_BOT_SNAPSHOT_DB_PATH", f"{SNAPSHOT_DIR}/bots_snapshot.db")
 LOG_DIR     = f"{DATA_ROOT}/logs"
 BACKUP_DIR  = f"{DATA_ROOT}/backup"
 SAVES_DIR   = f"{DATA_ROOT}/saves"
 API_BASE_URL = os.environ.get("GT_API_BASE_URL", "https://gt.nikolai-linschmann.de")
+BOOTSTRAP_STATUS_PATH = os.environ.get("GT_BOOTSTRAP_STATUS_PATH", f"{DATA_ROOT}/simulations/historical-bootstrap-status.json")
 
 
 # ── Database helpers ─────────────────────────────────────────────
@@ -48,6 +52,30 @@ def db_query(db_path: str, sql: str, params: tuple = ()) -> list[dict]:
         return rows
     except Exception:
         return []
+
+
+def snapshot_db_path() -> str:
+    """Prefer snapshot DB if available. Falls back to live DB."""
+    if os.path.exists(SNAPSHOT_DB_PATH):
+        return SNAPSHOT_DB_PATH
+    return DB_PATH
+
+
+def snapshot_bot_db_path() -> str:
+    """Prefer snapshot bot DB if available. Falls back to active bot DB."""
+    if os.path.exists(BOT_SNAPSHOT_DB_PATH):
+        return BOT_SNAPSHOT_DB_PATH
+    return BOT_DB_PATH
+
+
+def db_query_snapshot(sql: str, params: tuple = ()) -> list[dict]:
+    """Query from snapshot or live fallback DB for game data."""
+    return db_query(snapshot_db_path(), sql, params)
+
+
+def db_query_snapshot_bots(sql: str, params: tuple = ()) -> list[dict]:
+    """Query from snapshot or live fallback bot DB."""
+    return db_query(snapshot_bot_db_path(), sql, params)
 
 
 def api_post_json(path: str, payload: dict, bearer_token: str | None = None) -> dict:
@@ -124,6 +152,68 @@ def get_bot_stats() -> dict:
     return stats
 
 
+def get_bootstrap_status() -> dict:
+    """Read historical bootstrap progress/status emitted by bots runtime."""
+    status = {
+        "exists": False,
+        "phase": "unknown",
+        "completed": False,
+        "progress_percent": 0.0,
+        "current_season": 0,
+        "current_matchday": 0,
+        "target_seasons": 0,
+        "matchdays_per_season": 0,
+        "completed_seasons": 0,
+        "total_sessions": 0,
+        "total_success": 0,
+        "total_auth_failures": 0,
+        "total_bots": 0,
+        "anchor_season": 0,
+        "anchor_day_one_utc": "",
+        "virtual_date_utc": "",
+        "observed_live_season": 0,
+        "observed_live_matchday": 0,
+        "updated_at_utc": "",
+    }
+
+    if not os.path.exists(BOOTSTRAP_STATUS_PATH):
+        return status
+
+    try:
+        with open(BOOTSTRAP_STATUS_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+
+        status["exists"] = True
+        status["phase"] = data.get("Phase", data.get("phase", "unknown"))
+        status["completed"] = bool(data.get("Completed", data.get("completed", False)))
+        status["current_season"] = int(data.get("CurrentSeason", data.get("current_season", 0)) or 0)
+        status["current_matchday"] = int(data.get("CurrentMatchday", data.get("current_matchday", 0)) or 0)
+        status["target_seasons"] = int(data.get("TargetSeasons", data.get("target_seasons", 0)) or 0)
+        status["matchdays_per_season"] = int(data.get("MatchdaysPerSeason", data.get("matchdays_per_season", 0)) or 0)
+        status["completed_seasons"] = int(data.get("CompletedSeasons", data.get("completed_seasons", 0)) or 0)
+        status["total_sessions"] = int(data.get("TotalSessions", data.get("total_sessions", 0)) or 0)
+        status["total_success"] = int(data.get("TotalSuccess", data.get("total_success", 0)) or 0)
+        status["total_auth_failures"] = int(data.get("TotalAuthFailures", data.get("total_auth_failures", 0)) or 0)
+        status["total_bots"] = int(data.get("TotalBots", data.get("total_bots", 0)) or 0)
+        status["anchor_season"] = int(data.get("AnchorSeason", data.get("anchor_season", 0)) or 0)
+        status["anchor_day_one_utc"] = str(data.get("AnchorDayOneUtc", data.get("anchor_day_one_utc", "")) or "")
+        status["virtual_date_utc"] = str(data.get("VirtualDateUtc", data.get("virtual_date_utc", "")) or "")
+        status["observed_live_season"] = int(data.get("ObservedLiveSeason", data.get("observed_live_season", 0)) or 0)
+        status["observed_live_matchday"] = int(data.get("ObservedLiveMatchday", data.get("observed_live_matchday", 0)) or 0)
+        status["updated_at_utc"] = str(data.get("UpdatedAtUtc", data.get("updated_at_utc", "")) or "")
+
+        target = max(1, status["target_seasons"])
+        # Within current season, assume linear progress by matchday.
+        md_total = max(1, status["matchdays_per_season"])
+        md_done = min(md_total, max(0, status["current_matchday"] - 1))
+        progress = (status["completed_seasons"] + (md_done / md_total)) / target
+        status["progress_percent"] = round(max(0.0, min(1.0, progress)) * 100.0, 2)
+    except Exception:
+        return status
+
+    return status
+
+
 # ── Log reading ──────────────────────────────────────────────────
 
 def read_log_tail(filename: str, lines: int = 500) -> str:
@@ -176,6 +266,7 @@ def index():
     game_stats = get_game_stats()
     bot_stats = get_bot_stats()
     log_files = get_log_files()
+    bootstrap_status = get_bootstrap_status()
 
     # Service status
     try:
@@ -191,6 +282,7 @@ def index():
     return render_template("index.html",
                            game_stats=game_stats,
                            bot_stats=bot_stats,
+                           bootstrap_status=bootstrap_status,
                            log_files=log_files,
                            service_status=service_status,
                            backup_count=backup_count)
@@ -369,6 +461,51 @@ def analytics_page():
                            recent_matches=recent_matches)
 
 
+@app.route("/snapshot")
+def snapshot_page():
+    """Show snapshot-based game state and navigation to details."""
+    teams = db_query_snapshot(
+        "SELECT id, name, country, league_name, fans, strength, wins, losses, members FROM teams ORDER BY name LIMIT 300")
+    players_count = db_query_snapshot("SELECT COUNT(*) as c FROM team_players")
+    matches = db_query_snapshot(
+        "SELECT id, league_id, scheduled_date_utc, home_team_name, away_team_name, home_score, away_score, is_played FROM league_matches ORDER BY scheduled_date_utc DESC LIMIT 200")
+    leagues = db_query_snapshot("SELECT id, name, tier, group_number, mount, dismount FROM leagues ORDER BY tier, group_number LIMIT 100")
+    league_teams = db_query_snapshot("SELECT league_id, team_id, team_name, points_home + points_away as points FROM league_teams ORDER BY league_id, points DESC LIMIT 300")
+    auctions = db_query_snapshot(
+        "SELECT id, player_name, player_position, player_strength, player_talent, player_age, minimum_bid, current_bid, current_bidder_team_name, end_date_utc, status FROM auctions ORDER BY end_date_utc ASC LIMIT 200")
+
+    return render_template("snapshot.html",
+                           teams=teams,
+                           players_count=players_count[0]['c'] if players_count else 0,
+                           matches=matches,
+                           leagues=leagues,
+                           league_teams=league_teams,
+                           auctions=auctions)
+
+
+@app.route("/snapshot/team/<team_id>")
+def snapshot_team_detail(team_id):
+    team = db_query_snapshot("SELECT * FROM teams WHERE id = ?", (team_id,))
+    if not team:
+        return "Team not found", 404
+    team = team[0]
+
+    players = db_query_snapshot(
+        "SELECT id, name, position, age, talent, strength, fitness, matches, goals, yellow_cards, red_cards, market_value FROM team_players WHERE team_id = ? ORDER BY position, strength DESC", (team_id,))
+
+    team_auctions = db_query_snapshot(
+        "SELECT id, player_name, player_position, player_strength, current_bid, current_bidder_team_name, end_date_utc, status FROM auctions WHERE seller_team_id = ? OR current_bidder_team_id = ? ORDER BY end_date_utc ASC", (team_id, team_id))
+
+    recent_matches = db_query_snapshot(
+        "SELECT id, league_id, scheduled_date_utc, home_team_name, away_team_name, home_score, away_score, is_played FROM league_matches WHERE home_team_name = ? OR away_team_name = ? ORDER BY scheduled_date_utc DESC LIMIT 50", (team['name'], team['name']))
+
+    return render_template("snapshot_team.html",
+                           team=team,
+                           players=players,
+                           team_auctions=team_auctions,
+                           recent_matches=recent_matches)
+
+
 @app.route("/backups")
 def backups_page():
     """Backup management page."""
@@ -514,6 +651,7 @@ def api_stats():
     return jsonify({
         "game": get_game_stats(),
         "bots": get_bot_stats(),
+        "bootstrap": get_bootstrap_status(),
     })
 
 

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Snapshot — GoalTactics Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Live Snapshot Browser</h1>
+    <span style="color:var(--text-muted)">Using snapshot DB: {{ 'enabled' if teams else 'no teams found' }}</span>
+</div>
+
+<div class="card-grid">
+    <div class="card"><div class="card-label">Teams</div><div class="card-value">{{ teams|length }}</div></div>
+    <div class="card"><div class="card-label">Players</div><div class="card-value">{{ players_count }}</div></div>
+    <div class="card"><div class="card-label">Matches</div><div class="card-value">{{ matches|length }}</div></div>
+    <div class="card"><div class="card-label">Leagues</div><div class="card-value">{{ leagues|length }}</div></div>
+    <div class="card"><div class="card-label">Auctions</div><div class="card-value">{{ auctions|length }}</div></div>
+</div>
+
+<div class="table-wrapper">
+    <div class="table-header"><h2>Teams</h2></div>
+    <table>
+        <thead>
+            <tr><th>Name</th><th>Country</th><th>League</th><th>Fans</th><th>Strength</th><th>W-L</th><th>Players</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            {% for t in teams %}
+            <tr>
+                <td><a href="/snapshot/team/{{ t.id }}" style="color:var(--accent)">{{ t.name }}</a></td>
+                <td>{{ t.country }}</td>
+                <td>{{ t.league_name }}</td>
+                <td>{{ t.fans }}</td>
+                <td>{{ t.strength }}</td>
+                <td>{{ t.wins }}-{{ t.losses }}</td>
+                <td>{{ t.members }}</td>
+                <td><a href="/snapshot/team/{{ t.id }}" class="btn btn-sm">Detail</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="table-wrapper">
+    <div class="table-header"><h2>Recent Matches</h2></div>
+    <table>
+        <thead><tr><th>Date (UTC)</th><th>League</th><th>Home</th><th>Away</th><th>Score</th><th>Played</th></tr></thead>
+        <tbody>
+            {% for m in matches %}
+            <tr>
+                <td>{{ m.scheduled_date_utc }}</td>
+                <td>{{ m.league_id }}</td>
+                <td>{{ m.home_team_name }}</td>
+                <td>{{ m.away_team_name }}</td>
+                <td>{{ m.home_score if m.home_score is not none else '-' }} : {{ m.away_score if m.away_score is not none else '-' }}</td>
+                <td>{{ 'Y' if m.is_played else 'N' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="table-wrapper">
+    <div class="table-header"><h2>Leagues / Standings</h2></div>
+    <table>
+        <thead><tr><th>League</th><th>Team</th><th>Points</th></tr></thead>
+        <tbody>
+            {% for t in league_teams %}
+            <tr>
+                <td>{{ t.league_id }}</td>
+                <td>{{ t.team_name }}</td>
+                <td>{{ t.points }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="table-wrapper">
+    <div class="table-header"><h2>Transfer Market</h2></div>
+    <table>
+        <thead><tr><th>Player</th><th>Pos</th><th>Str</th><th>Talent</th><th>Age</th><th>Min</th><th>Current</th><th>Bidder</th><th>Ends</th><th>Status</th></tr></thead>
+        <tbody>
+            {% for a in auctions %}
+            <tr>
+                <td>{{ a.player_name }}</td>
+                <td>{{ a.player_position }}</td>
+                <td>{{ a.player_strength }}</td>
+                <td>{{ a.player_talent }}</td>
+                <td>{{ a.player_age }}</td>
+                <td>{{ a.minimum_bid }}</td>
+                <td>{{ a.current_bid }}</td>
+                <td>{{ a.current_bidder_team_name }}</td>
+                <td>{{ a.end_date_utc }}</td>
+                <td>{{ a.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

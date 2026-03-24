@@ -368,8 +368,11 @@ public sealed class TrainingBehavior
 
         var resources = await api.ExecuteForBotAsync("GetMyResources");
         var squad = await api.ExecuteForBotAsync("GetSquad");
+        var squadPlayers = squad.Success
+            ? BotApiTranslationReader.GetObjectList(squad, "players").Select(ToPlayer).ToList()
+            : new List<PlayerSnapshot>();
         var squadStats = squad.Success
-            ? BuildSquadStats(BotApiTranslationReader.GetObjectList(squad, "players").Select(ToPlayer).ToList())
+            ? BuildSquadStats(squadPlayers)
             : new SquadStats();
 
         int pendingScoutCount = BotApiTranslationReader.GetInt(scouted.Output, "pendingScoutCount");
@@ -392,7 +395,8 @@ public sealed class TrainingBehavior
 
         if (pendingScoutCount < maxSimultaneousScouts)
         {
-            await api.ExecuteForBotAsync("InstructScout", new InstructScoutRequest());
+            var scoutRequest = BuildScoutInstruction(bot, nightPlan, squadPlayers, resources);
+            await api.ExecuteForBotAsync("InstructScout", scoutRequest);
 
             // refresh after new instruction (may take multiple attempts to generate candidates)
             for (int attempt = 0; attempt < 3; attempt++)
@@ -420,15 +424,15 @@ public sealed class TrainingBehavior
 
         if (squad.Success)
         {
-            var squadPlayers = BotApiTranslationReader.GetObjectList(squad, "players")
+            var currentSquadPlayers = BotApiTranslationReader.GetObjectList(squad, "players")
                 .Select(ToPlayer)
                 .Where(p => p.Age > 0)
                 .ToList();
 
-            if (squadPlayers.Count > 0)
+            if (currentSquadPlayers.Count > 0)
             {
-                avgAge = squadPlayers.Average(p => p.Age);
-                pctYoung = squadPlayers.Count(p => p.Age <= 23) / (double)squadPlayers.Count;
+                avgAge = currentSquadPlayers.Average(p => p.Age);
+                pctYoung = currentSquadPlayers.Count(p => p.Age <= 23) / (double)currentSquadPlayers.Count;
             }
         }
 
@@ -456,6 +460,87 @@ public sealed class TrainingBehavior
         {
             RememberScoutedRecruit(bot, best.Id);
         }
+    }
+
+    private static InstructScoutRequest BuildScoutInstruction(
+        BotRecord bot,
+        BotNightPlan? nightPlan,
+        List<PlayerSnapshot> squadPlayers,
+        BotApiTranslation resources)
+    {
+        var scoutType = (nightPlan?.ScoutIntensity ?? bot.YouthFocus) >= 75 ? "premium" : "normal";
+        var price = scoutType == "premium" ? 1000 : 10_000;
+        var money = BotApiTranslationReader.GetDecimal(resources.Output, "money");
+        var stars = BotApiTranslationReader.GetDecimal(resources.Output, "gtStars");
+
+        // Fall back to normal scouting if premium cannot be paid this session.
+        if (scoutType == "premium" && stars < 1000m)
+        {
+            scoutType = "normal";
+            price = 10_000;
+        }
+
+        if (scoutType == "normal" && money < 10_000m)
+        {
+            // Keep price at normal baseline; API-side validation decides final acceptance.
+            price = 10_000;
+        }
+
+        var (positionIndex, positionLabel) = DetermineScoutPositionFocus(squadPlayers);
+        return new InstructScoutRequest
+        {
+            ScoutType = scoutType,
+            Position = positionIndex,
+            PositionFilter = positionLabel,
+            Price = price
+        };
+    }
+
+    private static (int PositionIndex, string PositionLabel) DetermineScoutPositionFocus(List<PlayerSnapshot> squadPlayers)
+    {
+        // Desired squad profile: GK=2, DEF=6, MID=6, FWD=4.
+        var desired = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["GK"] = 2,
+            ["DEF"] = 6,
+            ["MID"] = 6,
+            ["FWD"] = 4
+        };
+
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["GK"] = 0,
+            ["DEF"] = 0,
+            ["MID"] = 0,
+            ["FWD"] = 0
+        };
+
+        foreach (var player in squadPlayers)
+        {
+            var group = PositionGroup(player.PositionIndex, player.PositionLabel);
+            if (counts.ContainsKey(group))
+            {
+                counts[group]++;
+            }
+        }
+
+        var weakest = counts
+            .Select(x => new
+            {
+                Position = x.Key,
+                Ratio = desired[x.Key] == 0 ? 1.0 : x.Value / (double)desired[x.Key]
+            })
+            .OrderBy(x => x.Ratio)
+            .ThenBy(x => x.Position)
+            .First().Position;
+
+        return weakest switch
+        {
+            "GK" => (0, "GK"),
+            "DEF" => (1, "DEF"),
+            "MID" => (2, "MID"),
+            _ => (3, "FWD")
+        };
     }
 
     private HashSet<string> GetRecentScoutedPlayerIds(BotRecord bot)
@@ -539,13 +624,31 @@ public sealed class TrainingBehavior
             {
                 0 => "GK",
                 1 => "DEF",
-                2 => "MID",
-                3 => "FWD",
+                2 => "DEF",
+                3 => "MID",
+                4 => "MID",
+                5 => "FWD",
+                6 => "FWD",
                 _ => "UNK"
             };
         }
 
         var normalized = positionLabel.Trim().ToUpperInvariant();
+        if (int.TryParse(normalized, out var numericCode))
+        {
+            return numericCode switch
+            {
+                0 => "GK",
+                1 => "DEF",
+                2 => "DEF",
+                3 => "MID",
+                4 => "MID",
+                5 => "FWD",
+                6 => "FWD",
+                _ => "UNK"
+            };
+        }
+
         if (normalized is "GK" or "GOALKEEPER" or "TOR") return "GK";
         if (normalized is "DEF" or "DEFENDER" or "ABWEHR") return "DEF";
         if (normalized is "MID" or "MIDFIELDER" or "MITTELFELD") return "MID";

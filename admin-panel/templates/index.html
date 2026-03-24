@@ -70,6 +70,47 @@
     </div>
 </div>
 
+<!-- Historical Bootstrap / Live Progress -->
+<div class="table-wrapper" style="margin-top: 20px;">
+    <div class="table-header">
+        <h2>Historical Bootstrap Progress</h2>
+        {% if bootstrap_status.exists %}
+            <span class="status-badge {{ 'status-active' if bootstrap_status.completed else 'status-inactive' }}">
+                {{ bootstrap_status.phase }}
+            </span>
+        {% endif %}
+    </div>
+
+    {% if bootstrap_status.exists %}
+    <div style="padding: 10px 0 18px 0;">
+        <div style="height: 14px; background: #1f2937; border-radius: 8px; overflow: hidden; border: 1px solid #334155;">
+            <div style="height: 100%; width: {{ bootstrap_status.progress_percent }}%; background: linear-gradient(90deg, #22c55e, #10b981);"></div>
+        </div>
+        <div style="margin-top: 8px; font-size: 13px; color: #94a3b8;">
+            {{ bootstrap_status.progress_percent }}% complete, season {{ bootstrap_status.current_season }} matchday {{ bootstrap_status.current_matchday }}
+            {% if bootstrap_status.virtual_date_utc %}
+            • virtual date {{ bootstrap_status.virtual_date_utc }}
+            {% endif %}
+        </div>
+    </div>
+    <table>
+        <tbody>
+            <tr><th>Target</th><td>{{ bootstrap_status.target_seasons }} seasons, {{ bootstrap_status.matchdays_per_season }} matchdays/season</td></tr>
+            <tr><th>Anchor</th><td>Season {{ bootstrap_status.anchor_season }} day 1 @ {{ bootstrap_status.anchor_day_one_utc }}</td></tr>
+            <tr><th>Completed Seasons</th><td>{{ bootstrap_status.completed_seasons }}</td></tr>
+            <tr><th>Total Sessions</th><td>{{ bootstrap_status.total_sessions }}</td></tr>
+            <tr><th>Successful Sessions</th><td>{{ bootstrap_status.total_success }}</td></tr>
+            <tr><th>Auth Failures</th><td>{{ bootstrap_status.total_auth_failures }}</td></tr>
+            <tr><th>Total Bots</th><td>{{ bootstrap_status.total_bots }}</td></tr>
+            <tr><th>Observed Live Season</th><td>{{ bootstrap_status.observed_live_season }} / matchday {{ bootstrap_status.observed_live_matchday }}</td></tr>
+            <tr><th>Updated</th><td>{{ bootstrap_status.updated_at_utc }}</td></tr>
+        </tbody>
+    </table>
+    {% else %}
+    <div style="padding: 12px 0; color: #94a3b8;">No bootstrap status file found yet.</div>
+    {% endif %}
+</div>
+
 <!-- Log Files Overview -->
 <div class="table-wrapper">
     <div class="table-header">

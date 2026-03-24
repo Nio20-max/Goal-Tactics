@@ -12,12 +12,18 @@ SAVES_DIR="${DATA_ROOT}/saves"
 BACKUP_DIR="${DATA_ROOT}/backup"
 DB_PATH="${DATA_ROOT}/data/goaltactics.db"
 BOT_DB_PATH="${DATA_ROOT}/data/bots.db"
+SNAPSHOT_DIR="${DATA_ROOT}/simulations/snapshots"
+SNAPSHOT_DB_PATH="${SNAPSHOT_DIR}/goaltactics_snapshot.db"
+BOT_SNAPSHOT_DB_PATH="${SNAPSHOT_DIR}/bots_snapshot.db"
+BOOTSTRAP_STATUS_PATH="${DATA_ROOT}/simulations/historical-bootstrap-status.json"
+# Enable daily progression ticks during fast simulation mode, even if real UTC days don't advance.
+export GT_SIMULATION_FORCE_DAY_TICK="1"
 BACKUP_INTERVAL=300  # 5 minutes
 API_HEALTH_TIMEOUT=60  # seconds to wait for API startup
 
 # Ensure directories exist
 mkdir -p "${DATA_ROOT}/data" "${DATA_ROOT}/data-protection" "${LOG_DIR}" \
-         "${SAVES_DIR}" "${BACKUP_DIR}" "${DATA_ROOT}/tmp"
+         "${SAVES_DIR}" "${BACKUP_DIR}" "${DATA_ROOT}/tmp" "${SNAPSHOT_DIR}"
 
 # ── Logging helpers ──────────────────────────────────────────────
 log() {
@@ -85,6 +91,23 @@ log "Starting GoalTactics Bots..."
     --api-url=http://127.0.0.1:5195 \
     --db-path="${BOT_DB_PATH}" \
     --bot-count=96 \
+    --neural-enabled=true \
+    --require-llm-for-chat=true \
+    --enable-historical-bootstrap=true \
+    --historical-bootstrap-central-brain=true \
+    --game-db-path="${DB_PATH}" \
+    --historical-bootstrap-fast-seasons=29 \
+    --historical-bootstrap-real-simulation-seasons=1 \
+    --central-brain-bots-per-matchday=16 \
+    --historical-bootstrap-seasons=30 \
+    --historical-bootstrap-bots-per-season=16 \
+    --historical-bootstrap-anchor-season=31 \
+    --historical-bootstrap-anchor-day1-utc=2026-03-23 \
+    --historical-bootstrap-status-path="${BOOTSTRAP_STATUS_PATH}" \
+    --enable-seasonal-bot-growth=true \
+    --seasonal-bots-per-season=16 \
+    --seasonal-growth-check-minutes=20 \
+    --simulate-matchdays=30 \
     --poll-interval=10 \
     >> "${LOG_DIR}/bots.log" 2>&1 &
 BOT_PID=$!
@@ -132,6 +155,36 @@ con_src.close()
             # Retain last 288 main backups (24h at 5min interval)
             ls -1t "${BACKUP_DIR}"/goaltactics_*.db.gz 2>/dev/null | tail -n +289 | xargs -r rm -f
             ls -1t "${BACKUP_DIR}"/bots_*.db.gz 2>/dev/null | tail -n +289 | xargs -r rm -f
+
+            # Save snapshot DB copy (live snapshot usage for admin panel)
+            if [[ -f "${DB_PATH}" ]]; then
+                python3 - <<PY 2>>"${LOG_DIR}/backup.log"
+import sqlite3, os
+src = "${DB_PATH}"
+dst = "${SNAPSHOT_DB_PATH}"
+if os.path.exists(src):
+    con_src = sqlite3.connect(src)
+    con_dst = sqlite3.connect(dst)
+    with con_dst:
+        con_src.backup(con_dst)
+    con_dst.close()
+    con_src.close()
+PY
+            fi
+            if [[ -f "${BOT_DB_PATH}" ]]; then
+                python3 - <<PY 2>>"${LOG_DIR}/backup.log"
+import sqlite3, os
+src = "${BOT_DB_PATH}"
+dst = "${BOT_SNAPSHOT_DB_PATH}"
+if os.path.exists(src):
+    con_src = sqlite3.connect(src)
+    con_dst = sqlite3.connect(dst)
+    with con_dst:
+        con_src.backup(con_dst)
+    con_dst.close()
+    con_src.close()
+PY
+            fi
 
             # Save state snapshot to saves directory
             local save_file="${SAVES_DIR}/state_${stamp}.json"
@@ -203,6 +256,23 @@ while true; do
             --api-url=http://127.0.0.1:5195 \
             --db-path="${BOT_DB_PATH}" \
             --bot-count=96 \
+            --neural-enabled=true \
+            --require-llm-for-chat=true \
+            --enable-historical-bootstrap=true \
+            --historical-bootstrap-central-brain=true \
+            --game-db-path="${DB_PATH}" \
+            --historical-bootstrap-fast-seasons=29 \
+            --historical-bootstrap-real-simulation-seasons=1 \
+            --central-brain-bots-per-matchday=16 \
+            --historical-bootstrap-seasons=30 \
+            --historical-bootstrap-bots-per-season=16 \
+            --historical-bootstrap-anchor-season=31 \
+            --historical-bootstrap-anchor-day1-utc=2026-03-23 \
+            --historical-bootstrap-status-path="${BOOTSTRAP_STATUS_PATH}" \
+            --enable-seasonal-bot-growth=true \
+            --seasonal-bots-per-season=16 \
+            --seasonal-growth-check-minutes=20 \
+            --simulate-matchdays=30 \
             --poll-interval=10 \
             >> "${LOG_DIR}/bots.log" 2>&1 &
         BOT_PID=$!

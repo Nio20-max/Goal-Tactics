@@ -23,6 +23,8 @@ public sealed class TransferMarketBehavior
     private sealed class TransferPlayerSnapshot
     {
         public string Name { get; init; } = "";
+        public int PositionIndex { get; init; }
+        public string PositionLabel { get; init; } = "";
         public int Age { get; init; }
         public int Talent { get; init; }
         public decimal Strength { get; init; }
@@ -32,11 +34,32 @@ public sealed class TransferMarketBehavior
         public string BidTeamName { get; init; } = "";
     }
 
+    private sealed class SquadPlayerSnapshot
+    {
+        public string Id { get; init; } = "";
+        public string Name { get; init; } = "";
+        public int PositionIndex { get; init; }
+        public string PositionLabel { get; init; } = "";
+        public int Age { get; init; }
+        public int Talent { get; init; }
+        public decimal Strength { get; init; }
+        public decimal MarketValue { get; init; }
+    }
+
     private sealed class SquadContext
     {
         public int SquadSize { get; init; }
         public double AverageAge { get; init; }
         public double YoungPlayerShare { get; init; }
+    }
+
+    private sealed class SquadPositionProfile
+    {
+        public int Goalkeepers { get; init; }
+        public int Defenders { get; init; }
+        public int Midfielders { get; init; }
+        public int Forwards { get; init; }
+        public string WeakestPosition { get; init; } = "MID";
     }
 
     public TransferMarketBehavior(BotDatabase db, SocialBehavior social, BotNeuralDecisionEngine neural, BotHumanizationService human, BotActionNeuralPolicy actionPolicy, BotConfig config)
@@ -65,16 +88,27 @@ public sealed class TransferMarketBehavior
         var envelope = _human.BuildTransferEnvelope(bot, availableMoney, availableStars);
 
         var squad = await api.ExecuteForBotAsync("GetSquad");
+        var squadPlayers = squad.Success
+            ? BotApiTranslationReader.GetObjectList(squad, "players").Select(ToSquadPlayer).Where(p => !string.IsNullOrWhiteSpace(p.Id)).ToList()
+            : new List<SquadPlayerSnapshot>();
+        if (squad.Success)
+        {
+            availableMoney = await TrySellPlayersAsync(api, bot, squad, nightPlan, availableMoney);
+        }
+
         var squadContext = BuildSquadContext(squad);
+        var positionProfile = BuildSquadPositionProfile(squadPlayers);
 
         // Search for players that match team needs
-        var searchRequest = BuildSearchRequest(bot);
+        var searchRequest = BuildSearchRequest(bot, squadContext, positionProfile);
         var market = await api.ExecuteForBotAsync("SearchTransfermarket", searchRequest);
         if (!market.Success) return;
 
         var players = BotApiTranslationReader.GetObjectList(market, "players")
             .Select(ToTransferPlayer)
             .Where(p => !string.IsNullOrEmpty(p.AuctionId))
+            .Where(p => ShouldConsiderTransferTarget(p, squadContext, positionProfile))
+            .OrderByDescending(p => TransferTargetScore(p, positionProfile))
             .ToList();
         if (players.Count == 0) return;
 
@@ -175,24 +209,139 @@ public sealed class TransferMarketBehavior
         }
     }
 
+    private async Task<decimal> TrySellPlayersAsync(
+        GoalTacticsApiClient api,
+        BotRecord bot,
+        BotApiTranslation squad,
+        BotNightPlan? nightPlan,
+        decimal availableMoney)
+    {
+        var players = BotApiTranslationReader.GetObjectList(squad, "players")
+            .Select(ToSquadPlayer)
+            .Where(p => !string.IsNullOrWhiteSpace(p.Id))
+            .ToList();
+        if (players.Count == 0)
+        {
+            return availableMoney;
+        }
+
+        var listedIds = BotApiTranslationReader.GetObjectList(squad, "playersOnTransfermarket")
+            .Select(p => BotApiTranslationReader.GetString(p, "id"))
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var urgencyTargetMoney = 8_000_000m;
+        var moneyUrgency = Math.Clamp((double)((urgencyTargetMoney - availableMoney) / urgencyTargetMoney), 0.0, 1.0);
+
+        if (!(nightPlan?.ConsiderSelling ?? false) && moneyUrgency < 0.25)
+        {
+            return availableMoney;
+        }
+
+        var squadContext = BuildSquadContext(squad);
+        var candidates = players
+            .Where(p => !listedIds.Contains(p.Id))
+            .Where(p => p.Age >= 31 || p.Talent <= 4 || p.Strength <= 52m)
+            .Where(p => CanSellWithoutBreakingPositionCoverage(p, players, listedIds))
+            .OrderByDescending(p => p.Age)
+            .ThenBy(p => p.Talent)
+            .ThenBy(p => p.Strength)
+            .Take(2)
+            .ToList();
+
+        foreach (var candidate in candidates)
+        {
+            var estimatedStartBid = Math.Max(1_000m, Math.Round((candidate.MarketValue > 0 ? candidate.MarketValue : candidate.Strength * 850m) * 0.9m, MidpointRounding.AwayFromZero));
+            var sellBidInput = new BidDecisionInput
+            {
+                Money = (double)availableMoney,
+                Stars = 0,
+                SquadSize = squadContext.SquadSize,
+                AverageAge = squadContext.AverageAge,
+                YoungPlayerShare = squadContext.YoungPlayerShare,
+                PlayerTalent = candidate.Talent,
+                PlayerStrength = (double)candidate.Strength,
+                PlayerAge = candidate.Age,
+                CurrentBid = (long)estimatedStartBid,
+                EstimatedBudgetCap = (int)Math.Max(2_000m, estimatedStartBid * 2m),
+                NightBidAggression = nightPlan?.BidAggression ?? bot.Risk
+            };
+
+            var bidProbability = _actionPolicy.PredictBidProbability(bot, sellBidInput);
+            var shouldSell = bidProbability >= 0.35 || moneyUrgency >= 0.7;
+            if (!shouldSell)
+            {
+                continue;
+            }
+
+            var directSale = moneyUrgency >= 0.75 && bidProbability < 0.5;
+            var durationHours = directSale ? 0 : (nightPlan?.ShouldBid == true ? 8 : 6);
+
+            var result = await api.ExecuteForBotAsync("SellPlayer", new SellPlayerRequest
+            {
+                Id = candidate.Id,
+                Offer = estimatedStartBid,
+                Hours = durationHours,
+                DirectSale = directSale
+            });
+
+            if (result.Success)
+            {
+                _db.AddActionLog(
+                    bot.BotId,
+                    "transfer-sell",
+                    $"{(directSale ? "direct" : "auction")} sale for {candidate.Name} (pBid={bidProbability:F2}, urgency={moneyUrgency:F2})",
+                    true,
+                    bot.Risk);
+
+                if (directSale)
+                {
+                    availableMoney += estimatedStartBid;
+                }
+            }
+            else
+            {
+                _db.AddActionLog(bot.BotId, "transfer-sell", $"Sale failed for {candidate.Name}", false, bot.Risk);
+            }
+        }
+
+        return availableMoney;
+    }
+
     /// <summary>
     /// Build a transfer market search based on youth focus:
     /// high youth focus → search for young, high-talent players.
     /// </summary>
-    private SearchTransfermarketRequest BuildSearchRequest(BotRecord bot)
+    private SearchTransfermarketRequest BuildSearchRequest(BotRecord bot, SquadContext squadContext, SquadPositionProfile positionProfile)
     {
         var request = new SearchTransfermarketRequest();
+        var weakestPosition = positionProfile.WeakestPosition;
+        request.SkillIndex = SkillIndexForPosition(weakestPosition);
 
-        if (bot.YouthFocus > 60)
+        var ageMax = bot.YouthFocus > 70 ? 24 : bot.YouthFocus > 40 ? 27 : 30;
+        if (squadContext.AverageAge >= 27)
         {
-            // Focus on high-talent young players
-            request.Talent = new RangeFilter { Min = 70, Max = 100 };
+            ageMax += 1;
         }
-        else if (bot.YouthFocus > 30)
+
+        request.Age = new RangeFilter { Min = 17, Max = ageMax };
+
+        var talentMin = bot.YouthFocus > 70 ? 7 : bot.YouthFocus > 40 ? 6 : 5;
+        if (squadContext.YoungPlayerShare < 0.35)
         {
-            request.Talent = new RangeFilter { Min = 50, Max = 100 };
+            talentMin = Math.Max(6, talentMin);
         }
-        // Low youth focus: no talent filter, accept any player
+
+        request.Talent = new RangeFilter { Min = talentMin, Max = 10 };
+
+        var strengthFloor = weakestPosition switch
+        {
+            "GK" => 66,
+            "DEF" => 64,
+            "MID" => 64,
+            _ => 65
+        };
+        request.Strength = new RangeFilter { Min = strengthFloor, Max = null };
 
         return request;
     }
@@ -304,6 +453,8 @@ public sealed class TransferMarketBehavior
         => new()
         {
             Name = BotApiTranslationReader.GetString(data, "name"),
+            PositionIndex = BotApiTranslationReader.GetInt(data, "position", -1),
+            PositionLabel = BotApiTranslationReader.GetString(data, "position"),
             Age = BotApiTranslationReader.GetInt(data, "age"),
             Talent = BotApiTranslationReader.GetInt(data, "talent"),
             Strength = BotApiTranslationReader.GetDecimal(data, "strength"),
@@ -312,6 +463,171 @@ public sealed class TransferMarketBehavior
             IsFrozen = BotApiTranslationReader.GetBool(data, "isFrozen"),
             BidTeamName = BotApiTranslationReader.GetString(data, "bidTeamName")
         };
+
+    private static SquadPlayerSnapshot ToSquadPlayer(Dictionary<string, object?> data)
+        => new()
+        {
+            Id = BotApiTranslationReader.GetString(data, "id"),
+            Name = BotApiTranslationReader.GetString(data, "name"),
+            PositionIndex = BotApiTranslationReader.GetInt(data, "position", -1),
+            PositionLabel = BotApiTranslationReader.GetString(data, "position"),
+            Age = BotApiTranslationReader.GetInt(data, "age"),
+            Talent = BotApiTranslationReader.GetInt(data, "talent"),
+            Strength = BotApiTranslationReader.GetDecimal(data, "strength"),
+            MarketValue = BotApiTranslationReader.GetDecimal(data, "marketValue")
+        };
+
+    private static bool ShouldConsiderTransferTarget(TransferPlayerSnapshot player, SquadContext squadContext, SquadPositionProfile profile)
+    {
+        if (player.Talent <= 0 || player.Age <= 0)
+        {
+            return false;
+        }
+
+        // Keep quality bar high enough so long-term simulations do not drift into weak/old squads.
+        var talentFloor = squadContext.AverageAge > 28 ? 5 : 6;
+        if (player.Talent < talentFloor)
+        {
+            return false;
+        }
+
+        if (player.Age > 31 && player.Talent < 8)
+        {
+            return false;
+        }
+
+        var position = PositionGroup(player.PositionIndex, player.PositionLabel);
+        if (position == "UNK")
+        {
+            return true;
+        }
+
+        var required = RequiredByPosition(position);
+        var owned = OwnedByPosition(profile, position);
+        return owned < required || player.Talent >= 8 || player.Age <= 23;
+    }
+
+    private static decimal TransferTargetScore(TransferPlayerSnapshot player, SquadPositionProfile profile)
+    {
+        var position = PositionGroup(player.PositionIndex, player.PositionLabel);
+        var required = RequiredByPosition(position);
+        var owned = OwnedByPosition(profile, position);
+        var scarcityBonus = Math.Max(0, required - owned) * 4m;
+        var overstockPenalty = Math.Max(0, owned - required) * 3m;
+
+        var quality = (player.Talent * 12m) + player.Strength - (player.Age * 1.2m);
+        return quality + scarcityBonus - overstockPenalty;
+    }
+
+    private static bool CanSellWithoutBreakingPositionCoverage(SquadPlayerSnapshot candidate, List<SquadPlayerSnapshot> allPlayers, HashSet<string> listedIds)
+    {
+        var position = PositionGroup(candidate.PositionIndex, candidate.PositionLabel);
+        if (position == "UNK")
+        {
+            return true;
+        }
+
+        var activeCount = allPlayers.Count(p => !listedIds.Contains(p.Id) && PositionGroup(p.PositionIndex, p.PositionLabel) == position);
+        var minimumRequired = position == "GK" ? 2 : 4;
+        return activeCount > minimumRequired;
+    }
+
+    private static SquadPositionProfile BuildSquadPositionProfile(List<SquadPlayerSnapshot> players)
+    {
+        var gk = players.Count(p => PositionGroup(p.PositionIndex, p.PositionLabel) == "GK");
+        var def = players.Count(p => PositionGroup(p.PositionIndex, p.PositionLabel) == "DEF");
+        var mid = players.Count(p => PositionGroup(p.PositionIndex, p.PositionLabel) == "MID");
+        var fwd = players.Count(p => PositionGroup(p.PositionIndex, p.PositionLabel) == "FWD");
+
+        var ratios = new Dictionary<string, decimal>(StringComparer.Ordinal)
+        {
+            ["GK"] = gk / (decimal)Math.Max(1, RequiredByPosition("GK")),
+            ["DEF"] = def / (decimal)Math.Max(1, RequiredByPosition("DEF")),
+            ["MID"] = mid / (decimal)Math.Max(1, RequiredByPosition("MID")),
+            ["FWD"] = fwd / (decimal)Math.Max(1, RequiredByPosition("FWD"))
+        };
+
+        var weakest = ratios.OrderBy(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).First().Key;
+
+        return new SquadPositionProfile
+        {
+            Goalkeepers = gk,
+            Defenders = def,
+            Midfielders = mid,
+            Forwards = fwd,
+            WeakestPosition = weakest
+        };
+    }
+
+    private static int SkillIndexForPosition(string position)
+        => position switch
+        {
+            "GK" => 1,
+            "DEF" => 0,
+            "MID" => 3,
+            "FWD" => 2,
+            _ => -1
+        };
+
+    private static int RequiredByPosition(string position)
+        => position switch
+        {
+            "GK" => 2,
+            "DEF" => 6,
+            "MID" => 6,
+            "FWD" => 4,
+            _ => 0
+        };
+
+    private static int OwnedByPosition(SquadPositionProfile profile, string position)
+        => position switch
+        {
+            "GK" => profile.Goalkeepers,
+            "DEF" => profile.Defenders,
+            "MID" => profile.Midfielders,
+            "FWD" => profile.Forwards,
+            _ => 0
+        };
+
+    private static string PositionGroup(int positionIndex, string positionLabel)
+    {
+        if (positionIndex >= 0)
+        {
+            return positionIndex switch
+            {
+                0 => "GK",
+                1 => "DEF",
+                2 => "DEF",
+                3 => "MID",
+                4 => "MID",
+                5 => "FWD",
+                6 => "FWD",
+                _ => "UNK"
+            };
+        }
+
+        var normalized = positionLabel.Trim().ToUpperInvariant();
+        if (int.TryParse(normalized, out var numericCode))
+        {
+            return numericCode switch
+            {
+                0 => "GK",
+                1 => "DEF",
+                2 => "DEF",
+                3 => "MID",
+                4 => "MID",
+                5 => "FWD",
+                6 => "FWD",
+                _ => "UNK"
+            };
+        }
+
+        if (normalized is "GK" or "GOALKEEPER" or "TOR") return "GK";
+        if (normalized is "DEF" or "DEFENDER" or "ABWEHR") return "DEF";
+        if (normalized is "MID" or "MIDFIELDER" or "MITTELFELD") return "MID";
+        if (normalized is "FWD" or "ST" or "ATT" or "STRIKER" or "ANGRIFF") return "FWD";
+        return "UNK";
+    }
 
     private static SquadContext BuildSquadContext(BotApiTranslation squad)
     {

@@ -279,6 +279,7 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext, INotification
                     if (player is not null)
                     {
                         player.TeamId = auction.CurrentBidderTeamId;
+                        EnsureRequiredPlayerFields(player);
                         // Assign new shirt number
                         var existingShirts = await dbContext.TeamPlayers
                             .Where(p => p.TeamId == auction.CurrentBidderTeamId && !p.IsScouted)
@@ -303,7 +304,7 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext, INotification
                         _ => "MID"
                     };
 
-                    dbContext.TeamPlayers.Add(new TeamPlayerEntity
+                    var playerEntity = new TeamPlayerEntity
                     {
                         Id = Guid.NewGuid().ToString("N"),
                         TeamId = auction.CurrentBidderTeamId,
@@ -317,7 +318,10 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext, INotification
                         Experience = LegacyAppCompatibility.BuildExperience(auction.PlayerStrength, auction.PlayerAge, 0),
                         Fitness = 100,
                         ContractEndUtc = DateTime.UtcNow.AddDays(180)
-                    });
+                    };
+
+                    EnsureRequiredPlayerFields(playerEntity);
+                    dbContext.TeamPlayers.Add(playerEntity);
                 }
 
                 // Deduct money from buyer's team
@@ -432,6 +436,35 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext, INotification
 
         await dbContext.SaveChangesAsync(ct);
         return auctionId;
+    }
+
+    public async Task<long> DirectSellPlayerAsync(string sellerTeamId, string playerId, long desiredPrice, CancellationToken ct = default)
+    {
+        var alreadyListed = await dbContext.Auctions.AsNoTracking()
+            .AnyAsync(a => a.PlayerId == playerId && a.Status == "Active", ct);
+        if (alreadyListed)
+        {
+            throw new InvalidOperationException("Player is already listed on the transfer market.");
+        }
+
+        var player = await dbContext.TeamPlayers
+            .FirstOrDefaultAsync(p => p.Id == playerId && p.TeamId == sellerTeamId && !p.IsScouted, ct)
+            ?? throw new InvalidOperationException("Player not found or not owned by team.");
+
+        var resources = await dbContext.TeamResources
+            .FirstOrDefaultAsync(r => r.TeamId == sellerTeamId, ct)
+            ?? throw new InvalidOperationException("Team resources not found.");
+
+        var baseMarket = player.MarketValue ?? Math.Max(1_000m, player.Strength * 900m);
+        var instantMarketCap = (long)Math.Round(Math.Max(1_000m, baseMarket * 0.78m), MidpointRounding.AwayFromZero);
+        var asked = Math.Max(1_000L, desiredPrice);
+        var payout = Math.Max(1_000L, Math.Min(asked, instantMarketCap));
+
+        resources.Money += payout;
+        dbContext.TeamPlayers.Remove(player);
+
+        await dbContext.SaveChangesAsync(ct);
+        return payout;
     }
 
     public async Task EnsureSystemAuctionsAsync(int minimumCount, CancellationToken ct = default)
@@ -619,6 +652,45 @@ public sealed class AuctionDbStore(GoalTacticsDbContext dbContext, INotification
         3 => 4,  // midfielder (main skill = playmaking)
         _ => -1
     };
+
+    private static void EnsureRequiredPlayerFields(TeamPlayerEntity player)
+    {
+        player.MarketValue ??= Math.Max(1_000m, player.Strength * 900m);
+
+        var hasAllSkills = player.Skill0.HasValue && player.Skill1.HasValue && player.Skill2.HasValue && player.Skill3.HasValue
+            && player.Skill4.HasValue && player.Skill5.HasValue && player.Skill6.HasValue && player.Skill7.HasValue
+            && player.Skill8.HasValue && player.Skill9.HasValue && player.Skill10.HasValue && player.Skill11.HasValue
+            && player.Skill12.HasValue && player.Skill13.HasValue;
+
+        if (hasAllSkills)
+        {
+            return;
+        }
+
+        var position = player.Position switch
+        {
+            "GK" or "DEF" or "MID" or "FWD" => player.Position,
+            _ => "MID"
+        };
+
+        var bonus = LegacyAppCompatibility.BuildRandomBonusSkills(Guid.TryParse(player.Id, out var parsedId) ? parsedId : Guid.Empty);
+        var skills = LegacyAppCompatibility.BuildSkills(player.Strength, position, player.Talent, player.Age, bonus);
+
+        player.Skill0 = skills[0];
+        player.Skill1 = skills[1];
+        player.Skill2 = skills[2];
+        player.Skill3 = skills[3];
+        player.Skill4 = skills[4];
+        player.Skill5 = skills[5];
+        player.Skill6 = skills[6];
+        player.Skill7 = skills[7];
+        player.Skill8 = skills[8];
+        player.Skill9 = skills[9];
+        player.Skill10 = skills[10];
+        player.Skill11 = skills[11];
+        player.Skill12 = skills[12];
+        player.Skill13 = skills[13];
+    }
 
     private async Task AddAuctionMailForTeamAsync(
         string teamId,

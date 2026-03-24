@@ -8,7 +8,7 @@ public interface IAuthStore
 
     Task<bool> IsManagerNameTakenAsync(string managerName, CancellationToken cancellationToken = default);
 
-    Task<bool> AddUserAsync(AuthUserRecord user, CancellationToken cancellationToken = default);
+    Task<bool> AddUserAsync(AuthUserRecord user, bool isBotRegistration = false, CancellationToken cancellationToken = default);
 
     Task AddSessionAsync(AuthSessionRecord session, CancellationToken cancellationToken = default);
 

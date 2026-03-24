@@ -6,6 +6,12 @@ public sealed class RegisterRequest : IValidatableObject
 {
     public bool IsGuest { get; init; }
 
+    /// <summary>
+    /// Optional registration marker for automation clients (for example, production bots).
+    /// </summary>
+    [StringLength(64)]
+    public string? BotTag { get; init; }
+
     [EmailAddress]
     [StringLength(256)]
     public string? Email { get; init; }
