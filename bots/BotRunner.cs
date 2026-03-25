@@ -17,6 +17,7 @@ using GoalTactics.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
@@ -156,6 +157,10 @@ public sealed class BotRunner : IDisposable
         {
             "season,matchday,sessions,successes,auth_failures,night_sessions"
         };
+            var matchdayTimingLines = new List<string>
+            {
+                "season,matchday,bots,duration_ms,duration_seconds"
+            };
 
         var reasonSamples = new List<string>();
         var actionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -171,6 +176,25 @@ public sealed class BotRunner : IDisposable
         {
             for (int matchday = 1; matchday <= _config.SimulateMatchdaysPerSeason && !ct.IsCancellationRequested; matchday++)
             {
+                var matchdayTimer = Stopwatch.StartNew();
+
+                if (_config.SimulateCentralBrainFastEngine)
+                {
+                    var fastSummary = await RunCentralBrainFastMatchdayAsync(season, matchday, ct);
+
+                    totalSessions += fastSummary.Sessions;
+                    totalSuccess += fastSummary.Success;
+                    totalAuthFailures += fastSummary.AuthFailures;
+
+                    seasonLines.Add($"{season},{matchday},{fastSummary.Sessions},{fastSummary.Success},{fastSummary.AuthFailures},0");
+                    matchdayTimer.Stop();
+                    var fastDurationMs = matchdayTimer.ElapsedMilliseconds;
+                    var fastDurationSeconds = matchdayTimer.Elapsed.TotalSeconds;
+                    matchdayTimingLines.Add($"{season},{matchday},{_db.GetBotCount()},{fastDurationMs},{fastDurationSeconds:F3}");
+                    Console.WriteLine($"[Sim] season={season} matchday={matchday} sessions={fastSummary.Sessions} success={fastSummary.Success} auth_fail={fastSummary.AuthFailures} night=0 duration_s={fastDurationSeconds:F3}");
+                    continue;
+                }
+
                 var bots = _db.GetAllBots();
                 int daySessions = 0;
                 int daySuccess = 0;
@@ -243,8 +267,11 @@ public sealed class BotRunner : IDisposable
                         reasonSamples.Add($"season={season},matchday={matchday},bot={bot.BotId},team={bot.TeamName},reason={result.DecisionReason}");
                     }
 
-                    // Light pacing to avoid bursting the API under higher bot counts.
-                    await Task.Delay(75, ct);
+                        // Allow benchmark runs to remove per-session pacing overhead.
+                        if (_config.SimulationInterSessionDelayMs > 0)
+                        {
+                            await Task.Delay(_config.SimulationInterSessionDelayMs, ct);
+                        }
                 }
 
                 totalSessions += daySessions;
@@ -253,11 +280,16 @@ public sealed class BotRunner : IDisposable
                 totalNightSessions += dayNightSessions;
 
                 seasonLines.Add($"{season},{matchday},{daySessions},{daySuccess},{dayAuthFailures},{dayNightSessions}");
-                Console.WriteLine($"[Sim] season={season} matchday={matchday} sessions={daySessions} success={daySuccess} auth_fail={dayAuthFailures} night={dayNightSessions}");
+                matchdayTimer.Stop();
+                var durationMs = matchdayTimer.ElapsedMilliseconds;
+                var durationSeconds = matchdayTimer.Elapsed.TotalSeconds;
+                matchdayTimingLines.Add($"{season},{matchday},{bots.Count},{durationMs},{durationSeconds:F3}");
+                Console.WriteLine($"[Sim] season={season} matchday={matchday} sessions={daySessions} success={daySuccess} auth_fail={dayAuthFailures} night={dayNightSessions} duration_s={durationSeconds:F3}");
             }
         }
 
         await File.WriteAllLinesAsync(Path.Combine(runDir, "season-simulation.csv"), seasonLines, ct);
+        await File.WriteAllLinesAsync(Path.Combine(runDir, "matchday-timings.csv"), matchdayTimingLines, ct);
 
         var actionsCsv = new List<string> { "action,count" };
         actionsCsv.AddRange(actionCounts.OrderByDescending(x => x.Value).Select(x => $"{x.Key},{x.Value}"));
@@ -399,7 +431,7 @@ public sealed class BotRunner : IDisposable
         for (var season = Math.Max(1, status.CurrentSeason); season <= fastSeasons && !ct.IsCancellationRequested; season++)
         {
             var startMatchday = season == status.CurrentSeason ? Math.Max(1, status.CurrentMatchday) : 1;
-            if (startMatchday == 1 && _config.HistoricalBootstrapBotsPerSeason > 0)
+            if (season > 1 && startMatchday == 1 && _config.HistoricalBootstrapBotsPerSeason > 0)
             {
                 await AddNewBotsAsync(_config.HistoricalBootstrapBotsPerSeason, $"bootstrap-season-{season}", ct);
             }
@@ -424,7 +456,7 @@ public sealed class BotRunner : IDisposable
 
         for (var season = fastSeasons + 1; season <= totalHistoricalSeasons && !ct.IsCancellationRequested; season++)
         {
-            if (_config.HistoricalBootstrapBotsPerSeason > 0)
+            if (season > 1 && _config.HistoricalBootstrapBotsPerSeason > 0)
             {
                 await AddNewBotsAsync(_config.HistoricalBootstrapBotsPerSeason, $"bootstrap-season-{season}", ct);
             }
@@ -476,6 +508,23 @@ public sealed class BotRunner : IDisposable
 
     private async Task<(int Sessions, int Success, int AuthFailures)> RunFullySimulatedSeasonAsync(int season, CancellationToken ct)
     {
+        if (!_config.HistoricalBootstrapCentralBrain)
+        {
+            var fastSessions = 0;
+            var fastSuccess = 0;
+            var fastAuthFail = 0;
+
+            for (var matchday = 1; matchday <= _config.SimulateMatchdaysPerSeason && !ct.IsCancellationRequested; matchday++)
+            {
+                var summary = await RunCentralBrainFastMatchdayAsync(season, matchday, ct);
+                fastSessions += summary.Sessions;
+                fastSuccess += summary.Success;
+                fastAuthFail += summary.AuthFailures;
+            }
+
+            return (fastSessions, fastSuccess, fastAuthFail);
+        }
+
         var sessions = 0;
         var success = 0;
         var authFail = 0;
@@ -541,10 +590,16 @@ public sealed class BotRunner : IDisposable
             return (0, 0, 0, 0, 0);
         }
 
+        var botUserIds = bots
+            .Select(x => x.BotId)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         var botTeams = await (
             from team in dbContext.Teams
             join user in dbContext.Users on team.UserId equals user.Id
             where user.Email != null && user.Email.EndsWith("@goaltactics.bot")
+                && botUserIds.Contains(user.Id)
             select team)
             .ToListAsync(ct);
 
@@ -1248,10 +1303,16 @@ public sealed class BotRunner : IDisposable
         var sponsorStore = scope.ServiceProvider.GetRequiredService<ISponsorStore>();
         var engine = new MatchSimulationEngine();
 
+        var botUserIds = _db.GetAllBots()
+            .Select(x => x.BotId)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         var botTeamIds = await (
             from team in dbContext.Teams.AsNoTracking()
             join user in dbContext.Users.AsNoTracking() on team.UserId equals user.Id
             where user.Email != null && user.Email.EndsWith("@goaltactics.bot")
+                && botUserIds.Contains(user.Id)
             select team.Id)
             .ToListAsync(ct);
 
@@ -1476,17 +1537,30 @@ public sealed class BotRunner : IDisposable
 
     private async Task AddNewBotsAsync(int count, string modelKeySuffix, CancellationToken ct)
     {
-        for (var i = 0; i < count && !ct.IsCancellationRequested; i++)
+        var created = 0;
+        var attempts = 0;
+        var maxAttempts = Math.Max(count * 8, count + 16);
+
+        while (created < count && attempts < maxAttempts && !ct.IsCancellationRequested)
         {
+            attempts++;
             var bot = await _factory.CreateBotAsync();
             if (bot is null)
             {
+                // Back off on failed registrations (typically rate limited), then retry.
+                await Task.Delay(800, ct);
                 continue;
             }
 
             _actionPolicy.EnsureBotModels(bot, modelKeySuffix, forceReset: true);
             _scheduler.ScheduleNextOnline(bot);
+            created++;
             await Task.Delay(150, ct);
+        }
+
+        if (created < count)
+        {
+            Console.Error.WriteLine($"[BotRunner] Bot growth incomplete for {modelKeySuffix}: requested={count}, created={created}, attempts={attempts}.");
         }
     }
 
@@ -1571,8 +1645,22 @@ public sealed class BotRunner : IDisposable
         }
 
         var tempPath = path + ".tmp";
-        await File.WriteAllTextAsync(tempPath, JsonSerializer.Serialize(status, new JsonSerializerOptions { WriteIndented = true }), ct);
-        File.Move(tempPath, path, overwrite: true);
+        var json = JsonSerializer.Serialize(status, new JsonSerializerOptions { WriteIndented = true });
+
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, json, ct);
+            File.Move(tempPath, path, overwrite: true);
+        }
+        catch (IOException)
+        {
+            // Mounted storage can occasionally fail atomic rename; fall back to direct write.
+            await File.WriteAllTextAsync(path, json, ct);
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 
     private DateTime ParseAnchorDate(string raw)

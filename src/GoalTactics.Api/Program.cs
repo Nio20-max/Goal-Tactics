@@ -84,7 +84,11 @@ builder.Services.AddDataProtection()
 builder.Services.AddGoalTacticsInfrastructure(builder.Configuration);
 builder.Services.AddGoalTacticsRealtime();
 builder.Services.AddGoalTacticsRealtimeFilters();
-builder.Services.AddGoalTacticsWorkerJobs();
+var enableWorkerJobs = builder.Configuration.GetValue<bool?>("Worker:EnableJobs") ?? true;
+if (enableWorkerJobs)
+{
+    builder.Services.AddGoalTacticsWorkerJobs();
+}
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -177,92 +181,96 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
-builder.Services.AddRateLimiter(options =>
+var enableRateLimiter = builder.Configuration.GetValue<bool?>("RateLimiting:Enabled") ?? true;
+if (enableRateLimiter)
 {
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-    options.OnRejected = async (context, cancellationToken) =>
+    builder.Services.AddRateLimiter(options =>
     {
-        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("RateLimiting");
-        var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        var path = context.HttpContext.Request.Path;
-        logger.LogWarning("Rate limit exceeded for IP {IpAddress} on {Path} (policy: {Policy})", ip, path, context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter) ? $"retry-after {retryAfter}" : "none");
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-        context.HttpContext.Response.ContentType = "application/json; charset=utf-8";
-        await context.HttpContext.Response.WriteAsync(
-            """{"success":false,"message":"Too many requests. Please try again later."}""",
-            cancellationToken);
-    };
-
-    // Global fallback: IP-based limit for all endpoints (generous ceiling)
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-    {
-        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: ip,
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 600,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-    });
-
-    static string BuildLimiterKey(HttpContext httpContext)
-    {
-        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!string.IsNullOrWhiteSpace(userId))
+        options.OnRejected = async (context, cancellationToken) =>
         {
-            return $"uid:{userId}";
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("RateLimiting");
+            var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var path = context.HttpContext.Request.Path;
+            logger.LogWarning("Rate limit exceeded for IP {IpAddress} on {Path} (policy: {Policy})", ip, path, context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter) ? $"retry-after {retryAfter}" : "none");
+
+            context.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+            await context.HttpContext.Response.WriteAsync(
+                """{"success":false,"message":"Too many requests. Please try again later."}""",
+                cancellationToken);
+        };
+
+        // Global fallback: IP-based limit for all endpoints (generous ceiling)
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        {
+            var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: ip,
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 600,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                });
+        });
+
+        static string BuildLimiterKey(HttpContext httpContext)
+        {
+            var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                return $"uid:{userId}";
+            }
+
+            var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            return $"ip:{ip}";
         }
 
-        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        return $"ip:{ip}";
-    }
+        options.AddPolicy("auth-sensitive", httpContext =>
+        {
+            var key = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: key,
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 200,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                });
+        });
 
-    options.AddPolicy("auth-sensitive", httpContext =>
-    {
-        var key = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: key,
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 200,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-    });
+        options.AddPolicy("chat-write", httpContext =>
+        {
+            var key = BuildLimiterKey(httpContext);
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: key,
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 12,
+                    Window = TimeSpan.FromSeconds(10),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                });
+        });
 
-    options.AddPolicy("chat-write", httpContext =>
-    {
-        var key = BuildLimiterKey(httpContext);
-        return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: key,
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 12,
-                Window = TimeSpan.FromSeconds(10),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
+        options.AddPolicy("mutation-write", httpContext =>
+        {
+            var key = BuildLimiterKey(httpContext);
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: key,
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 30,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                });
+        });
     });
-
-    options.AddPolicy("mutation-write", httpContext =>
-    {
-        var key = BuildLimiterKey(httpContext);
-        return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: key,
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 30,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-    });
-});
+}
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -324,7 +332,10 @@ app.UseRequestLocalization();
 // Extract JWT from request body "Token" field for the legacy Xamarin app.
 app.UseMiddleware<BodyTokenAuthMiddleware>();
 
-app.UseRateLimiter();
+if (enableRateLimiter)
+{
+    app.UseRateLimiter();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 

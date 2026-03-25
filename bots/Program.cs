@@ -21,6 +21,8 @@ if (config.EnableHistoricalBootstrap)
 if (config.SimulateSeasons > 0)
 {
     Console.WriteLine($"  Sim mode:  {config.SimulateSeasons} seasons x {config.SimulateMatchdaysPerSeason} matchdays");
+    Console.WriteLine($"  Sim delay: {config.SimulationInterSessionDelayMs}ms between bot sessions");
+    Console.WriteLine($"  Sim engine:{(config.SimulateCentralBrainFastEngine ? " central-brain-fast" : " full-bot-api")}");
     Console.WriteLine($"  Sim out:   {config.SimulationOutputRoot}");
     Console.WriteLine($"  Sim audit: {(config.EnableSimulationAudit ? "enabled" : "disabled")}, snapshots={(config.CaptureSimulationSnapshots ? "on" : "off")}, stride={config.SimulationSnapshotStride}");
 }
@@ -117,6 +119,12 @@ static BotConfig ParseConfig(string[] args)
 
     if (map.TryGetValue("simulate-matchdays", out var simulateMatchdays) && int.TryParse(simulateMatchdays, out var matchdays))
         config.SimulateMatchdaysPerSeason = Math.Max(1, matchdays);
+
+    if (map.TryGetValue("simulate-inter-session-delay-ms", out var simulationInterSessionDelay) && int.TryParse(simulationInterSessionDelay, out var interSessionDelay))
+        config.SimulationInterSessionDelayMs = Math.Max(0, interSessionDelay);
+
+    if (map.TryGetValue("simulate-central-brain-fast", out var simulateCentralBrainFast) && bool.TryParse(simulateCentralBrainFast, out var centralBrainFast))
+        config.SimulateCentralBrainFastEngine = centralBrainFast;
 
     if (map.TryGetValue("simulation-output-root", out var simulationOutputRoot) && !string.IsNullOrWhiteSpace(simulationOutputRoot))
         config.SimulationOutputRoot = simulationOutputRoot;

@@ -114,6 +114,7 @@ public sealed class BotFactory
             catch (HttpRequestException ex)
             {
                 Console.Error.WriteLine($"[BotFactory] Registration failed for {teamName} (attempt {attempt}/4): {ex.Message}");
+                await Task.Delay(300 * attempt);
                 continue;
             }
 
@@ -123,6 +124,7 @@ public sealed class BotFactory
             }
 
             Console.Error.WriteLine($"[BotFactory] Registration rejected for {teamName} (attempt {attempt}/4). Retrying with fresh identity...");
+            await Task.Delay(200 * attempt);
         }
 
         if (!registerResult.Success)

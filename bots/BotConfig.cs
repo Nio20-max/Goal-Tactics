@@ -34,6 +34,8 @@ public sealed class BotConfig
     public bool EnableSelfAudit { get; set; } = true;
     public int SimulateSeasons { get; set; } = 0;
     public int SimulateMatchdaysPerSeason { get; set; } = 30;
+    public int SimulationInterSessionDelayMs { get; set; } = 75;
+    public bool SimulateCentralBrainFastEngine { get; set; } = false;
     public string SimulationOutputRoot { get; set; } = "/mnt/website/goal_tactics/simulations";
     public bool EnableSimulationAudit { get; set; } = true;
     public bool CaptureSimulationSnapshots { get; set; } = true;
