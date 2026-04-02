@@ -339,6 +339,29 @@ if (enableRateLimiter)
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Legacy chat URL handling:
+// - Web browser GET /chat should show user-friendly guidance instead of SignalR "Connection ID required".
+// - WebSocket upgrade requests are forwarded to SignalR hub.
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.Equals("/chat", StringComparison.OrdinalIgnoreCase)
+        && context.Request.Method == HttpMethods.Get
+        && !context.WebSockets.IsWebSocketRequest
+        && !context.Request.Headers.TryGetValue("Upgrade", out var upgradeValue))
+    {
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync("<html><head><title>GoalTactics Chat</title></head><body>");
+        await context.Response.WriteAsync("<h1>Chat endpoint</h1>");
+        await context.Response.WriteAsync("<p>Use chat via the REST API and SignalR negotiation endpoints.</p>");
+        await context.Response.WriteAsync("<p>Login via <code>/api/Login</code>, then use <code>/api/PostChatMessage</code> and <code>/api/GetChatHistory</code>.</p>");
+        await context.Response.WriteAsync("<p>If you are a browser user, please navigate to the dedicated and improved /admin/chat interface or client UI.</p>");
+        await context.Response.WriteAsync("</body></html>");
+        return;
+    }
+
+    await next();
+});
+
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = async (context, report) =>

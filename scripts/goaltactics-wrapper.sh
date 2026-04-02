@@ -12,12 +12,13 @@ SAVES_DIR="${DATA_ROOT}/saves"
 BACKUP_DIR="${DATA_ROOT}/backup"
 DB_PATH="${DATA_ROOT}/data/goaltactics.db"
 BOT_DB_PATH="${DATA_ROOT}/data/bots.db"
+DISABLE_BOTS_FLAG="${DATA_ROOT}/tmp/disable_bots"
 SNAPSHOT_DIR="${DATA_ROOT}/simulations/snapshots"
 SNAPSHOT_DB_PATH="${SNAPSHOT_DIR}/goaltactics_snapshot.db"
 BOT_SNAPSHOT_DB_PATH="${SNAPSHOT_DIR}/bots_snapshot.db"
 BOOTSTRAP_STATUS_PATH="${DATA_ROOT}/simulations/historical-bootstrap-status.json"
-# Enable daily progression ticks during fast simulation mode, even if real UTC days don't advance.
-export GT_SIMULATION_FORCE_DAY_TICK="1"
+# Enable daily progression ticks during fast simulation mode for bots only,
+# so we don't accelerate real players while the API runs.
 BACKUP_INTERVAL=300  # 5 minutes
 API_HEALTH_TIMEOUT=60  # seconds to wait for API startup
 
@@ -86,32 +87,37 @@ if ! curl -sf http://127.0.0.1:5195/health >/dev/null 2>&1; then
 fi
 
 # ── Start Bots ───────────────────────────────────────────────────
-log "Starting GoalTactics Bots..."
-/usr/bin/dotnet "${INSTALL_ROOT}/bots/GoalTacticsBots.dll" \
-    --api-url=http://127.0.0.1:5195 \
-    --db-path="${BOT_DB_PATH}" \
-    --bot-count=96 \
-    --neural-enabled=true \
-    --require-llm-for-chat=true \
-    --enable-historical-bootstrap=true \
-    --historical-bootstrap-central-brain=true \
-    --game-db-path="${DB_PATH}" \
-    --historical-bootstrap-fast-seasons=29 \
-    --historical-bootstrap-real-simulation-seasons=1 \
-    --central-brain-bots-per-matchday=16 \
-    --historical-bootstrap-seasons=30 \
-    --historical-bootstrap-bots-per-season=16 \
-    --historical-bootstrap-anchor-season=31 \
-    --historical-bootstrap-anchor-day1-utc=2026-03-23 \
-    --historical-bootstrap-status-path="${BOOTSTRAP_STATUS_PATH}" \
-    --enable-seasonal-bot-growth=true \
-    --seasonal-bots-per-season=16 \
-    --seasonal-growth-check-minutes=20 \
-    --simulate-matchdays=30 \
-    --poll-interval=10 \
-    >> "${LOG_DIR}/bots.log" 2>&1 &
-BOT_PID=$!
-log "Bots started (PID ${BOT_PID})"
+if [[ -f "${DISABLE_BOTS_FLAG}" ]]; then
+    BOT_PID=""
+    log "Bot startup disabled by flag: ${DISABLE_BOTS_FLAG}"
+else
+    log "Starting GoalTactics Bots..."
+    env GT_SIMULATION_FORCE_DAY_TICK="1" /usr/bin/dotnet "${INSTALL_ROOT}/bots/GoalTacticsBots.dll" \
+        --api-url=http://127.0.0.1:5195 \
+        --db-path="${BOT_DB_PATH}" \
+        --bot-count=96 \
+        --neural-enabled=true \
+        --require-llm-for-chat=true \
+        --enable-historical-bootstrap=true \
+        --historical-bootstrap-central-brain=true \
+        --game-db-path="${DB_PATH}" \
+        --historical-bootstrap-fast-seasons=29 \
+        --historical-bootstrap-real-simulation-seasons=1 \
+        --central-brain-bots-per-matchday=16 \
+        --historical-bootstrap-seasons=30 \
+        --historical-bootstrap-bots-per-season=16 \
+        --historical-bootstrap-anchor-season=31 \
+        --historical-bootstrap-anchor-day1-utc=2026-03-23 \
+        --historical-bootstrap-status-path="${BOOTSTRAP_STATUS_PATH}" \
+        --enable-seasonal-bot-growth=true \
+        --seasonal-bots-per-season=16 \
+        --seasonal-growth-check-minutes=20 \
+        --simulate-matchdays=30 \
+        --poll-interval=10 \
+        >> "${LOG_DIR}/bots.log" 2>&1 &
+    BOT_PID=$!
+    log "Bots started (PID ${BOT_PID})"
+fi
 
 # ── Backup loop ──────────────────────────────────────────────────
 backup_loop() {
@@ -249,9 +255,11 @@ while true; do
         log "API restarted (PID ${API_PID})"
     fi
 
-    # Check if Bots are still alive
-    if ! kill -0 "$BOT_PID" 2>/dev/null; then
-        log "WARNING: Bot process (PID ${BOT_PID}) died. Restarting..."
+    # Check if Bots are still alive (unless auto-bot mode is disabled)
+    if [[ -f "${DISABLE_BOTS_FLAG}" ]]; then
+        BOT_PID=""
+    elif [[ -z "${BOT_PID}" ]] || ! kill -0 "$BOT_PID" 2>/dev/null; then
+        log "WARNING: Bot process (PID ${BOT_PID:-none}) not running. Restarting..."
         /usr/bin/dotnet "${INSTALL_ROOT}/bots/GoalTacticsBots.dll" \
             --api-url=http://127.0.0.1:5195 \
             --db-path="${BOT_DB_PATH}" \

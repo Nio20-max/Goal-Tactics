@@ -20,6 +20,7 @@ import shutil
 import hashlib
 import random
 import uuid
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -32,9 +33,11 @@ BOT_DB_PATH = f"{DATA_ROOT}/data/bots.db"
 LOG_DIR     = f"{DATA_ROOT}/logs"
 BACKUP_DIR  = f"{DATA_ROOT}/backup"
 SAVES_DIR   = f"{DATA_ROOT}/saves"
+TMP_DIR     = f"{DATA_ROOT}/tmp"
 INSTALL_ROOT = "/opt/goaltactics"
 SERVICE_NAME = "goaltactics.service"
 ADMIN_PANEL_SERVICE = "goaltactics-admin-panel.service"
+DISABLE_BOTS_FLAG_PATH = f"{TMP_DIR}/disable_bots"
 
 INITIAL_SQUAD_POSITIONS = ["GK", "GK", "DEF", "DEF", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "MID", "MID", "FWD", "FWD", "FWD", "FWD"]
 FIRST_NAMES = [
@@ -79,6 +82,18 @@ PRE_SIM_INTENSITY_MODIFIERS = {
         "talent_bonus": 1,
     },
 }
+
+PRE_SIM_MAX_AGE_YEARS = {
+    "light": 8.5,
+    "medium": 8.5,
+    "heavy": 30.0,
+}
+
+# Pre-simulation progression target: mirror notebook A4 semantics.
+A4_MAIN_WEIGHT = 0.55
+A4_BONUS_WEIGHT = 0.25
+A4_OVERALL_WEIGHT = 0.20
+A4_STRENGTH_MULTIPLIER = 1.4
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -138,6 +153,19 @@ def db_execute(db_path: str, sql: str, params: tuple = ()) -> int:
     affected = cur.rowcount
     con.close()
     return affected
+
+
+def wait_for_api_health(timeout_seconds: int = 120, poll_seconds: int = 2) -> bool:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:5195/health", timeout=5) as response:
+                if response.status == 200:
+                    return True
+        except Exception:
+            pass
+        time.sleep(poll_seconds)
+    return False
 
 
 def _stable_rng(seed_text: str) -> random.Random:
@@ -249,20 +277,38 @@ def individual_training_gain(age: int, talent: int, fitness: int) -> float:
 
 def derive_team_age_years(activity: int, rng: random.Random, intensity: str = "medium") -> float:
     act = max(0, min(100, activity)) / 100.0
+    intensity = normalize_intensity(intensity)
+    mod = PRE_SIM_INTENSITY_MODIFIERS[intensity]
+    max_age = PRE_SIM_MAX_AGE_YEARS.get(intensity, 8.5)
+    # Increase baseline to reflect more seasons run in stable bots. High activity means deeper history.
+    base_years = (1.0 + (4.1 * act) + rng.uniform(1.0, 3.6)) * mod["age_mult"]
+    return min(max_age, max(2.0, base_years))
+
+
+def facility_level_for_age(age_years: float, activity: int, youth_focus: int, intensity: str = "medium") -> int:
+    intensity = normalize_intensity(intensity)
+    mod = PRE_SIM_INTENSITY_MODIFIERS[intensity]
+    max_age = PRE_SIM_MAX_AGE_YEARS.get(intensity, 8.5)
+    age_signal = _clamp(age_years / max_age, 0.0, 1.0)
+    activity_signal = max(0, min(100, activity)) / 100.0
+    youth_signal = max(0, min(100, youth_focus)) / 100.0
+
+    # Infrastructure progression should reflect both club maturity and development intent.
+    infra_signal = 0.20 + (age_signal * 0.55 * mod["infra_mult"]) + (((activity_signal * 0.45) + (youth_signal * 0.55)) * 0.25)
+    return max(1, min(20, int(round(1 + (19 * _clamp(infra_signal, 0.0, 1.0))))))
+
+
+def training_quality_multiplier(activity: int, youth_focus: int, intensity: str = "medium") -> float:
     mod = PRE_SIM_INTENSITY_MODIFIERS[normalize_intensity(intensity)]
-    # Low-activity bots are often younger; high-activity bots have a larger historical footprint.
-    base_years = (0.15 + (3.6 * act) + rng.uniform(0.0, 2.8)) * mod["age_mult"]
-    return min(7.5, max(0.1, base_years))
+    activity_signal = max(0, min(100, activity)) / 100.0
+    youth_signal = max(0, min(100, youth_focus)) / 100.0
+
+    # Activity approximates routine consistency, youth focus approximates development effort.
+    base_quality = 0.82 + (activity_signal * 0.18) + (youth_signal * 0.20)
+    return round(_clamp(base_quality * mod["training_mult"], 0.70, 1.45), 3)
 
 
-def facility_level_for_age(age_years: float, activity: int) -> int:
-    if age_years >= 1.0:
-        return 20
-    activity_factor = 0.55 + (max(0, min(100, activity)) / 220.0)
-    return max(1, min(20, int(round(1 + (age_years * 19 * activity_factor)))))
-
-
-def build_stadium_state(age_years: float, activity: int, league_tier: int, intensity: str = "medium") -> tuple[int, int, int, int]:
+def build_stadium_state(age_years: float, activity: int, youth_focus: int, league_tier: int, intensity: str = "medium") -> tuple[int, int, int, int]:
     mod = PRE_SIM_INTENSITY_MODIFIERS[normalize_intensity(intensity)]
     vip_cap, sit_cap, stand_cap_by_tier = seat_caps_for_tier(league_tier)
     stand_cap = min(60000, stand_cap_by_tier)
@@ -281,7 +327,8 @@ def build_stadium_state(age_years: float, activity: int, league_tier: int, inten
     vip = max(200, min(vip_cap, vip))
     sit = max(2500, min(sit_cap, sit))
     stand = max(2300, min(stand_cap, stand))
-    return (20 if age_years >= 1.0 else facility_level_for_age(age_years, activity), vip, sit, stand)
+    level = facility_level_for_age(age_years, activity, youth_focus, intensity=intensity)
+    return (level, vip, sit, stand)
 
 
 def project_strength_from_training_curve(
@@ -292,66 +339,45 @@ def project_strength_from_training_curve(
     youth_focus: int,
     rng: random.Random,
     intensity: str = "medium",
-    elite_profile: bool = False,
 ) -> float:
     age = max(16, min(35, age))
-    talent = max(9 if elite_profile else 4, min(10, talent))
+    talent = max(4, min(10, talent))
     activity = max(0, min(100, activity))
     youth_focus = max(0, min(100, youth_focus))
     training_center_level = max(1, min(20, training_center_level))
-    mod = PRE_SIM_INTENSITY_MODIFIERS[normalize_intensity(intensity)]
 
-    start_age = 16 if youth_focus >= 55 else 17
+    # Start age and training quality should depend on scouting behavior, not hardcoded elite paths.
+    min_scout_age, max_scout_age = _select_scout_age_range(activity, youth_focus)
+    start_age = rng.randint(min_scout_age, min(max_scout_age, max(16, age)))
+    seed = rng.randint(1, 10_000_000)
+    base_strength = _generate_scouted_strength("MID", talent, seed)
+    base_strength = max(50.0, min(90.0, base_strength))
 
-    # Assume bots initially scouted quality players before long-term development.
-    scouting_quality = 0.45 + (activity / 220.0) + (youth_focus / 180.0)
-    scouted_base_strength = 300.0 + (talent * 14.0) + (scouting_quality * 40.0) if elite_profile else 50.0 + (talent * 2.6) + (scouting_quality * 6.0)
-    strength = scouted_base_strength + rng.uniform(-1.8, 1.8)
+    initial_fitness = int(max(50, min(100, 72 + (activity / 4.0) + rng.randint(-8, 8))))
+    days_per_year = {
+        "light": 24,
+        "medium": 30,
+        "heavy": 36,
+    }[normalize_intensity(intensity)]
+    gain_mult = training_quality_multiplier(activity, youth_focus, intensity=intensity)
 
-    training_factor = (
-        0.0044 * (0.95 + (activity / 170.0) + (youth_focus / 230.0)) * mod["training_mult"]
-        if elite_profile
-        else 0.0098 * (0.85 + (activity / 180.0) + (youth_focus / 260.0)) * mod["training_mult"]
+    strength, _, _, _ = _simulate_strength_progression(
+        start_age=start_age,
+        target_age=age,
+        talent=talent,
+        position="MID",
+        training_center_level=training_center_level,
+        initial_strength=base_strength,
+        initial_fitness=initial_fitness,
+        days_per_year=days_per_year,
+        fixed_main_training=True,
+        gain_multiplier=gain_mult,
+        strength_multiplier=A4_STRENGTH_MULTIPLIER,
+        main_weight=A4_MAIN_WEIGHT,
+        bonus_weight=A4_BONUS_WEIGHT,
+        overall_weight=A4_OVERALL_WEIGHT,
     )
-
-    for year_age in range(start_age, age):
-        main = daily_main_training_gain(year_age, talent, training_center_level)
-        sub = main * 0.18
-
-        # Virtual development assumes regular individual plans and recurring camps.
-        fitness = int(max(82, min(100, 86 + (training_center_level // 2) + rng.randint(-4, 4))))
-        individual = individual_training_gain(year_age, talent, fitness)
-        if elite_profile:
-            # Elite top teams are assumed to run individual programs from age 16 continuously.
-            individual_coverage = 1.0
-            camp_coverage = max(0.10, min(0.34, 0.10 + (activity / 900.0) + (youth_focus / 700.0)))
-        else:
-            individual_coverage = max(0.30, min(0.96, 0.38 + (activity / 210.0) + (youth_focus / 260.0)))
-            camp_coverage = max(0.02, min(0.26, 0.03 + (activity / 1000.0) + (youth_focus / 850.0)))
-
-        daily_effective = main + sub + (individual * individual_coverage) + (1.5 * camp_coverage)
-        yearly_growth = 365.0 * daily_effective * training_factor
-        strength += yearly_growth
-
-    peak_cap = (
-        610.0 + ((talent - 9) * 24.0) + ((activity - 85) * 0.8) + ((youth_focus - 80) * 0.65)
-        if elite_profile
-        else 53.0 + (talent * 4.0) + (activity * 0.12) + (youth_focus * 0.05)
-    )
-    if age <= 20:
-        peak_cap -= 35.0 if elite_profile else 5.0
-    elif age >= 31:
-        peak_cap -= min(95.0, (age - 30) * 18.0) if elite_profile else min(8.0, (age - 30) * 1.4)
-
-    peak_cap = max(420.0, min(600.0, peak_cap)) if elite_profile else max(62.0, min(97.0, peak_cap))
-    strength = min(strength, peak_cap)
-
-    if age >= 30:
-        strength -= (age - 29) * (16.0 if elite_profile else 0.95)
-
-    if elite_profile:
-        return round(max(360.0, min(600.0, strength)), 2)
-    return round(max(48.0, min(97.0, strength)), 2)
+    return round(max(1.0, min(700.0, strength)), 2)
 
 
 def _player_training_focus(position: str) -> str:
@@ -363,20 +389,280 @@ def _player_training_focus(position: str) -> str:
     }.get(position, "playmaking")
 
 
-def _skills_for_strength(position: str, strength: float, rng: random.Random) -> dict[str, float]:
-    base = strength * 0.90
-    primary = {"GK": [1], "DEF": [0, 6], "MID": [3, 4, 5], "FWD": [2, 8, 9]}.get(position, [3, 4])
-    secondary = {"GK": [0, 6], "DEF": [8, 9], "MID": [6, 9], "FWD": [4, 7]}.get(position, [9])
+def _clamp(value: float, mn: float, mx: float) -> float:
+    return max(mn, min(mx, value))
 
-    out: dict[str, float] = {}
+
+def _main_skill_index(position: str) -> int:
+    return {
+        "GK": 1,
+        "DEF": 0,
+        "MID": 3,
+        "FWD": 2,
+    }.get(position.upper(), 3)
+
+
+def _build_bonus_skills(position: str) -> list[int]:
+    return {
+        "GK": [1, 13, 13, 12],
+        "DEF": [0, 13, 12, 11],
+        "MID": [11, 10, 9, 8],
+        "FWD": [6, 5, 4, 3],
+    }.get(position.upper(), [0, 1])
+
+
+def _clamp_skill(skill: float) -> float:
+    return _clamp(skill, 1.0, 700.0)
+
+
+def _build_skills(strength: float, position: str, talent: int, age: int, bonus_skill_indices: list[int] | None = None) -> list[float]:
+    # Mirrors LegacyAppCompatibility.BuildSkills behavior used by the attached simulator.
+    primary_skill = _main_skill_index(position)
+    bonus_skills = bonus_skill_indices or _build_bonus_skills(position)
+    age_factor = max(0.85, 1.18 - (max(16, age) - 16) / 60)
+    talent_factor = 0.92 + (talent / 50.0)
+    base_skill = max(18.0, strength * 0.48 * age_factor * talent_factor)
+
+    skills: list[float] = []
     for idx in range(14):
-        value = base + rng.uniform(-12.0, 12.0)
-        if idx in primary:
-            value += strength * 0.16
-        elif idx in secondary:
-            value += strength * 0.07
-        out[f"skill_{idx}"] = round(max(40.0, value), 2)
-    return out
+        if idx == primary_skill:
+            weight = 1.95
+        elif idx in bonus_skills:
+            weight = 1.28
+        else:
+            weight = 0.62
+        skills.append(max(20.0, round(base_skill * weight, 10)))
+    return skills
+
+
+def _calculate_strength_from_skills(
+    skills: list[float],
+    position: str,
+    fitness: int,
+    age: int,
+    talent: int,
+    bonus_skill_indices: list[int] | None = None,
+    strength_multiplier: float = 1.0,
+    main_weight: float = 0.55,
+    bonus_weight: float = 0.25,
+    overall_weight: float = 0.20,
+) -> float:
+    if not skills or len(skills) < 14:
+        return 1.0
+
+    main_idx = _main_skill_index(position)
+    bonus_idx = bonus_skill_indices or _build_bonus_skills(position)
+
+    main = _clamp_skill(skills[main_idx])
+    bonus_vals = [_clamp_skill(skills[i]) for i in bonus_idx if 0 <= i < len(skills) and i != main_idx]
+    bonus_avg = sum(bonus_vals) / len(bonus_vals) if bonus_vals else 0.0
+    overall_avg = sum(_clamp_skill(x) for x in skills) / len(skills)
+
+    fit_factor = 0.80 + _clamp(fitness, 0, 100) / 500.0
+    age_factor = 0.98 if age <= 20 else 1.02 if age <= 24 else 1.00 if age <= 30 else 0.97 if age <= 34 else 0.94
+    talent_factor = 0.95 + _clamp(talent, 1, 10) * 0.01
+
+    base_strength = (main_weight * main) + (bonus_weight * bonus_avg) + (overall_weight * overall_avg)
+    strength = base_strength * fit_factor * age_factor * talent_factor * strength_multiplier
+    return _clamp(round(strength, 2), 1.0, 700.0)
+
+
+def _generate_scouted_strength(position: str, talent: int, seed: int) -> float:
+    rng = random.Random(seed)
+    base_str = {
+        "GK": 68.0,
+        "DEF": 62.0,
+        "MID": 63.0,
+        "FWD": 64.0,
+    }.get(position.upper(), 60.0)
+    bonus = rng.randint(-5, 14)
+    tier_bonus = rng.randint(2, 7) if talent >= 8 else 0
+    return _clamp(base_str + bonus + tier_bonus, 50.0, 90.0)
+
+
+def _simulate_strength_progression(
+    start_age: int,
+    target_age: int,
+    talent: int,
+    position: str,
+    training_center_level: int,
+    initial_strength: float,
+    initial_fitness: int,
+    days_per_year: int = 30,
+    fixed_main_training: bool = True,
+    gain_multiplier: float = 1.0,
+    strength_multiplier: float = A4_STRENGTH_MULTIPLIER,
+    main_weight: float = A4_MAIN_WEIGHT,
+    bonus_weight: float = A4_BONUS_WEIGHT,
+    overall_weight: float = A4_OVERALL_WEIGHT,
+) -> tuple[float, list[float], float, float]:
+    start_age = max(16, min(35, start_age))
+    target_age = max(start_age, min(35, target_age))
+    training_center_level = max(1, min(20, int(training_center_level)))
+    gain_multiplier = max(0.1, min(2.0, float(gain_multiplier)))
+
+    bonus_skills = _build_bonus_skills(position)
+    skills = _build_skills(initial_strength, position, talent, start_age, bonus_skills)
+    fitness = _clamp(initial_fitness, 0, 100)
+    experience = max(10.0, (initial_strength * 1.4) + max(0, start_age - 16) * 11.0)
+
+    strength = _calculate_strength_from_skills(
+        skills,
+        position,
+        int(fitness),
+        start_age,
+        talent,
+        bonus_skills,
+        strength_multiplier=strength_multiplier,
+        main_weight=main_weight,
+        bonus_weight=bonus_weight,
+        overall_weight=overall_weight,
+    )
+
+    total_days = int((target_age - start_age) * days_per_year)
+    for day_index in range(1, total_days + 1):
+        age_year = start_age + (day_index - 1) // days_per_year
+
+        # Applied model: changing team training focus + individual main-skill + 1.5 experience camp.
+        main_gain = daily_main_training_gain(age_year, talent, training_center_level)
+        sub_gain = round(main_gain * 0.18, 3)
+        individual = individual_training_gain(age_year, talent, int(fitness))
+        daily_total_gain = (main_gain + sub_gain + individual) * gain_multiplier
+
+        if fixed_main_training:
+            main_idx = _main_skill_index(position)
+            sub_idx = (main_idx + 1) % 14
+        else:
+            # Rotating team training by skill index.
+            main_idx = day_index % 14
+            sub_idx = (day_index + 1) % 14
+
+        skills[main_idx] = _clamp_skill(skills[main_idx] + (daily_total_gain * 0.65))
+        skills[sub_idx] = _clamp_skill(skills[sub_idx] + (daily_total_gain * 0.35))
+
+        # Individual training always boosts the currently trained main skill.
+        skills[main_idx] = _clamp_skill(skills[main_idx] + individual)
+
+        # Camp choice is fixed to +1.5 experience.
+        experience += 1.5
+
+        # Fitness gain mirrors backend rule: max(1, level/5)
+        fitness = min(100.0, fitness + max(1, training_center_level // 5))
+
+        strength = _calculate_strength_from_skills(
+            skills,
+            position,
+            int(fitness),
+            age_year,
+            talent,
+            bonus_skills,
+            strength_multiplier=strength_multiplier,
+            main_weight=main_weight,
+            bonus_weight=bonus_weight,
+            overall_weight=overall_weight,
+        )
+
+    return strength, skills, fitness, experience
+
+
+def _select_scout_age_range(activity: int, youth_focus: int) -> tuple[int, int]:
+    score = max(0, min(100, activity)) + max(0, min(100, youth_focus))
+    if score >= 155:
+        return (16, 21)
+    if score >= 120:
+        return (17, 23)
+    if score >= 90:
+        return (18, 25)
+    return (20, 28)
+
+
+def _simulate_player_history(
+    team_age_years: float,
+    activity: int,
+    youth_focus: int,
+    target_age: int,
+    position: str,
+    training_center_level: int,
+    intensity: str,
+    rng: random.Random,
+) -> tuple[int, int, float, int, int, list[float], float, float]:
+    total_seasons = max(1, int(round(team_age_years)))
+    min_scout_age, max_scout_age = _select_scout_age_range(activity, youth_focus)
+
+    # Scouting recency depends on activity + youth focus.
+    base_scout_threshold = min(0.96, 0.24 + (activity / 220.0) + (youth_focus / 260.0))
+    if rng.random() < base_scout_threshold:
+        seasons_since_scout = rng.randint(1, max(1, total_seasons // 2))
+        scouted_season = max(1, total_seasons - seasons_since_scout + 1)
+        scout_age = rng.randint(min_scout_age, min(max_scout_age, 21))
+    else:
+        seasons_since_scout = rng.randint(max(1, total_seasons // 2), total_seasons)
+        scouted_season = max(1, total_seasons - seasons_since_scout + 1)
+        scout_age = rng.randint(min_scout_age, max_scout_age)
+
+    base_age = scout_age + seasons_since_scout
+    current_age = int(round((0.45 * target_age) + (0.55 * base_age)))
+    current_age = max(16, min(35, current_age))
+
+    base_talent = 6
+    if current_age <= 21:
+        base_talent += 1
+    elif current_age >= 31:
+        base_talent -= 1
+    talent = max(4, min(10, base_talent + rng.randint(-2, 2)))
+
+    seed = rng.randint(1, 10_000_000)
+    initial_strength = _generate_scouted_strength(position, talent, seed)
+    initial_fitness = int(_clamp(78 + (activity / 5.0) + rng.randint(-6, 6), 50, 100))
+
+    days_per_year = {
+        "light": 24,
+        "medium": 30,
+        "heavy": 36,
+    }[normalize_intensity(intensity)]
+    gain_mult = training_quality_multiplier(activity, youth_focus, intensity=intensity)
+
+    strength, skills, fitness, experience = _simulate_strength_progression(
+        start_age=scout_age,
+        target_age=current_age,
+        talent=talent,
+        position=position,
+        training_center_level=training_center_level,
+        initial_strength=initial_strength,
+        initial_fitness=initial_fitness,
+        days_per_year=days_per_year,
+        fixed_main_training=True,
+        gain_multiplier=gain_mult,
+        strength_multiplier=A4_STRENGTH_MULTIPLIER,
+        main_weight=A4_MAIN_WEIGHT,
+        bonus_weight=A4_BONUS_WEIGHT,
+        overall_weight=A4_OVERALL_WEIGHT,
+    )
+
+    return current_age, talent, strength, scouted_season, seasons_since_scout, skills, fitness, experience
+
+
+def _assign_league_tiers_by_strength(cur: sqlite3.Cursor, ranked_team_strengths: list[tuple[str, int]]) -> None:
+    if not ranked_team_strengths:
+        return
+
+    tier_rows = cur.execute("SELECT DISTINCT tier FROM leagues ORDER BY tier ASC").fetchall()
+    tiers = [int(r[0]) for r in tier_rows] if tier_rows else [1, 2, 3, 4]
+    tier_name_rows = cur.execute("SELECT tier, MIN(name) FROM leagues GROUP BY tier").fetchall()
+    tier_names = {int(t): n for t, n in tier_name_rows}
+
+    total = len(ranked_team_strengths)
+    sorted_rows = sorted(ranked_team_strengths, key=lambda x: x[1], reverse=True)
+    tier_count = len(tiers)
+
+    for rank, (team_id, _) in enumerate(sorted_rows):
+        bucket = min(tier_count - 1, int((rank * tier_count) / max(1, total)))
+        tier = tiers[bucket]
+        league_name = tier_names.get(tier, f"Tier {tier}")
+        cur.execute(
+            "UPDATE teams SET league_tier = ?, league_name = ? WHERE id = ?",
+            (tier, league_name, team_id),
+        )
 
 
 def _position_base_strength(position: str) -> float:
@@ -405,49 +691,72 @@ def _generate_squad(
 ) -> list[dict]:
     rng = _stable_rng(f"{team_id}:{team_name}:{activity}:{youth_focus}:{age_years:.3f}")
 
-    mod = PRE_SIM_INTENSITY_MODIFIERS[normalize_intensity(intensity)]
-    elite_profile = activity >= 85 and youth_focus >= 80 and age_years >= 2.0 and intensity == "heavy"
-    young_slots = max(2, min(9, 2 + (youth_focus // 16) + (activity // 45) + (1 if intensity == "heavy" else 0)))
-    veteran_slots = max(1, min(5, int(age_years) + (0 if youth_focus >= 65 else 1)))
-    prime_slots = max(0, 18 - young_slots - veteran_slots)
+    # Enforce at least 2 seasons for maturity and avoid unrealistic brand-new team profiles.
+    team_age_seasons = max(2, int(round(age_years)))
 
-    ages: list[int] = []
-    for _ in range(young_slots):
-        ages.append(rng.randint(17, 22))
-    for _ in range(prime_slots):
-        ages.append(rng.randint(23, 28))
-    for _ in range(veteran_slots):
-        ages.append(rng.randint(29, 34))
-    rng.shuffle(ages)
+    # Historical player pool should be bounded for business rule: max 50 players per team.
+    players_per_season = max(15, int(15 + (activity * 0.05) + (youth_focus * 0.08)))
+    target_pool_size = max(20, min(50, int(team_age_seasons * players_per_season * 0.4)))
 
+    # Keep a realistic active roster that fits within 50-team max.
+    active_roster_size = max(14, min(24, 14 + int(team_age_seasons * 0.7) + (youth_focus // 35)))
+    active_targets = {
+        "GK": 3,
+        "DEF": 9,
+        "MID": 9,
+        "FWD": max(3, active_roster_size - 21),
+    }
+
+    # Position distribution based on bot needs/profile.
+    gk_ratio = 0.08
+    def_ratio = 0.33 - (youth_focus / 2500.0)
+    mid_ratio = 0.32 + (youth_focus / 2200.0)
+    fwd_ratio = max(0.15, 1.0 - (gk_ratio + def_ratio + mid_ratio))
+
+    pool_targets = {
+        "GK": max(2, int(target_pool_size * gk_ratio)),
+        "DEF": max(5, int(target_pool_size * def_ratio)),
+        "MID": max(5, int(target_pool_size * mid_ratio)),
+        "FWD": max(3, int(target_pool_size * fwd_ratio)),
+    }
+
+    position_counts = {"GK": 0, "DEF": 0, "MID": 0, "FWD": 0}
     players: list[dict] = []
     now_utc = datetime.now(timezone.utc)
-    for idx, position in enumerate(INITIAL_SQUAD_POSITIONS):
-        age = ages[idx % len(ages)]
-        if elite_profile:
-            talent = 9 if rng.random() < 0.35 else 10
-        else:
-            base_talent = 4 + (activity // 23) + (2 if age_years >= 2.0 else 0)
-            if age <= 21:
-                base_talent += youth_focus // 25
-            elif age >= 31:
-                base_talent -= 1
-            talent = max(4, min(10, base_talent + int(mod["talent_bonus"]) + rng.randint(-1, 1)))
 
-        projected = project_strength_from_training_curve(
-            age,
-            talent,
-            training_center_level,
-            activity,
-            youth_focus,
-            rng,
-            intensity=intensity,
-            elite_profile=elite_profile,
-        )
-        if elite_profile:
-            strength = round(max(420.0, min(600.0, projected + rng.uniform(-9.0, 9.0))), 2)
+    for idx in range(target_pool_size):
+        targets = active_targets if idx < active_roster_size else pool_targets
+        need_scores = {
+            pos: (targets.get(pos, 0) - position_counts[pos]) + rng.uniform(-0.35, 0.35)
+            for pos in ["GK", "DEF", "MID", "FWD"]
+        }
+        position = max(need_scores, key=need_scores.get)
+        position_counts[position] += 1
+
+        youth_bias = min(0.80, 0.26 + (youth_focus / 220.0) + (activity / 420.0))
+        veteran_bias = min(0.45, 0.16 + (activity / 350.0) - (youth_focus / 700.0))
+        core_bias = 1.0 - youth_bias - veteran_bias
+        core_bias = max(0.15, min(core_bias, 0.70))
+        veteran_bias = max(0.08, min(veteran_bias, 0.50))
+
+        r = rng.random()
+        if r < youth_bias:
+            target_age = rng.randint(16, 21)
+        elif r < youth_bias + core_bias:
+            target_age = rng.randint(22, 29)
         else:
-            strength = round(max(48.0, min(97.0, projected + _position_base_strength(position) + rng.uniform(-1.4, 1.4))), 2)
+            target_age = rng.randint(30, 35)
+
+        age, talent, strength, scouted_season, training_seasons, skills_arr, fitness, experience = _simulate_player_history(
+            team_age_years=age_years,
+            activity=activity,
+            youth_focus=youth_focus,
+            target_age=target_age,
+            position=position,
+            training_center_level=training_center_level,
+            intensity=intensity,
+            rng=rng,
+        )
 
         first = FIRST_NAMES[(rng.randrange(len(FIRST_NAMES)) + idx) % len(FIRST_NAMES)]
         last = LAST_NAMES[(rng.randrange(len(LAST_NAMES)) + idx * 3) % len(LAST_NAMES)]
@@ -457,7 +766,10 @@ def _generate_squad(
         contract_end = _utc_iso(now_utc + timedelta(days=contract_days))
         individual_until = _utc_iso(now_utc + timedelta(days=365))
         player_id = uuid.uuid4().hex
-        skills = _skills_for_strength(position, strength, rng)
+
+        # Scouting flags are not surfaced as a special elite mode anymore.
+        is_scouted = 0 if idx < active_roster_size else 1
+        scouting_ready_at = None if is_scouted else _utc_iso(now_utc + timedelta(days=rng.randint(2, 12)))
 
         players.append({
             "id": player_id,
@@ -469,38 +781,40 @@ def _generate_squad(
             "age": age,
             "talent": talent,
             "strength": strength,
-            "fitness": rng.randint(84, 100),
-            "matches": int(max(0, age_years * rng.uniform(6.0, 11.0))),
+            "fitness": int(fitness),
+            "matches": int(30 * team_age_seasons),
             "goals": 0,
             "yellow_cards": 0,
             "red_cards": 0,
             "individual_training_skill": _player_training_focus(position),
             "individual_training_until_utc": individual_until,
             "contract_end_utc": contract_end,
-            "is_scouted": 0,
-            "scouting_ready_at_utc": None,
+            "is_scouted": is_scouted,
+            "scouting_ready_at_utc": scouting_ready_at,
             "head": "01_head-A01",
             "body": "01_body-A00",
             "gloves": "01_Gloves01",
             "shoes": "01_Shoes01",
             "is_premium_scout": 0,
             "market_value": market_value,
-            "skill_0": skills["skill_0"],
-            "skill_1": skills["skill_1"],
-            "skill_2": skills["skill_2"],
-            "skill_3": skills["skill_3"],
-            "skill_4": skills["skill_4"],
-            "skill_5": skills["skill_5"],
-            "skill_6": skills["skill_6"],
-            "skill_7": skills["skill_7"],
-            "skill_8": skills["skill_8"],
-            "skill_9": skills["skill_9"],
-            "skill_10": skills["skill_10"],
-            "skill_11": skills["skill_11"],
-            "skill_12": skills["skill_12"],
-            "skill_13": skills["skill_13"],
+            "skill_0": round(skills_arr[0], 2),
+            "skill_1": round(skills_arr[1], 2),
+            "skill_2": round(skills_arr[2], 2),
+            "skill_3": round(skills_arr[3], 2),
+            "skill_4": round(skills_arr[4], 2),
+            "skill_5": round(skills_arr[5], 2),
+            "skill_6": round(skills_arr[6], 2),
+            "skill_7": round(skills_arr[7], 2),
+            "skill_8": round(skills_arr[8], 2),
+            "skill_9": round(skills_arr[9], 2),
+            "skill_10": round(skills_arr[10], 2),
+            "skill_11": round(skills_arr[11], 2),
+            "skill_12": round(skills_arr[12], 2),
+            "skill_13": round(skills_arr[13], 2),
             "suspension_matches_remaining": 0,
-            "experience": round(max(0.0, (strength * 0.9) + (age * 1.2) + rng.uniform(-6.0, 6.0)), 2),
+            "experience": round(max(0.0, experience), 2),
+            "sim_scouted_season": scouted_season,
+            "sim_training_seasons": training_seasons,
         })
 
     return players
@@ -519,6 +833,7 @@ def pre_simulate_bot_teams(max_wait_seconds: int = 300, poll_seconds: int = 5, i
 
     waited = 0
     bots: list[dict] = []
+    age_years_list: list[float] = []
     while waited <= max_wait_seconds:
         bots = db_query(BOT_DB_PATH, "SELECT BotId, TeamName, Activity, YouthFocus FROM Bots")
         if bots:
@@ -564,6 +879,7 @@ def pre_simulate_bot_teams(max_wait_seconds: int = 300, poll_seconds: int = 5, i
         now_utc = datetime.now(timezone.utc)
         cur = con.cursor()
 
+        ranked_team_strengths: list[tuple[str, int]] = []
         for team in teams:
             user_id = team["user_id"]
             team_id = team["team_id"]
@@ -576,13 +892,14 @@ def pre_simulate_bot_teams(max_wait_seconds: int = 300, poll_seconds: int = 5, i
             youth_focus = int(bot.get("YouthFocus") or 50)
             rng = _stable_rng(f"presim:{user_id}:{team_id}")
             age_years = derive_team_age_years(activity, rng, intensity=intensity)
+            age_years_list.append(age_years)
 
             created_at = now_utc - timedelta(days=int(age_years * 365.0))
             idle_hours = int((100 - max(0, min(100, activity))) * 0.9)
             last_activity = now_utc - timedelta(hours=idle_hours)
 
-            level, vip, sit, stand = build_stadium_state(age_years, activity, league_tier, intensity=intensity)
-            training_level = level if age_years >= 1.0 else max(level, 5)
+            level, vip, sit, stand = build_stadium_state(age_years, activity, youth_focus, league_tier, intensity=intensity)
+            training_level = max(1, min(20, level))
 
             cur.execute(
                 """
@@ -612,7 +929,7 @@ def pre_simulate_bot_teams(max_wait_seconds: int = 300, poll_seconds: int = 5, i
                 (level, training_level, level, level, level, level, vip, sit, stand, _utc_iso(now_utc), _utc_iso(now_utc), team_id),
             )
 
-            cur.execute("DELETE FROM team_players WHERE team_id = ? AND is_scouted = 0", (team_id,))
+            cur.execute("DELETE FROM team_players WHERE team_id = ?", (team_id,))
             squad = _generate_squad(
                 team_id,
                 team.get("team_name") or "Bot Team",
@@ -658,12 +975,31 @@ def pre_simulate_bot_teams(max_wait_seconds: int = 300, poll_seconds: int = 5, i
                 (team_strength, team_market_value, fans, max(100, fans // 2), team_id),
             )
             cur.execute("UPDATE league_teams SET strength = ? WHERE team_id = ?", (str(team_strength), team_id))
+            ranked_team_strengths.append((team_id, team_strength))
 
             summary.updated_teams += 1
+
+        _assign_league_tiers_by_strength(cur, ranked_team_strengths)
 
         con.commit()
     finally:
         con.close()
+
+    if age_years_list:
+        total_teams = len(age_years_list)
+        brackets = [
+            ((0.0, 1.0), "0-1"),
+            ((1.0, 2.0), "1-2"),
+            ((2.0, 3.0), "2-3"),
+            ((3.0, 5.0), "3-5"),
+            ((5.0, 10.0), "5-10"),
+            ((10.0, float('inf')), ">10"),
+        ]
+        print("  Club age distribution (years) at pre-sim:")
+        for (low, high), label in brackets:
+            count = sum(1 for a in age_years_list if low <= a < high)
+            percent = (count / total_teams) * 100
+            print(f"    {label}: {count}/{total_teams} ({percent:.1f}%)")
 
     return summary
 
@@ -721,13 +1057,6 @@ def reset_database(create_bots: bool = True):
     print(f"  Create bots after reset: {'YES' if create_bots else 'NO'}")
     print()
 
-    pre_simulate_bots = False
-    pre_sim_intensity = "medium"
-    if create_bots:
-        pre_simulate_bots = confirm("Pre-simulate bot teams after reset (fictional team age, stadium growth, trained squad)?")
-        if pre_simulate_bots:
-            pre_sim_intensity = choose_pre_sim_intensity()
-
     if not confirm("Are you absolutely sure?"):
         print("  Cancelled.")
         return
@@ -765,6 +1094,14 @@ def reset_database(create_bots: bool = True):
         print("  Bot database deleted.")
 
     # Restart service (API will auto-migrate on startup, bots will re-register)
+    os.makedirs(TMP_DIR, exist_ok=True)
+    if create_bots:
+        if os.path.exists(DISABLE_BOTS_FLAG_PATH):
+            os.remove(DISABLE_BOTS_FLAG_PATH)
+    else:
+        with open(DISABLE_BOTS_FLAG_PATH, "w", encoding="utf-8") as f:
+            f.write("1\n")
+
     if create_bots:
         print("  Starting service (bots will auto-register)...")
     else:
@@ -775,16 +1112,7 @@ def reset_database(create_bots: bool = True):
     print()
     if create_bots:
         print("  Bots will register themselves over the next few minutes.")
-        if pre_simulate_bots:
-            print(f"  Running bot pre-simulation ({pre_sim_intensity}) (waiting for registrations first)...")
-            summary = pre_simulate_bot_teams(max_wait_seconds=300, poll_seconds=5, intensity=pre_sim_intensity)
-            print("  Pre-simulation summary:")
-            print(f"    Intensity:             {pre_sim_intensity}")
-            print(f"    Bots in bot DB:        {summary.total_bots}")
-            print(f"    Bot teams matched:     {summary.matched_teams}")
-            print(f"    Teams pre-simulated:   {summary.updated_teams}")
-            print(f"    Missing team matches:  {summary.skipped_missing_team}")
-            print(f"    Players regenerated:   {summary.players_replaced}")
+        print("  Pre-simulation is NOT automatic. Use bot option 23 to run it manually when needed.")
     else:
         print("  To add bots later, use option 4 from the admin menu.")
 
@@ -827,21 +1155,75 @@ def add_bots():
         print("  Cancelled.")
         return
 
-    # Run the bot client with the new count target — it will register additional bots
-    # A very high poll interval ensures it exits after registration instead of entering the main loop
-    print(f"  Starting bot registration process for {count} new bots...")
-    result = run_cmd([
-        "/usr/bin/dotnet", f"{INSTALL_ROOT}/bots/GoalTacticsBots.dll",
-        f"--api-url=http://127.0.0.1:5195",
-        f"--db-path={BOT_DB_PATH}",
-        f"--bot-count={new_target}",
-        "--poll-interval=999999"
-    ], check=False, capture=True)
+    print("  Waiting for API health before registration...")
+    if not wait_for_api_health(timeout_seconds=120, poll_seconds=2):
+        print("  API is not healthy yet. Please retry in a minute.")
+        return
 
-    if result.stdout:
-        for line in result.stdout.strip().split("\n")[-10:]:
-            print(f"    {line}")
-    print(f"  Bot registration complete.")
+    # Run the bot client with the new count target — it will register additional bots
+    # Register-only mode ensures the process exits after bot creation and cannot loop endlessly.
+    print(f"  Starting bot registration process for {count} new bots...")
+    result = None
+    for attempt in range(1, 4):
+        result = run_cmd([
+            "/usr/bin/dotnet", f"{INSTALL_ROOT}/bots/GoalTacticsBots.dll",
+            f"--api-url=http://127.0.0.1:5195",
+            f"--db-path={BOT_DB_PATH}",
+            f"--bot-count={new_target}",
+            "--register-only=true",
+            "--poll-interval=999999"
+        ], check=False, capture=True)
+
+        if result.stdout:
+            print(f"  Attempt {attempt} output:")
+            for line in result.stdout.strip().split("\n")[-10:]:
+                print(f"    {line}")
+
+        if result.returncode == 0:
+            break
+
+        print(f"  Registration attempt {attempt} failed (exit code {result.returncode}).")
+        if result.stderr:
+            for line in result.stderr.strip().split("\n")[-6:]:
+                print(f"    {line}")
+
+        if attempt < 3:
+            print("  Waiting for API recovery before retry...")
+            if not wait_for_api_health(timeout_seconds=60, poll_seconds=2):
+                print("  API still unhealthy; aborting retries.")
+                break
+
+    # Final count summary helps operators spot partial registration quickly.
+    latest = db_query(BOT_DB_PATH, "SELECT COUNT(*) as c FROM Bots")
+    latest_count = latest[0]["c"] if latest else 0
+    print(f"  Bot registration finished. Current bot count: {latest_count}")
+
+
+def run_bot_presimulation_now():
+    """Run bot pre-simulation against currently registered bot teams."""
+    header("Pre-Simulate Bot Teams")
+
+    if not os.path.exists(BOT_DB_PATH):
+        print("  Bot DB not found.")
+        return
+    if not os.path.exists(DB_PATH):
+        print("  Main DB not found.")
+        return
+
+    intensity = choose_pre_sim_intensity()
+    if not confirm(f"Run bot pre-simulation now with intensity '{intensity}'?"):
+        print("  Cancelled.")
+        return
+
+    print("  Running pre-simulation...")
+    summary = pre_simulate_bot_teams(max_wait_seconds=180, poll_seconds=5, intensity=intensity)
+    print("  Pre-simulation summary:")
+    print(f"    Intensity:             {intensity}")
+    print(f"    Bots in bot DB:        {summary.total_bots}")
+    print(f"    Bot teams matched:     {summary.matched_teams}")
+    print(f"    Teams pre-simulated:   {summary.updated_teams}")
+    print(f"    Missing team matches:  {summary.skipped_missing_team}")
+    print(f"    Players regenerated:   {summary.players_replaced}")
 
 
 def remove_bots():
@@ -1220,6 +1602,7 @@ MENU = """
 ║    20. Show bots                             ║
 ║    21. Add bots                              ║
 ║    22. Remove bots                           ║
+║    23. Run bot pre-simulation now            ║
 ║                                              ║
 ║  LOGS                                        ║
 ║    30. View logs                             ║
@@ -1264,6 +1647,7 @@ def main():
             "20": show_bots,
             "21": add_bots,
             "22": remove_bots,
+            "23": run_bot_presimulation_now,
             "30": view_logs,
             "31": tail_logs,
             "40": list_backups,

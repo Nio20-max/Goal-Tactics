@@ -122,6 +122,13 @@ public sealed class BotRunner : IDisposable
         // Ensure we have enough bots registered
         await EnsureBotsRegisteredAsync(ct);
 
+        if (_config.RegisterOnly)
+        {
+            await EnsureRegisteredBotsInitializedAsync(ct);
+            Console.WriteLine("[BotRunner] Register-only mode complete. Exiting.");
+            return;
+        }
+
         if (_config.EnableHistoricalBootstrap)
         {
             await RunHistoricalBootstrapAsync(ct);
@@ -398,15 +405,40 @@ public sealed class BotRunner : IDisposable
     private async Task RunHistoricalBootstrapAsync(CancellationToken ct)
     {
         var status = await LoadBootstrapStatusAsync(ct);
-        if (status.Completed)
-        {
-            Console.WriteLine("[BotRunner] Historical bootstrap already completed. Continuing live runtime.");
-            return;
-        }
-
         var anchorDate = ParseAnchorDate(_config.HistoricalBootstrapAnchorDayOneUtc);
         var fastSeasons = Math.Max(1, _config.HistoricalBootstrapFastSeasons);
         var totalHistoricalSeasons = fastSeasons + Math.Max(0, _config.HistoricalBootstrapRealSimulationSeasons);
+
+        if (status.Completed)
+        {
+            if (status.AnchorSeason != _config.HistoricalBootstrapAnchorSeason
+                || status.TargetSeasons != totalHistoricalSeasons
+                || status.AnchorDayOneUtc != anchorDate.ToString("yyyy-MM-dd"))
+            {
+                Console.WriteLine("[BotRunner] Historical bootstrap status already completed, but configuration changed. Resetting bootstrap status.");
+                status = new HistoricalBootstrapStatus
+                {
+                    Phase = "bootstrap-running",
+                    Completed = false,
+                    TargetSeasons = totalHistoricalSeasons,
+                    MatchdaysPerSeason = _config.SimulateMatchdaysPerSeason,
+                    CurrentSeason = 1,
+                    CurrentMatchday = 1,
+                    CompletedSeasons = 0,
+                    LiveSeasonalGrowthLastApplied = _config.HistoricalBootstrapAnchorSeason - 1,
+                    AnchorSeason = _config.HistoricalBootstrapAnchorSeason,
+                    AnchorDayOneUtc = anchorDate.ToString("yyyy-MM-dd"),
+                    StartedAtUtc = DateTime.UtcNow.ToString("o"),
+                    UpdatedAtUtc = DateTime.UtcNow.ToString("o")
+                };
+                await SaveBootstrapStatusAsync(status, ct);
+            }
+            else
+            {
+                Console.WriteLine("[BotRunner] Historical bootstrap already completed. Continuing live runtime.");
+                return;
+            }
+        }
         var runDir = Path.Combine(_config.SimulationOutputRoot, $"bots_bootstrap_{DateTime.UtcNow:yyyyMMdd_HHmmss}");
         Directory.CreateDirectory(runDir);
 
@@ -598,8 +630,7 @@ public sealed class BotRunner : IDisposable
         var botTeams = await (
             from team in dbContext.Teams
             join user in dbContext.Users on team.UserId equals user.Id
-            where user.Email != null && user.Email.EndsWith("@goaltactics.bot")
-                && botUserIds.Contains(user.Id)
+            where botUserIds.Contains(user.Id)
             select team)
             .ToListAsync(ct);
 
@@ -1693,20 +1724,101 @@ public sealed class BotRunner : IDisposable
             return;
         }
 
-        Console.WriteLine($"[BotRunner] Registering {needed} new bots...");
-        for (int i = 0; i < needed && !ct.IsCancellationRequested; i++)
+        Console.WriteLine($"[BotRunner] Registering {needed} new bots (bounded retries)...");
+        var created = 0;
+        var attempts = 0;
+        var maxAttempts = Math.Max(needed * 10, needed + 32);
+        var consecutiveFailures = 0;
+
+        while (created < needed && attempts < maxAttempts && !ct.IsCancellationRequested)
         {
+            attempts++;
             var bot = await _factory.CreateBotAsync();
             if (bot is not null)
             {
                 _actionPolicy.EnsureBotModels(bot);
                 // Schedule the bot's first online time (shortly in the future)
                 _scheduler.ScheduleNextOnline(bot);
+                created++;
+                consecutiveFailures = 0;
+                await Task.Delay(180, ct);
+                continue;
             }
 
-            // Brief pause to avoid hammering the API
-            await Task.Delay(200, ct);
+            consecutiveFailures++;
+            // Backoff hard on repeated 429/registration failures to avoid loops.
+            var backoffMs = Math.Min(7_500, 600 + (consecutiveFailures * 350));
+            await Task.Delay(backoffMs, ct);
+
+            if (consecutiveFailures >= 25)
+            {
+                Console.Error.WriteLine("[BotRunner] Too many consecutive registration failures. Stopping registration pass to avoid endless retry cycle.");
+                break;
+            }
         }
+
+        var finalCount = _db.GetBotCount();
+        if (created < needed)
+        {
+            Console.Error.WriteLine($"[BotRunner] Registration incomplete: requested={needed}, created={created}, attempts={attempts}, final_count={finalCount}.");
+        }
+        else
+        {
+            Console.WriteLine($"[BotRunner] Registration complete: +{created} bots, final_count={finalCount}.");
+        }
+    }
+
+    private async Task EnsureRegisteredBotsInitializedAsync(CancellationToken ct)
+    {
+        var bots = _db.GetAllBots();
+        if (bots.Count == 0)
+        {
+            return;
+        }
+
+        Console.WriteLine("[BotRunner] Initializing registered bot teams...");
+        var ok = 0;
+        var failed = 0;
+
+        foreach (var bot in bots)
+        {
+            if (ct.IsCancellationRequested)
+            {
+                break;
+            }
+
+            try
+            {
+                if (!await EnsureAuthenticatedAsync(bot))
+                {
+                    failed++;
+                    continue;
+                }
+
+                _api.SetToken(bot.ValidationToken);
+                var teamInfo = await _api.ExecuteForBotAsync("GetMyTeamExtendedInfo");
+                if (teamInfo.Success)
+                {
+                    ok++;
+                }
+                else
+                {
+                    failed++;
+                }
+            }
+            catch
+            {
+                failed++;
+            }
+            finally
+            {
+                _api.ClearToken();
+            }
+
+            await Task.Delay(60, ct);
+        }
+
+        Console.WriteLine($"[BotRunner] Team initialization finished: ok={ok}, failed={failed}.");
     }
 
     /// <summary>

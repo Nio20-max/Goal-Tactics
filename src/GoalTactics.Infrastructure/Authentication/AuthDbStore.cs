@@ -568,9 +568,9 @@ public sealed class AuthDbStore(GoalTacticsDbContext dbContext) : IAuthStore
             var age = i < 4 ? random.Next(18, 24) : random.Next(18, 33);
             var talent = random.Next(4, 11);
             var fitness = random.Next(86, 101);
-            var strength = Math.Clamp(baseStrength + random.Next(-6, 12) + random.Next(0, 6), 55m, 95m);
+            var strengthSeed = Math.Clamp(baseStrength + random.Next(-6, 12) + random.Next(0, 6), 55m, 95m);
             var bonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(playerId);
-            var skills = LegacyAppCompatibility.BuildSkills(strength, position, talent, age, bonusSkills);
+            var skills = LegacyAppCompatibility.BuildSkills(strengthSeed, position, talent, age, bonusSkills);
             var calculatedStrength = PlayerValueCalculator.CalculateStrength(skills, position, fitness, age, talent, bonusSkills);
             var marketValue = PlayerValueCalculator.CalculateMarketValue(skills, position, fitness, age, talent, bonusSkills);
 

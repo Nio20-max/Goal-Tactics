@@ -55,6 +55,7 @@ public sealed class BotConfig
     public bool EnableSeasonalBotGrowth { get; set; } = true;
     public int SeasonalBotsPerSeason { get; set; } = 16;
     public int SeasonalGrowthCheckMinutes { get; set; } = 30;
+    public bool RegisterOnly { get; set; } = false;
 
     /// <summary>Rate limits expressed as minimum seconds between successive calls.</summary>
     public RateLimits Rates { get; set; } = new();

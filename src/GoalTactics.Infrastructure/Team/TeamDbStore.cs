@@ -2675,7 +2675,7 @@ public sealed class TeamDbStore(
                 "FWD" => 70m,
                 _ => 65m
             };
-            var strength = Math.Clamp(baseStrength + random.Next(-6, 12) + (talent >= 9 ? random.Next(2, 10) : 0), 55m, 95m);
+            var strengthSeed = Math.Clamp(baseStrength + random.Next(-6, 12) + (talent >= 9 ? random.Next(2, 10) : 0), 55m, 95m);
             var firstName = FirstNames[(random.Next(FirstNames.Length) + i) % FirstNames.Length];
             var lastName = LastNames[(random.Next(LastNames.Length) + (i * 3)) % LastNames.Length];
             var origin = Origins[(random.Next(Origins.Length) + i) % Origins.Length];
@@ -2700,7 +2700,7 @@ public sealed class TeamDbStore(
             };
 
             var bonusSkills = LegacyAppCompatibility.BuildRandomBonusSkills(playerId);
-            SetSkills(player, LegacyAppCompatibility.BuildSkills(strength, position, talent, age, bonusSkills));
+            SetSkills(player, LegacyAppCompatibility.BuildSkills(strengthSeed, position, talent, age, bonusSkills));
             RecalculatePlayerDerivedValues(player);
             result.Add(player);
         }

@@ -197,6 +197,7 @@ Interactive menu options:
 | 20 | Show bots |
 | 21 | Add bots |
 | 22 | Remove bots |
+| 23 | Run bot pre-simulation now |
 | 30 | View logs |
 | 31 | Tail logs (live) |
 | 40 | List backups |
@@ -217,6 +218,8 @@ To reset the database **without** bot creation:
 python3 /opt/goaltactics/bin/admin.py
 # Select option 11
 ```
+
+Note: option 11 now writes `/mnt/website/goal_tactics/tmp/disable_bots` so the wrapper will not auto-start bots. Remove that file (or run option 10) to re-enable automatic bot startup.
 
 ### Manual Backup/Restore
 

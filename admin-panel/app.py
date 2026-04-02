@@ -532,6 +532,12 @@ def chat_page():
                            manager_name=session.get("chat_manager_name", ""))
 
 
+@app.route("/admin/chat")
+def admin_chat_redirect():
+    """Legacy route for old website link patterns."""
+    return redirect(url_for("chat_page"))
+
+
 @app.route("/chat/login", methods=["POST"])
 def chat_login():
     payload = request.get_json(silent=True) or {}

@@ -8,6 +8,10 @@ Console.WriteLine($"  API URL:   {config.ApiBaseUrl}");
 Console.WriteLine($"  Neural:    {(config.NeuralEnabled ? "enabled" : "disabled")} ({config.NeuralApiUrl})");
 Console.WriteLine($"  Database:  {config.DatabasePath}");
 Console.WriteLine($"  Bot count: {config.BotCount}");
+if (config.RegisterOnly)
+{
+    Console.WriteLine("  Mode:      register-only");
+}
 if (config.EnableHistoricalBootstrap)
 {
     Console.WriteLine($"  Bootstrap: enabled ({config.HistoricalBootstrapSeasons} seasons, +{config.HistoricalBootstrapBotsPerSeason}/season)");
@@ -190,6 +194,9 @@ static BotConfig ParseConfig(string[] args)
 
     if (map.TryGetValue("seasonal-growth-check-minutes", out var seasonalCheck) && int.TryParse(seasonalCheck, out var sCheck))
         config.SeasonalGrowthCheckMinutes = Math.Max(1, sCheck);
+
+    if (map.TryGetValue("register-only", out var registerOnly) && bool.TryParse(registerOnly, out var rOnly))
+        config.RegisterOnly = rOnly;
 
     return config;
 }

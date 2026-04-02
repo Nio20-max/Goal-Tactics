@@ -202,7 +202,7 @@ def calculate_daily_total_gain(age: int, talent: int, fitness: int, training_cen
 
 @dataclass
 class SimulationResult:
-    age: int
+    age: float
     day_index: int
     strength: float
     fitness: float
@@ -258,26 +258,27 @@ def simulate_player(
 
     results: List[SimulationResult] = []
 
-    age = start_age
+    age_year = start_age
     day_index = 0
 
     main_pos_skill_idx = main_skill_index(position)
     current_trained_skill_idx = day_index % 14  # current main training focus at simulation start
+    initial_strength = calculate_strength(
+        skills,
+        position,
+        int(fitness),
+        age_year,
+        talent,
+        bonus_skills,
+        strength_multiplier=strength_multiplier,
+        main_weight=main_weight,
+        bonus_weight=bonus_weight,
+        overall_weight=overall_weight,
+    )
     results.append(SimulationResult(
-        age=age,
+        age=float(age_year),
         day_index=day_index,
-        strength=calculate_strength(
-            skills,
-            position,
-            int(fitness),
-            age,
-            talent,
-            bonus_skills,
-            strength_multiplier=strength_multiplier,
-            main_weight=main_weight,
-            bonus_weight=bonus_weight,
-            overall_weight=overall_weight,
-        ),
+        strength=initial_strength,
         fitness=fitness,
         experience=experience,
         position_main_skill=clamp_skill(skills[main_pos_skill_idx]),
@@ -285,70 +286,65 @@ def simulate_player(
         training_main_skill_value=clamp_skill(skills[current_trained_skill_idx])
     ))
 
-    while age < max_age:
-        for day in range(days_per_year):
-            day_index += 1
+    total_days = int((max_age - start_age) * days_per_year)
+    for day_index in range(1, total_days + 1):
+        age_year = start_age + (day_index - 1) // days_per_year
+        age_float = start_age + day_index / days_per_year
 
-            has_individual = True
-            has_camp = True
+        has_individual = True
+        has_camp = True
 
-            daily_total_gain = calculate_daily_total_gain(age, talent, int(fitness), training_center_level, has_individual, False) * gain_multiplier
+        daily_total_gain = calculate_daily_total_gain(age_year, talent, int(fitness), training_center_level, has_individual, False) * gain_multiplier
 
-            if fixed_main_training:
-                main_idx = main_skill_index(position)
-                sub_idx = (main_idx + 1) % 14
-            else:
-                # Team training rotates through all 14 skills daily
-                main_idx = day_index % 14
-                sub_idx = (day_index + 1) % 14
+        if fixed_main_training:
+            main_idx = main_skill_index(position)
+            sub_idx = (main_idx + 1) % 14
+        else:
+            # Team training rotates through all 14 skills daily
+            main_idx = day_index % 14
+            sub_idx = (day_index + 1) % 14
 
-            skills[main_idx] = clamp_skill(skills[main_idx] + (daily_total_gain * 0.65))
-            skills[sub_idx] = clamp_skill(skills[sub_idx] + (daily_total_gain * 0.35))
+        skills[main_idx] = clamp_skill(skills[main_idx] + (daily_total_gain * 0.65))
+        skills[sub_idx] = clamp_skill(skills[sub_idx] + (daily_total_gain * 0.35))
 
-            # Individual training on main skill
-            ind_gain = calculate_individual_gain(age, talent, int(fitness))
-            skills[main_idx] = clamp_skill(skills[main_idx] + ind_gain)
+        # Individual training on main skill
+        ind_gain = calculate_individual_gain(age_year, talent, int(fitness))
+        skills[main_idx] = clamp_skill(skills[main_idx] + ind_gain)
 
-            # Camp is experience-only for experience camp
-            if has_camp:
-                experience += 1.5
+        # Camp is experience-only for experience camp
+        if has_camp:
+            experience += 1.5
 
-            # fitness recovery exactly as in engine: max(1, trainingCenterLevel/5)
-            fitness += max(1, training_center_level // 5)
-            if fitness > 100:
-                fitness = 100
+        # fitness recovery exactly as in engine: max(1, trainingCenterLevel/5)
+        fitness += max(1, training_center_level // 5)
+        if fitness > 100:
+            fitness = 100
 
-            # Recalculate strength daily using updated skills
-            current_strength = calculate_strength(
-                skills,
-                position,
-                int(fitness),
-                age,
-                talent,
-                bonus_skills,
-                strength_multiplier=strength_multiplier,
-                main_weight=main_weight,
-                bonus_weight=bonus_weight,
-                overall_weight=overall_weight,
-            )
+        # Recalculate strength daily using updated skills
+        current_strength = calculate_strength(
+            skills,
+            position,
+            int(fitness),
+            age_year,
+            talent,
+            bonus_skills,
+            strength_multiplier=strength_multiplier,
+            main_weight=main_weight,
+            bonus_weight=bonus_weight,
+            overall_weight=overall_weight,
+        )
 
-            if day == days_per_year - 1:
-                # on the last day of the current age/year, update age and record next age start
-                age += 1
-                if age <= max_age:
-                    current_trained_skill_idx = (day_index) % 14
-                    results.append(SimulationResult(
-                        age=age,
-                        day_index=day_index,
-                        strength=current_strength,
-                        fitness=fitness,
-                        experience=experience,
-                        position_main_skill=clamp_skill(skills[main_pos_skill_idx]),
-                        training_main_skill_index=current_trained_skill_idx,
-                        training_main_skill_value=clamp_skill(skills[current_trained_skill_idx])
-                    ))
-
-        # continue into next age
+        current_trained_skill_idx = day_index % 14
+        results.append(SimulationResult(
+            age=round(age_float, 3),
+            day_index=day_index,
+            strength=current_strength,
+            fitness=fitness,
+            experience=experience,
+            position_main_skill=clamp_skill(skills[main_pos_skill_idx]),
+            training_main_skill_index=current_trained_skill_idx,
+            training_main_skill_value=clamp_skill(skills[current_trained_skill_idx])
+        ))
 
     return results
 

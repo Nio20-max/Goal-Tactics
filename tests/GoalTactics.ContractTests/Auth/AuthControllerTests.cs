@@ -141,6 +141,42 @@ public sealed class AuthControllerTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
+    public async Task Chat_Login_ThenMe_ReturnsAuthenticated()
+    {
+        var email = $"chat_{Guid.NewGuid():N}@example.com";
+
+        await _client.PostAsJsonAsync("/api/Register", new RegisterRequest
+        {
+            Email = email,
+            Password = "pass12345",
+            ManagerName = "ChatWebManager"
+        });
+
+        var loginResponse = await _client.PostAsJsonAsync("/chat/login", new AuthRequest
+        {
+            Email = email,
+            Password = "pass12345"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(loginBody);
+        Assert.True(loginBody!.Success);
+        Assert.False(string.IsNullOrWhiteSpace(loginBody.Token));
+
+        using var statusRequest = new HttpRequestMessage(HttpMethod.Get, "/chat/me");
+        statusRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginBody.Token);
+
+        var statusResponse = await _client.SendAsync(statusRequest);
+        Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
+
+        var statusBody = await statusResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(statusBody);
+        Assert.True(statusBody!.Success);
+        Assert.Equal("ChatWebManager", statusBody.ManagerName);
+    }
+
+    [Fact]
     public async Task Logout_RevokesSessionToken()
     {
         var email = $"m_{Guid.NewGuid():N}@example.com";

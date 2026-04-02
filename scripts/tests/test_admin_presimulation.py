@@ -25,20 +25,26 @@ class BotPreSimulationTests(unittest.TestCase):
         age_heavy = admin.derive_team_age_years(activity=85, rng=rng_h, intensity="heavy")
         self.assertGreater(age_heavy, age_light)
 
-    def test_old_teams_have_max_side_buildings(self):
-        level, vip, sit, stand = admin.build_stadium_state(age_years=1.2, activity=65, league_tier=2)
-        self.assertEqual(level, 20)
+    def test_heavy_max_age_is_30_years(self):
+        rng = admin._stable_rng("heavy-age-cap")
+        age = admin.derive_team_age_years(activity=100, rng=rng, intensity="heavy")
+        self.assertLessEqual(age, 30.0)
+
+    def test_old_teams_have_high_side_buildings(self):
+        level, vip, sit, stand = admin.build_stadium_state(age_years=1.2, activity=65, youth_focus=55, league_tier=2)
+        self.assertGreaterEqual(level, 6)
+        self.assertLessEqual(level, 20)
         self.assertLessEqual(vip, 2300)
         self.assertLessEqual(sit, 28500)
         self.assertLessEqual(stand, 48000)
 
     def test_standing_seats_are_always_capped(self):
-        _, _, _, stand_t1 = admin.build_stadium_state(age_years=9.0, activity=100, league_tier=1)
-        _, _, _, stand_t4 = admin.build_stadium_state(age_years=9.0, activity=100, league_tier=4)
+        _, _, _, stand_t1 = admin.build_stadium_state(age_years=9.0, activity=100, youth_focus=90, league_tier=1)
+        _, _, _, stand_t4 = admin.build_stadium_state(age_years=9.0, activity=100, youth_focus=90, league_tier=4)
         self.assertLessEqual(stand_t1, 60000)
         self.assertLessEqual(stand_t4, 30000)
 
-    def test_training_curve_realistic_with_age(self):
+    def test_training_curve_progresses_with_experience(self):
         rng_a = admin._stable_rng("curve-a")
         rng_b = admin._stable_rng("curve-b")
         rng_c = admin._stable_rng("curve-c")
@@ -70,7 +76,7 @@ class BotPreSimulationTests(unittest.TestCase):
 
         self.assertGreaterEqual(young, 48.0)
         self.assertGreater(prime, young)
-        self.assertLess(older, prime)
+        self.assertGreater(older, prime)
 
     def test_heavy_intensity_raises_projection(self):
         rng_l = admin._stable_rng("strength-intensity")
@@ -106,24 +112,33 @@ class BotPreSimulationTests(unittest.TestCase):
             rng=rng,
             intensity="heavy",
         )
-        self.assertGreaterEqual(projected, 85.0)
+        self.assertGreaterEqual(projected, 80.0)
+        self.assertLessEqual(projected, 700.0)
 
-    def test_elite_projection_reaches_500_plus(self):
-        rng = admin._stable_rng("elite-projection")
-        projected = admin.project_strength_from_training_curve(
+    def test_training_quality_depends_on_activity_and_youth(self):
+        rng_low = admin._stable_rng("quality-projection")
+        rng_high = admin._stable_rng("quality-projection")
+        low_quality = admin.project_strength_from_training_curve(
             age=24,
-            talent=10,
-            training_center_level=20,
-            activity=95,
-            youth_focus=92,
-            rng=rng,
+            talent=8,
+            training_center_level=12,
+            activity=15,
+            youth_focus=15,
+            rng=rng_low,
             intensity="heavy",
-            elite_profile=True,
         )
-        self.assertGreaterEqual(projected, 500.0)
-        self.assertLessEqual(projected, 600.0)
+        high_quality = admin.project_strength_from_training_curve(
+            age=24,
+            talent=8,
+            training_center_level=12,
+            activity=95,
+            youth_focus=95,
+            rng=rng_high,
+            intensity="heavy",
+        )
+        self.assertGreater(high_quality, low_quality)
 
-    def test_elite_squad_has_9_or_10_talent_and_top_band(self):
+    def test_generated_squad_respects_pool_cap_and_realistic_band(self):
         squad = admin._generate_squad(
             team_id="elite-top",
             team_name="Elite Top",
@@ -133,13 +148,13 @@ class BotPreSimulationTests(unittest.TestCase):
             training_center_level=20,
             intensity="heavy",
         )
-        self.assertEqual(len(squad), 18)
-        self.assertTrue(all(p["talent"] in (9, 10) for p in squad))
+        self.assertGreaterEqual(len(squad), 20)
+        self.assertLessEqual(len(squad), 50)
+        self.assertTrue(all(4 <= p["talent"] <= 10 for p in squad))
 
-        top11 = sorted((p["strength"] for p in squad), reverse=True)[:11]
-        avg_top11 = sum(top11) / len(top11)
-        self.assertGreaterEqual(avg_top11, 500.0)
-        self.assertLessEqual(avg_top11, 600.0)
+        strengths = [p["strength"] for p in squad]
+        self.assertGreaterEqual(min(strengths), 45.0)
+        self.assertLessEqual(max(strengths), 700.0)
 
     def test_high_youth_focus_skews_younger_squad(self):
         young_avg = []
