@@ -375,7 +375,7 @@ void ConfigureLegacyChatRoute(WebApplication app)
         if (context.Request.Path.Equals("/chat", StringComparison.OrdinalIgnoreCase)
             && context.Request.Method == HttpMethods.Get
             && !context.WebSockets.IsWebSocketRequest
-            && !context.Request.Headers.TryGetValue("Upgrade", out _))
+            && !context.Request.Headers.TryGetValue("Upgrade", out var upgradeValue))
         {
             context.Response.ContentType = "text/html; charset=utf-8";
             await context.Response.WriteAsync("<html><head><title>GoalTactics Chat</title></head><body>");
@@ -401,9 +401,7 @@ void MapHealthEndpoint(WebApplication app)
             var payload = new
             {
                 success = report.Status == HealthStatus.Healthy,
-                message = report.Status == HealthStatus.Healthy
-                    ? "pong"
-                    : report.Status.ToString().ToLowerInvariant()
+                message = report.Status == HealthStatus.Healthy ? "pong" : report.Status.ToString().ToLowerInvariant()
             };
 
             await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
